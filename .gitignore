@@ -1,0 +1,24 @@
+# Dependencies
+node_modules/
+client/node_modules/
+server/node_modules/
+
+# Production build outputs
+client/dist/
+
+# Auto backups & sqlite temp files (preserve core db)
+server/backups/*.sqlite
+*.db-journal
+*.db-wal
+*.db-shm
+
+# Environment & logs
+*.log
+.env
+.env.local
+
+# Operating System & Editors
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/

@@ -1,0 +1,1155 @@
+import React, { useState, useEffect, useMemo } from 'react';
+import {
+  Search,
+  Plus,
+  Car,
+  Droplets,
+  Disc,
+  Battery,
+  Package,
+  RotateCcw,
+  Trash2,
+  Check,
+  AlertCircle,
+  AlertTriangle,
+  Gauge,
+  Calendar,
+  Wallet,
+  CreditCard,
+  UserCheck,
+  Sparkles,
+  ShieldCheck,
+  CheckCircle,
+  Info,
+  History,
+  Wrench,
+  Loader2,
+  Building2,
+} from 'lucide-react';
+
+import NewVehicleModal from './NewVehicleModal';
+import OilSelectorModal from './OilSelectorModal';
+import ProductPickerModal from './ProductPickerModal';
+import InvoiceReceiptModal from './InvoiceReceiptModal';
+import VehicleHistoryDrawer from './VehicleHistoryDrawer';
+import ReceiptVoucherModal from './ReceiptVoucherModal';
+
+export default function PosScreen({ inventory = [], workers = [], onRefreshData, initialVehicle = null, onOpenStatement }) {
+  // Vehicle Selection State
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchResults, setSearchResults] = useState([]);
+  const [isSearching, setIsSearching] = useState(false);
+  const [selectedVehicle, setSelectedVehicle] = useState(initialVehicle);
+  const [showNewVehicleModal, setShowNewVehicleModal] = useState(false);
+  const [showHistoryDrawer, setShowHistoryDrawer] = useState(false);
+  const [showReceiptModal, setShowReceiptModal] = useState(false);
+
+  // Free 8-Point Safety Inspection State
+  const [safetyPoints, setSafetyPoints] = useState({
+    radiator: true,     // ماء الرديتر والتبريد
+    brake: true,        // زيت الفرامل
+    washer: true,       // ماء المساحات
+    tires: true,        // ضغط الإطارات
+    air_filter: true,   // فلتر هواء المحرك
+    cabin_filter: true, // فلتر المكيف
+    leaks: true,        // فحص التهريب السفلي
+    battery: true,      // فحص أقطاب وشحن البطارية
+  });
+
+  useEffect(() => {
+    if (initialVehicle) {
+      handleSelectVehicle(initialVehicle);
+    }
+  }, [initialVehicle]);
+
+  // Odometer State: strictly 3000 km default interval
+  const [currentOdometer, setCurrentOdometer] = useState('');
+  const [kmInterval, setKmInterval] = useState(3000);
+  const [manualNextOdometer, setManualNextOdometer] = useState('');
+
+  // Cart State
+  const [cartItems, setCartItems] = useState([]);
+  const [selectedWorkerId, setSelectedWorkerId] = useState('');
+  const [specialDiscount, setSpecialDiscount] = useState(0);
+  const [invoiceNotes, setInvoiceNotes] = useState('');
+
+  // Payment State
+  const [paymentMethod, setPaymentMethod] = useState('cash'); // 'cash' | 'jeeb' | 'jawali' | 'kuraimi' | 'credit'
+  const [walletRefNumber, setWalletRefNumber] = useState('');
+  const [paidAmountInput, setPaidAmountInput] = useState('');
+  const [isSubmittingInvoice, setIsSubmittingInvoice] = useState(false);
+  const [cartNoticeMessage, setCartNoticeMessage] = useState('');
+
+  // Modals
+  const [showOilModal, setShowOilModal] = useState(false);
+  const [pickerModalType, setPickerModalType] = useState(null); // 'tire_patch' | 'tire_battery' | 'accessories' | 'services'
+  const [completedInvoice, setCompletedInvoice] = useState(null);
+
+  // Set default technician
+  useEffect(() => {
+    if (workers.length > 0 && !selectedWorkerId) {
+      setSelectedWorkerId(workers[0].id);
+    }
+  }, [workers, selectedWorkerId]);
+
+  // Handle vehicle search
+  useEffect(() => {
+    if (!searchQuery.trim()) {
+      setSearchResults([]);
+      return;
+    }
+
+    const timer = setTimeout(async () => {
+      try {
+        setIsSearching(true);
+        const res = await fetch(`/api/vehicles/search?q=${encodeURIComponent(searchQuery)}`);
+        const data = await res.json();
+        if (data.success) {
+          setSearchResults(data.data || []);
+        }
+      } catch (err) {
+        console.error('Error searching vehicles:', err);
+      } finally {
+        setIsSearching(false);
+      }
+    }, 200);
+
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
+
+  // When vehicle is chosen, set up odometer and default 3000 km interval
+  const handleSelectVehicle = (vehicle) => {
+    setSelectedVehicle(vehicle);
+    setSearchQuery('');
+    setSearchResults([]);
+    
+    // Suggest current odometer based on last visit
+    if (vehicle.last_odometer) {
+      setCurrentOdometer(String(vehicle.last_odometer));
+    }
+    // Default 3000 km for all categories as requested
+    setKmInterval(3000);
+    setManualNextOdometer('');
+  };
+
+  // Dynamic Odometer Calculation
+  const nextOdometer = useMemo(() => {
+    if (manualNextOdometer && Number(manualNextOdometer) > 0) {
+      return Number(manualNextOdometer);
+    }
+    const cur = Number(currentOdometer) || 0;
+    return cur + Number(kmInterval || 3000);
+  }, [currentOdometer, kmInterval, manualNextOdometer]);
+
+  const nextServiceDate = useMemo(() => {
+    const d = new Date();
+    d.setDate(d.getDate() + 60);
+    return d.toISOString().split('T')[0];
+  }, []);
+
+  // One-Click Repeat Last Service (into cart, fully editable)
+  const handleRepeatItemsIntoCart = (items) => {
+    if (!items || items.length === 0) return;
+    const repeated = items.map((i) => ({
+      inventory_id: i.inventory_id || null,
+      item_type: i.item_type || (i.description.includes('خدمة') || i.description.includes('رقعة') ? 'service' : 'product'),
+      description: i.description,
+      qty: i.qty || 1,
+      unit_price: Number(i.unit_price) || 0,
+      labor_fee: 0,
+      subtotal: (Number(i.qty) || 1) * (Number(i.unit_price) || 0),
+    }));
+    setCartItems(repeated);
+    setCartNoticeMessage('تم نسخ بنود الخدمة السابقة إلى السلة بنجاح. يمكنك تعديل الكميات أو إضافة أصناف بحرية قبل الاعتماد.');
+    setTimeout(() => setCartNoticeMessage(''), 5000);
+  };
+
+  const handleRepeatLastService = async () => {
+    if (!selectedVehicle) return;
+    try {
+      const res = await fetch(`/api/vehicles/${selectedVehicle.id}`);
+      const data = await res.json();
+      if (data.success && data.data.history && data.data.history.length > 0) {
+        const lastInvoice = data.data.history[0];
+        handleRepeatItemsIntoCart(lastInvoice.items);
+      } else {
+        alert('لا يوجد سجل خدمات سابق لهذه السيارة لتكراره');
+      }
+    } catch (err) {
+      console.error('Error repeating last service:', err);
+    }
+  };
+
+  // Cart operations
+  const handleAddToCart = (item) => {
+    setCartItems((prev) => {
+      const existingIdx = prev.findIndex(
+        (i) => i.inventory_id && i.inventory_id === item.inventory_id
+      );
+      if (existingIdx > -1) {
+        const updated = [...prev];
+        const newQty = updated[existingIdx].qty + (item.qty || 1);
+        updated[existingIdx] = {
+          ...updated[existingIdx],
+          qty: newQty,
+          subtotal: newQty * updated[existingIdx].unit_price,
+        };
+        return updated;
+      }
+      return [...prev, { ...item, labor_fee: 0 }];
+    });
+  };
+
+  const handleAddMultipleToCart = (items) => {
+    for (const item of items) {
+      handleAddToCart(item);
+    }
+  };
+
+  const handleUpdateItemQty = (index, delta) => {
+    setCartItems((prev) => {
+      const updated = [...prev];
+      const newQty = Math.max(1, updated[index].qty + delta);
+      updated[index] = {
+        ...updated[index],
+        qty: newQty,
+        subtotal: newQty * updated[index].unit_price,
+      };
+      return updated;
+    });
+  };
+
+  const handleRemoveCartItem = (index) => {
+    setCartItems((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  // Financial Separation: Goods Sales vs Pure Services Revenue
+  const goodsTotal = useMemo(() => {
+    return cartItems
+      .filter((item) => item.item_type !== 'service')
+      .reduce((acc, item) => acc + (item.unit_price * item.qty), 0);
+  }, [cartItems]);
+
+  const servicesTotal = useMemo(() => {
+    return cartItems
+      .filter((item) => item.item_type === 'service')
+      .reduce((acc, item) => acc + (item.unit_price * item.qty), 0);
+  }, [cartItems]);
+
+  const grossTotal = goodsTotal + servicesTotal;
+
+  // Upgrade 3: Automatically apply fleet/corporate discount percentage to gross total
+  useEffect(() => {
+    if (selectedVehicle && Number(selectedVehicle.discount_percent) > 0 && grossTotal > 0) {
+      const fleetDiscount = Math.round(grossTotal * (Number(selectedVehicle.discount_percent) / 100));
+      setSpecialDiscount(fleetDiscount);
+    }
+  }, [selectedVehicle, grossTotal]);
+
+  const netTotal = useMemo(() => {
+    return Math.max(0, grossTotal - Number(specialDiscount));
+  }, [grossTotal, specialDiscount]);
+
+  // Paid amount calculation
+  const effectivePaidAmount = useMemo(() => {
+    if (paymentMethod === 'credit') {
+      const p = parseFloat(paidAmountInput);
+      return isNaN(p) ? 0 : Math.min(netTotal, Math.max(0, p));
+    }
+    return netTotal;
+  }, [paymentMethod, paidAmountInput, netTotal]);
+
+  const remainingDebt = useMemo(() => {
+    return Math.max(0, netTotal - effectivePaidAmount);
+  }, [netTotal, effectivePaidAmount]);
+
+  // Submit Invoice Transaction
+  const handleSubmitInvoice = async () => {
+    if (!selectedVehicle) {
+      alert('يرجى اختيار أو تسجيل سيارة أولاً قبل إصدار الفاتورة');
+      return;
+    }
+
+    if (cartItems.length === 0) {
+      alert('يرجى إضافة خدمة أو صنف إلى الفاتورة');
+      return;
+    }
+
+    if (!selectedWorkerId) {
+      alert('يرجى تحديد الفني المسؤول عن تنفيذ الخدمة');
+      return;
+    }
+
+    // Safeguard check 1: Below Cost Confirmation (Upgrade 4)
+    const belowCostItem = cartItems.find((ci) => {
+      if (!ci.inventory_id || ci.item_type === 'service') return false;
+      const inv = inventory.find((i) => i.id === ci.inventory_id);
+      return inv && inv.cost_price && Number(ci.unit_price) < Number(inv.cost_price);
+    });
+
+    if (belowCostItem) {
+      const inv = inventory.find((i) => i.id === belowCostItem.inventory_id);
+      const ok = window.confirm(
+        `⚠️ تنبيه حماية الأرباح (Loss Prevention Guard):\nالصنف "${belowCostItem.description}" يُباع بسعر (${belowCostItem.unit_price.toLocaleString()} ر.ي) وهو أقل من سعر التكلفة (${inv.cost_price.toLocaleString()} ر.ي).\n\nهل تريد تأكيد إصدار الفاتورة بهذا السعر؟`
+      );
+      if (!ok) return;
+    }
+
+    // Safeguard check 2: Customer Credit Ceiling (Upgrade 4)
+    if (paymentMethod === 'credit' && selectedVehicle) {
+      const currentDebt = Number(selectedVehicle.balance_due) || 0;
+      const creditLimit = Number(selectedVehicle.credit_limit) || 50000;
+      const projected = currentDebt + remainingDebt;
+      if (projected > creditLimit) {
+        const ok = window.confirm(
+          `⚠️ تنبيه سقف المديونية (Credit Ceiling Guard):\nإجمالي دين العميل المتوقع (${projected.toLocaleString()} ر.ي) سيتجاوز سقف الائتمان (${creditLimit.toLocaleString()} ر.ي) بمقدار (${(projected - creditLimit).toLocaleString()} ر.ي).\n\nهل تؤكد منح هذا الائتمان الاستثنائي؟`
+        );
+        if (!ok) return;
+      }
+    }
+
+    try {
+      setIsSubmittingInvoice(true);
+
+      const payload = {
+        vehicle_id: selectedVehicle.id,
+        worker_id: selectedWorkerId,
+        current_odometer: Number(currentOdometer) || selectedVehicle.last_odometer || 0,
+        next_odometer: nextOdometer,
+        next_service_date: nextServiceDate,
+        items_total: goodsTotal,
+        labor_total: servicesTotal,
+        scrap_battery_deduction: 0, // Cancelled completely
+        discount: Number(specialDiscount) || 0,
+        payment_method: paymentMethod,
+        wallet_ref_number: walletRefNumber || null,
+        paid_amount: effectivePaidAmount,
+        notes: invoiceNotes || null,
+        items: cartItems.map((item) => ({
+          inventory_id: item.inventory_id || null,
+          item_type: item.item_type || 'product',
+          description: item.description,
+          qty: item.qty,
+          unit_price: item.unit_price,
+          labor_fee: 0,
+          warranty_serial: item.warranty_serial || null,
+          subtotal: item.qty * item.unit_price,
+        })),
+      };
+
+      const res = await fetch('/api/invoices', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.message || 'حدث خطأ أثناء إصدار الفاتورة');
+      }
+
+      // Show receipt modal
+      setCompletedInvoice({
+        ...data.data,
+        safetyPoints,
+        worker_name: workers.find((w) => w.id === selectedWorkerId)?.name || 'فني المركز',
+      });
+      if (onRefreshData) onRefreshData();
+    } catch (err) {
+      alert(err.message);
+    } finally {
+      setIsSubmittingInvoice(false);
+    }
+  };
+
+  // Check which cart items are low on stock
+  const lowStockItemsInCart = useMemo(() => {
+    return cartItems
+      .map((ci) => {
+        if (!ci.inventory_id || ci.item_type === 'service') return null;
+        const invItem = inventory.find((i) => i.id === ci.inventory_id);
+        if (invItem && invItem.stock_qty <= invItem.min_stock_alert) {
+          return {
+            name: ci.description,
+            stock: invItem.stock_qty,
+            alertLevel: invItem.min_stock_alert,
+          };
+        }
+        return null;
+      })
+      .filter(Boolean);
+  }, [cartItems, inventory]);
+
+  const handleResetPos = () => {
+    setCartItems([]);
+    setSelectedVehicle(null);
+    setCurrentOdometer('');
+    setKmInterval(3000);
+    setManualNextOdometer('');
+    setSpecialDiscount(0);
+    setInvoiceNotes('');
+    setPaymentMethod('cash');
+    setPaidAmountInput('');
+    setWalletRefNumber('');
+  };
+
+  return (
+    <div className="min-h-full flex flex-col gap-3.5 select-none pb-8">
+      {/* 1. TOP BAR: VEHICLE SEARCH & CONTEXT */}
+      <div className="apple-glass rounded-3xl p-4 border border-white/10 flex-shrink-0">
+        <div className="flex flex-col md:flex-row gap-3 items-stretch md:items-center justify-between">
+          {/* Live Search Input */}
+          <div className="relative flex-1">
+            <div className="relative">
+              <input
+                type="text"
+                placeholder="ابحث برقم اللوحة (مثلاً: 1-45892) أو رقم الهاتف أو اسم العميل..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full min-h-[52px] pr-12 pl-4 rounded-2xl bg-slate-900 border border-white/15 text-white placeholder-slate-400 font-semibold text-sm focus:outline-none focus:border-amber-400 shadow-inner"
+              />
+              <Search className="w-5 h-5 text-slate-400 absolute right-4 top-4 pointer-events-none" />
+            </div>
+
+            {/* Autocomplete Dropdown */}
+            {searchResults.length > 0 && (
+              <div className="absolute left-0 right-0 top-full mt-2 apple-glass-dropdown rounded-2xl border border-white/20 overflow-hidden shadow-2xl z-50 max-h-72 overflow-y-auto">
+                {searchResults.map((v) => (
+                  <button
+                    key={v.id}
+                    type="button"
+                    onClick={() => handleSelectVehicle(v)}
+                    className="w-full p-3.5 text-right hover:bg-white/10 border-b border-white/5 flex items-center justify-between transition"
+                  >
+                    <div>
+                      <div className="font-extrabold text-sm text-white flex items-center gap-2">
+                        <span>{v.plate_number}</span>
+                        <span className="text-xs text-amber-400 font-normal">({v.plate_type})</span>
+                        <span className="text-xs text-slate-400 font-normal">| {v.car_make_model}</span>
+                      </div>
+                      <div className="text-xs text-slate-400 mt-0.5">
+                        العميل: <span className="text-slate-200 font-bold">{v.customer_name}</span> &bull; {v.phone}
+                      </div>
+                    </div>
+                    <div className="text-left font-mono text-xs">
+                      {v.balance_due > 0 ? (
+                        <span className="text-rose-400 font-bold bg-rose-500/10 px-2 py-0.5 rounded-full border border-rose-500/20">
+                          دين: {Number(v.balance_due).toLocaleString()} ر.ي
+                        </span>
+                      ) : (
+                        <span className="text-emerald-400">خالي من الديون</span>
+                      )}
+                    </div>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Quick Action: New Vehicle Button */}
+          <button
+            type="button"
+            onClick={() => setShowNewVehicleModal(true)}
+            className="min-h-[52px] px-5 rounded-2xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-black text-sm shadow-lg shadow-amber-500/20 flex items-center justify-center gap-2 transition active:scale-95 flex-shrink-0"
+          >
+            <Plus className="w-5 h-5 stroke-[2.5]" />
+            <span>تسجيل سيارة جديدة 🚗</span>
+          </button>
+        </div>
+
+        {/* Selected Vehicle Card */}
+        {selectedVehicle && (
+          <div className="mt-3 p-3.5 rounded-2xl bg-gradient-to-r from-amber-500/10 via-slate-800/60 to-slate-800/80 border border-amber-500/30 flex flex-col gap-2.5 animate-in fade-in slide-in-from-top-2 duration-200">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div className="flex items-center gap-3">
+                <div className="w-11 h-11 rounded-2xl bg-amber-500/20 text-amber-400 border border-amber-500/30 flex items-center justify-center font-mono font-extrabold shadow-sm">
+                  <Car className="w-6 h-6" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="font-extrabold text-base text-white">{selectedVehicle.plate_number}</span>
+                    <span className="text-xs px-2 py-0.5 rounded-full bg-slate-800 text-slate-300 border border-white/10 font-semibold">
+                      {selectedVehicle.car_make_model}
+                    </span>
+                    <span className="text-[11px] text-amber-400 font-bold">({selectedVehicle.plate_type})</span>
+                  </div>
+                  <div className="text-xs text-slate-400 flex items-center gap-2 mt-0.5">
+                    <span className="text-slate-300 font-semibold">{selectedVehicle.customer_name}</span>
+                    <span>&bull;</span>
+                    <span className="font-mono">{selectedVehicle.phone}</span>
+                    <span>&bull;</span>
+                    <span className="text-amber-300 font-bold">
+                      الزيت المعتمد: {selectedVehicle.preferred_oil_brand || 'تويوتا'} ({selectedVehicle.preferred_viscosity || '20W-50'})
+                    </span>
+                  </div>
+
+                  {/* Corporate Fleet Badge (Upgrade 3) */}
+                  {selectedVehicle.customer_type && selectedVehicle.customer_type !== 'individual' && (
+                    <div className="mt-1.5 flex items-center gap-1.5 flex-wrap">
+                      <span className="px-2 py-0.5 rounded-lg bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 font-bold text-[11px] flex items-center gap-1">
+                        <Building2 className="w-3 h-3" />
+                        <span>{selectedVehicle.corporate_name || 'حساب أسطول معتمد'}</span>
+                      </span>
+                      {Number(selectedVehicle.discount_percent) > 0 && (
+                        <span className="px-2 py-0.5 rounded-lg bg-amber-500/20 text-amber-300 border border-amber-500/30 font-mono font-bold text-[11px]">
+                          خصم أسطول {selectedVehicle.discount_percent}% تلقائي
+                        </span>
+                      )}
+                      <span className="px-2 py-0.5 rounded-lg bg-slate-800 text-slate-300 border border-white/10 font-mono text-[11px]">
+                        سقف الائتمان: {Number(selectedVehicle.credit_limit || 50000).toLocaleString()} ر.ي
+                      </span>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2">
+                {/* Instant Vehicle Service History Drawer Button */}
+                <button
+                  type="button"
+                  onClick={() => setShowHistoryDrawer(true)}
+                  className="min-h-[40px] px-3.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-amber-300 border border-amber-500/30 font-bold text-xs flex items-center gap-1.5 transition active:scale-95"
+                  title="استعراض سجل زيارات وفواتير السيارة السابقة"
+                >
+                  <History className="w-3.5 h-3.5 text-amber-400" />
+                  <span>سجل الزيارات والخدمات 📜</span>
+                </button>
+
+                {/* 1-Click Repeat Service into cart (editable) */}
+                <button
+                  type="button"
+                  onClick={handleRepeatLastService}
+                  className="min-h-[40px] px-3.5 rounded-xl bg-white/10 hover:bg-white/20 text-white font-bold text-xs flex items-center gap-1.5 transition active:scale-95"
+                  title="تكرار آخر خدمة ونسخها للسلة لتعديلها"
+                >
+                  <RotateCcw className="w-3.5 h-3.5 text-emerald-400" />
+                  <span>تكرار آخر خدمة</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setSelectedVehicle(null)}
+                  className="w-8 h-8 rounded-xl bg-slate-800 hover:bg-rose-500/20 hover:text-rose-400 text-slate-400 flex items-center justify-center transition text-xs"
+                  title="إلغاء اختيار السيارة"
+                >
+                  &times;
+                </button>
+              </div>
+            </div>
+
+            {/* Smart Context Alert: Outstanding Debt & Credit Limit */}
+            {selectedVehicle.balance_due > 0 && (
+              <div className="w-full p-2.5 rounded-xl bg-rose-500/15 border border-rose-500/30 text-rose-300 text-xs font-bold flex flex-wrap items-center justify-between gap-2">
+                <div className="flex items-center gap-2">
+                  <AlertTriangle className="w-4 h-4 text-rose-400 flex-shrink-0 animate-pulse" />
+                  <span>
+                    ⚠️ رصيد الدين السابق: <span className="font-mono text-white text-sm font-black">{Number(selectedVehicle.balance_due).toLocaleString()} ر.ي</span>
+                    {selectedVehicle.credit_limit && Number(selectedVehicle.balance_due) > Number(selectedVehicle.credit_limit) && (
+                      <span className="text-amber-300 mr-2 underline decoration-amber-500">
+                        (تجاوز سقف الائتمان: {Number(selectedVehicle.credit_limit).toLocaleString()} ر.ي)
+                      </span>
+                    )}
+                  </span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => setShowReceiptModal(true)}
+                    className="px-2.5 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-[11px] font-black flex items-center gap-1 transition active:scale-95 shadow-sm"
+                    title="تحصيل دفعة نقدية وإصدار سند قبض رسمي فوري"
+                  >
+                    <span>قبض دفعة 📥</span>
+                  </button>
+                  {onOpenStatement && (
+                    <button
+                      type="button"
+                      onClick={() => onOpenStatement(selectedVehicle.id)}
+                      className="px-2.5 py-1 rounded-lg bg-white/10 hover:bg-white/20 text-white text-[11px] font-extrabold flex items-center gap-1 transition active:scale-95"
+                    >
+                      <span>كشف الحساب 🧾</span>
+                    </button>
+                  )}
+                  <span className="text-[10px] bg-rose-950 px-2 py-0.5 rounded border border-rose-500/30 text-rose-200">
+                    مستحق السداد
+                  </span>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* Notice Banner if repeated service */}
+      {cartNoticeMessage && (
+        <div className="p-3 rounded-2xl bg-amber-500/20 border border-amber-500/40 text-amber-300 text-xs font-bold flex items-center gap-2 animate-in fade-in">
+          <CheckCircle className="w-4 h-4 text-amber-400 flex-shrink-0" />
+          <span>{cartNoticeMessage}</span>
+        </div>
+      )}
+
+      {/* 2. TWO-COLUMN POS TOUCH INTERFACE */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-3.5 flex-1 min-h-0 items-start">
+        {/* LEFT COLUMN: SERVICE BUTTONS & ODOMETER (7 COLS) */}
+        <div className="lg:col-span-7 flex flex-col gap-3 pr-0.5">
+          {/* Odometer Tracker Bar (Strictly 3000 km default with full manual freedom) */}
+          <div className="apple-glass rounded-3xl p-4 border border-white/10 space-y-2.5">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-bold text-slate-300 flex items-center gap-1.5">
+                <Gauge className="w-4 h-4 text-amber-400" />
+                <span>قراءة العداد وموعد الغيار القادم:</span>
+              </span>
+              <div className="flex items-center gap-1">
+                {[3000, 5000, 7000, 10000].map((interval) => (
+                  <button
+                    key={interval}
+                    type="button"
+                    onClick={() => {
+                      setKmInterval(interval);
+                      setManualNextOdometer('');
+                    }}
+                    className={`px-2.5 py-1 rounded-lg text-xs font-mono font-bold transition border ${
+                      kmInterval === interval && !manualNextOdometer
+                        ? 'bg-amber-500 text-slate-950 border-amber-400 shadow-sm'
+                        : 'bg-slate-900 text-slate-400 border-white/5 hover:text-white'
+                    }`}
+                  >
+                    +{interval.toLocaleString()} كم {interval === 3000 ? '(افتراضي)' : ''}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+              <div>
+                <label className="block text-[11px] text-slate-400 mb-1">العداد الحالي للسيارة (كم):</label>
+                <input
+                  type="number"
+                  placeholder="مثال: 125000"
+                  value={currentOdometer}
+                  onChange={(e) => setCurrentOdometer(e.target.value)}
+                  className="w-full min-h-[46px] px-3 rounded-xl bg-slate-900 border border-white/10 font-mono text-base font-extrabold text-white focus:outline-none focus:border-amber-400 text-center"
+                />
+              </div>
+
+              <div>
+                <label className="block text-[11px] text-slate-400 mb-1">
+                  عداد الغيار القادم (تلقائي / يدوي):
+                </label>
+                <input
+                  type="number"
+                  placeholder={nextOdometer ? String(nextOdometer) : '---'}
+                  value={manualNextOdometer}
+                  onChange={(e) => setManualNextOdometer(e.target.value)}
+                  className="w-full min-h-[46px] px-3 rounded-xl bg-slate-900 border border-amber-500/30 font-mono text-base font-extrabold text-amber-400 focus:outline-none focus:border-amber-400 text-center"
+                />
+              </div>
+
+              <div>
+                <label className="block text-[11px] text-slate-400 mb-1">تاريخ الغيار القادم المقترح:</label>
+                <div className="w-full min-h-[46px] px-3 rounded-xl bg-slate-900/60 border border-white/10 font-mono text-sm font-bold text-slate-300 flex items-center justify-center">
+                  {nextServiceDate}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Quick Service Tiles */}
+          <div className="grid grid-cols-2 gap-3">
+            {/* 1. Oil & Filter Service Tile */}
+            <button
+              type="button"
+              onClick={() => setShowOilModal(true)}
+              className="min-h-[105px] p-4 rounded-3xl apple-glass-interactive border border-amber-500/30 hover:border-amber-400 flex flex-col justify-between group shadow-xl active:scale-[0.98] text-right"
+            >
+              <div className="flex items-center justify-between w-full">
+                <div className="w-11 h-11 rounded-2xl bg-amber-500/20 text-amber-400 border border-amber-500/30 flex items-center justify-center shadow-lg shadow-amber-500/10 group-hover:scale-110 transition-transform">
+                  <Droplets className="w-6 h-6 stroke-[2.2]" />
+                </div>
+                <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 font-bold border border-amber-500/30">
+                  شائع جداً
+                </span>
+              </div>
+              <div>
+                <div className="text-base font-extrabold text-white group-hover:text-amber-300 transition">
+                  🛢️ غيار زيت + فلتر
+                </div>
+                <div className="text-xs text-slate-400 mt-0.5">
+                  اختيار الماركة، اللزوجة، والعبوات (1L/4L/5L)
+                </div>
+              </div>
+            </button>
+
+            {/* 2. Tire Patch, Balancing & Workshop Services */}
+            <button
+              type="button"
+              onClick={() => setPickerModalType('services')}
+              className="min-h-[105px] p-4 rounded-3xl apple-glass-interactive border border-blue-500/30 hover:border-blue-400 flex flex-col justify-between group shadow-xl active:scale-[0.98] text-right"
+            >
+              <div className="flex items-center justify-between w-full">
+                <div className="w-11 h-11 rounded-2xl bg-blue-500/20 text-blue-400 border border-blue-500/30 flex items-center justify-center shadow-lg shadow-blue-500/10 group-hover:scale-110 transition-transform">
+                  <Wrench className="w-6 h-6 stroke-[2.2]" />
+                </div>
+                <span className="text-[10px] px-2 py-0.5 rounded-full bg-blue-500/20 text-blue-300 font-bold border border-blue-500/30">
+                  خدمات فورية
+                </span>
+              </div>
+              <div>
+                <div className="text-base font-extrabold text-white group-hover:text-blue-300 transition">
+                  🔧 خدمات الورشة والبنشر
+                </div>
+                <div className="text-xs text-slate-400 mt-0.5">
+                  غيار زيت خارجي، رقع تيوبلس، ترصيص، تشحيم
+                </div>
+              </div>
+            </button>
+
+            {/* 3. Tires & Batteries Tile */}
+            <button
+              type="button"
+              onClick={() => setPickerModalType('tire_battery')}
+              className="min-h-[105px] p-4 rounded-3xl apple-glass-interactive border border-emerald-500/30 hover:border-emerald-400 flex flex-col justify-between group shadow-xl active:scale-[0.98] text-right"
+            >
+              <div className="flex items-center justify-between w-full">
+                <div className="w-11 h-11 rounded-2xl bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 flex items-center justify-center shadow-lg shadow-emerald-500/10 group-hover:scale-110 transition-transform">
+                  <Battery className="w-6 h-6 stroke-[2.2]" />
+                </div>
+                <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 font-bold border border-emerald-500/30">
+                  قطع وبطاريات
+                </span>
+              </div>
+              <div>
+                <div className="text-base font-extrabold text-white group-hover:text-emerald-300 transition">
+                  🔋 بيع كفر / بطارية
+                </div>
+                <div className="text-xs text-slate-400 mt-0.5">
+                  كفرات يابانية وكورية، بطاريات جافة مع الضمان
+                </div>
+              </div>
+            </button>
+
+            {/* 4. Other Products & Catalog Tile */}
+            <button
+              type="button"
+              onClick={() => setPickerModalType('accessories')}
+              className="min-h-[105px] p-4 rounded-3xl apple-glass-interactive border border-purple-500/30 hover:border-purple-400 flex flex-col justify-between group shadow-xl active:scale-[0.98] text-right"
+            >
+              <div className="flex items-center justify-between w-full">
+                <div className="w-11 h-11 rounded-2xl bg-purple-500/20 text-purple-400 border border-purple-500/30 flex items-center justify-center shadow-lg shadow-purple-500/10 group-hover:scale-110 transition-transform">
+                  <Package className="w-6 h-6 stroke-[2.2]" />
+                </div>
+                <span className="text-[10px] px-2 py-0.5 rounded-full bg-purple-500/20 text-purple-300 font-bold border border-purple-500/30">
+                  إكسسوار وسوائل
+                </span>
+              </div>
+              <div>
+                <div className="text-base font-extrabold text-white group-hover:text-purple-300 transition">
+                  📦 قائمة المنتجات الأخرى
+                </div>
+                <div className="text-xs text-slate-400 mt-0.5">
+                  ماء رديتر، زيت فرامل، فلاتر مكيف
+                </div>
+              </div>
+            </button>
+          </div>
+
+          {/* Technician Assignment Strip (Salaried Workers - No Individual Labor Fees) */}
+          <div className="apple-glass rounded-3xl p-3 border border-white/10">
+            <div className="text-xs font-bold text-slate-300 mb-2 flex items-center justify-between">
+              <span className="flex items-center gap-1.5">
+                <UserCheck className="w-4 h-4 text-amber-400" />
+                <span>الفني المسؤول عن تنفيذ الخدمة:</span>
+              </span>
+              <span className="text-[11px] text-slate-400 font-mono">طاقم الورشة المعتمد</span>
+            </div>
+            <div className="grid grid-cols-3 gap-2">
+              {workers.map((w) => {
+                const isSelected = selectedWorkerId === w.id;
+                return (
+                  <button
+                    key={w.id}
+                    type="button"
+                    onClick={() => setSelectedWorkerId(w.id)}
+                    className={`min-h-[44px] px-3 py-2 rounded-2xl border text-right transition flex items-center justify-between ${
+                      isSelected
+                        ? 'bg-amber-500/20 border-amber-400 text-white font-bold shadow-md shadow-amber-500/10'
+                        : 'bg-slate-900/60 border-white/10 text-slate-400 hover:text-slate-200'
+                    }`}
+                  >
+                    <div className="truncate">
+                      <div className="text-xs font-extrabold truncate">{w.name.split(' ')[0]}</div>
+                      <div className="text-[10px] text-slate-400 truncate">{w.role.split(' ')[1] || w.role}</div>
+                    </div>
+                    {isSelected && <Check className="w-4 h-4 text-amber-400 stroke-[3] flex-shrink-0" />}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* 8-Point Free Touch Safety Inspection Checklist */}
+          <div className="apple-glass rounded-3xl p-3 border border-white/10">
+            <div className="flex items-center justify-between mb-2">
+              <div className="text-xs font-bold text-slate-300 flex items-center gap-1.5">
+                <ShieldCheck className="w-4 h-4 text-emerald-400" />
+                <span>فحص السلامة المجاني (8 نقاط سريعة):</span>
+              </div>
+              <span className="text-[10px] text-emerald-400 font-bold bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20">
+                ميزة تنافسية للزبون 🛡️
+              </span>
+            </div>
+
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5 text-xs">
+              {[
+                { id: 'radiator', label: '💧 ماء الرديتر' },
+                { id: 'brake', label: '🛑 زيت الفرامل' },
+                { id: 'washer', label: '🚿 ماء المساحات' },
+                { id: 'tires', label: '🛞 ضغط الإطارات' },
+                { id: 'air_filter', label: '💨 فلتر الهواء' },
+                { id: 'cabin_filter', label: '❄️ فلتر المكيف' },
+                { id: 'leaks', label: '🔍 فحص التهريب' },
+                { id: 'battery', label: '🔋 فحص البطارية' },
+              ].map((pt) => {
+                const isChecked = safetyPoints[pt.id];
+                return (
+                  <button
+                    key={pt.id}
+                    type="button"
+                    onClick={() => setSafetyPoints((prev) => ({ ...prev, [pt.id]: !prev[pt.id] }))}
+                    className={`min-h-[36px] px-2 py-1 rounded-xl text-[11px] font-bold transition flex items-center justify-between border ${
+                      isChecked
+                        ? 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30'
+                        : 'bg-slate-900/60 text-slate-500 border-white/5 line-through'
+                    }`}
+                  >
+                    <span className="truncate">{pt.label}</span>
+                    {isChecked ? (
+                      <Check className="w-3.5 h-3.5 text-emerald-400 stroke-[3] flex-shrink-0" />
+                    ) : (
+                      <span className="text-[10px] text-slate-600">✕</span>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+
+        {/* RIGHT COLUMN: POS CART, TOTALS & PAYMENT GATEWAY (5 COLS) */}
+        <div className="lg:col-span-5 apple-glass rounded-3xl p-4 border border-white/10 flex flex-col justify-between overflow-visible lg:sticky lg:top-2">
+          {/* Cart Header */}
+          <div className="border-b border-white/10 pb-2.5 flex items-center justify-between flex-shrink-0">
+            <div>
+              <h3 className="font-extrabold text-white text-base">سلة الفاتورة الحالية</h3>
+              <p className="text-xs text-slate-400">
+                {cartItems.length > 0 ? `${cartItems.length} بنود في الفاتورة` : 'السلة فارغة حالياً'}
+              </p>
+            </div>
+            {cartItems.length > 0 && (
+              <button
+                type="button"
+                onClick={() => setCartItems([])}
+                className="text-xs text-rose-400 hover:text-rose-300 font-semibold transition"
+              >
+                تفريغ السلة
+              </button>
+            )}
+          </div>
+
+          {/* Smart Cart Alert: Low Stock Warning in Cart */}
+          {lowStockItemsInCart.length > 0 && (
+            <div className="mt-2 p-2 rounded-2xl bg-amber-500/15 border border-amber-500/30 text-amber-300 text-xs font-bold flex items-center gap-2 animate-pulse flex-shrink-0">
+              <AlertTriangle className="w-4 h-4 text-amber-400 flex-shrink-0" />
+              <div className="leading-snug">
+                <span className="text-white font-extrabold">تنبيه مخزون: </span>
+                {lowStockItemsInCart.map((i) => `${i.name} (المتبقي: ${i.stock})`).join('، ')} أوشك على النفاد!
+              </div>
+            </div>
+          )}
+
+          {/* Cart Items List */}
+          <div className="max-h-72 overflow-y-auto my-2.5 space-y-2 pr-1 custom-scrollbar">
+            {cartItems.length === 0 ? (
+              <div className="h-full flex flex-col items-center justify-center text-center p-6 text-slate-500">
+                <Package className="w-12 h-12 stroke-[1.2] mb-2 opacity-50" />
+                <p className="text-sm font-semibold">لم يتم إضافة أي أصناف حتى الآن</p>
+                <p className="text-xs text-slate-500 mt-1">
+                  اختر [غيار زيت + فلتر] أو [خدمات الورشة والبنشر] للبدء
+                </p>
+              </div>
+            ) : (
+              cartItems.map((item, idx) => {
+                const isService = item.item_type === 'service';
+                const invMatch = item.inventory_id ? inventory.find((i) => i.id === item.inventory_id) : null;
+                const isBelowCost = !isService && invMatch && invMatch.cost_price && Number(item.unit_price) < Number(invMatch.cost_price);
+
+                return (
+                  <div
+                    key={idx}
+                    className={`p-2.5 rounded-2xl border flex items-center justify-between gap-2 transition ${
+                      isBelowCost
+                        ? 'bg-rose-950/40 border-rose-500/40'
+                        : isService
+                        ? 'bg-slate-900/90 border-teal-500/30'
+                        : 'bg-slate-900/80 border-white/10'
+                    }`}
+                  >
+                    <div className="flex-1 min-w-0">
+                      <div className="font-bold text-sm text-white truncate flex items-center gap-1.5">
+                        {isService && <Wrench className="w-3.5 h-3.5 text-teal-400 flex-shrink-0" />}
+                        <span className="truncate">{item.description}</span>
+                        {isBelowCost && (
+                          <span className="text-[10px] px-1.5 py-0.5 rounded bg-rose-500 text-white font-black animate-pulse flex-shrink-0">
+                            ⚠️ أقل من التكلفة!
+                          </span>
+                        )}
+                      </div>
+                      <div className="text-xs text-slate-400 font-mono flex items-center gap-2 mt-0.5">
+                        <span className="text-amber-400 font-bold">{Number(item.unit_price).toLocaleString()} ر.ي</span>
+                        {isService ? (
+                          <span className="text-teal-400 text-[10px] bg-teal-500/10 px-1.5 rounded">خدمة ورشة</span>
+                        ) : isBelowCost ? (
+                          <span className="text-rose-400 text-[11px] font-bold">
+                            (التكلفة: {Number(invMatch.cost_price).toLocaleString()} ر.ي)
+                          </span>
+                        ) : null}
+                      </div>
+                    </div>
+
+                    {/* Quantity Stepper */}
+                    <div className="flex items-center gap-1.5 flex-shrink-0">
+                      <button
+                        type="button"
+                        onClick={() => handleUpdateItemQty(idx, -1)}
+                        className="w-7 h-7 rounded-lg bg-slate-800 hover:bg-slate-700 text-white flex items-center justify-center font-bold"
+                      >
+                        -
+                      </button>
+                      <span className="w-6 text-center font-mono font-bold text-sm text-white">
+                        {item.qty}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => handleUpdateItemQty(idx, 1)}
+                        className="w-7 h-7 rounded-lg bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 flex items-center justify-center font-bold"
+                      >
+                        +
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveCartItem(idx)}
+                        className="w-7 h-7 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 flex items-center justify-center mr-1"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  </div>
+                );
+              })
+            )}
+          </div>
+
+          {/* Cart Financial Breakdown (Clear separation of goods and services) */}
+          <div className="pt-2.5 border-t border-white/10 space-y-1.5 flex-shrink-0 text-xs">
+            {goodsTotal > 0 && (
+              <div className="flex justify-between text-slate-300">
+                <span>إجمالي مبيعات الزيوت والقطع:</span>
+                <span className="font-mono font-bold">{goodsTotal.toLocaleString()} ر.ي</span>
+              </div>
+            )}
+
+            {servicesTotal > 0 && (
+              <div className="flex justify-between text-teal-300">
+                <span>إجمالي إيراد الخدمات:</span>
+                <span className="font-mono font-bold">{servicesTotal.toLocaleString()} ر.ي</span>
+              </div>
+            )}
+
+            {/* Corporate Fleet Discount Indicator (Upgrade 3) */}
+            {selectedVehicle && Number(selectedVehicle.discount_percent) > 0 && (
+              <div className="p-2 rounded-xl bg-indigo-500/15 border border-indigo-500/30 text-indigo-300 text-[11px] font-bold flex items-center justify-between">
+                <span>🏢 خصم تسعير الأسطول ({selectedVehicle.discount_percent}%):</span>
+                <span className="font-mono text-amber-300">-{specialDiscount.toLocaleString()} ر.ي</span>
+              </div>
+            )}
+
+            {/* Special Discount Input */}
+            <div className="flex items-center justify-between text-rose-400">
+              <span>خصم إضافي / تعديل الخصم:</span>
+              <div className="flex items-center gap-1">
+                <span>-</span>
+                <input
+                  type="number"
+                  placeholder="0"
+                  value={specialDiscount || ''}
+                  onChange={(e) => setSpecialDiscount(Number(e.target.value) || 0)}
+                  className="w-20 px-2 py-0.5 rounded-lg bg-slate-900 border border-rose-500/30 font-mono text-xs font-bold text-center text-rose-400"
+                />
+                <span>ر.ي</span>
+              </div>
+            </div>
+
+            {/* Net Total Display */}
+            <div className="pt-2 border-t border-white/10 flex justify-between items-center">
+              <span className="font-extrabold text-sm text-white">الصافي المطلوب دفعه:</span>
+              <span className="font-mono font-extrabold text-xl text-amber-400">
+                {netTotal.toLocaleString()} <span className="text-xs font-sans text-slate-300">ر.ي</span>
+              </span>
+            </div>
+          </div>
+
+          {/* 4. YEMENI PAYMENT GATEWAY UI */}
+          <div className="pt-2.5 border-t border-white/10 space-y-2 flex-shrink-0">
+            <div className="text-[11px] font-bold text-slate-400">طريقة الدفع في السوق اليمني:</div>
+            <div className="grid grid-cols-3 sm:grid-cols-5 gap-1.5">
+              {[
+                { id: 'cash', label: '💵 كاش' },
+                { id: 'jeeb', label: '📱 جيب' },
+                { id: 'jawali', label: '📱 جوالي' },
+                { id: 'kuraimi', label: '🏦 كريمي' },
+                { id: 'credit', label: '📝 آجل/جزئي' },
+              ].map((m) => {
+                const isSelected = paymentMethod === m.id;
+                return (
+                  <button
+                    key={m.id}
+                    type="button"
+                    onClick={() => setPaymentMethod(m.id)}
+                    className={`min-h-[42px] py-1 px-1.5 rounded-xl text-xs font-bold transition flex items-center justify-center border ${
+                      isSelected
+                        ? 'bg-white/20 border-white text-white shadow-md'
+                        : 'bg-slate-900/60 border-white/10 text-slate-400 hover:text-white'
+                    }`}
+                  >
+                    {m.label}
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Wallet Reference Input */}
+            {['jeeb', 'jawali', 'kuraimi'].includes(paymentMethod) && (
+              <div className="p-2 rounded-xl bg-slate-900 border border-white/10 animate-in fade-in">
+                <label className="block text-[11px] text-slate-400 mb-1">
+                  رقم إشعار الحوالة للمحفظة:
+                </label>
+                <input
+                  type="text"
+                  placeholder="مثال: KUR-9988112"
+                  value={walletRefNumber}
+                  onChange={(e) => setWalletRefNumber(e.target.value)}
+                  className="w-full min-h-[36px] px-3 rounded-lg bg-slate-800 border border-white/10 text-white font-mono text-xs font-bold"
+                />
+              </div>
+            )}
+
+            {/* Partial / Debt Amount Input */}
+            {paymentMethod === 'credit' && (
+              <div className="p-2.5 rounded-xl bg-rose-500/10 border border-rose-500/25 space-y-1.5 animate-in fade-in text-xs">
+                <div className="flex items-center justify-between">
+                  <span className="text-slate-300">المبلغ المدفوع فعلياً (كاش/محفظة):</span>
+                  <input
+                    type="number"
+                    placeholder="0"
+                    value={paidAmountInput}
+                    onChange={(e) => setPaidAmountInput(e.target.value)}
+                    className="w-24 px-2 py-1 rounded-lg bg-slate-900 border border-white/20 font-mono text-xs font-bold text-white text-center"
+                  />
+                </div>
+                <div className="flex justify-between font-bold text-rose-300">
+                  <span>المبلغ المتبقي كدين على العميل:</span>
+                  <span className="font-mono">{remainingDebt.toLocaleString()} ر.ي</span>
+                </div>
+              </div>
+            )}
+
+            {/* PRIMARY GREEN SUBMIT BUTTON: Double-Submit Guard */}
+            <button
+              type="button"
+              disabled={isSubmittingInvoice || cartItems.length === 0 || !selectedVehicle}
+              onClick={handleSubmitInvoice}
+              className={`w-full min-h-[52px] rounded-2xl font-black text-sm shadow-xl flex items-center justify-center gap-2 transition active:scale-95 ${
+                !selectedVehicle || cartItems.length === 0 || isSubmittingInvoice
+                  ? 'bg-slate-800 text-slate-500 cursor-not-allowed border border-white/5'
+                  : 'bg-gradient-to-r from-emerald-500 to-green-600 hover:from-emerald-400 hover:to-green-500 text-slate-950 shadow-emerald-500/25'
+              }`}
+            >
+              {isSubmittingInvoice ? (
+                <>
+                  <Loader2 className="w-5 h-5 animate-spin text-slate-950" />
+                  <span>جاري ترحيل الفاتورة والقيود المحاسبية...</span>
+                </>
+              ) : (
+                <span>حفظ الفاتورة وإرسال كرت الخدمة واتساب 📲</span>
+              )}
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* Modals & Drawers */}
+      <NewVehicleModal
+        isOpen={showNewVehicleModal}
+        onClose={() => setShowNewVehicleModal(false)}
+        onVehicleCreated={(v) => handleSelectVehicle(v)}
+      />
+
+      <OilSelectorModal
+        isOpen={showOilModal}
+        onClose={() => setShowOilModal(false)}
+        inventory={inventory}
+        preferredBrand={selectedVehicle ? selectedVehicle.preferred_oil_brand : 'تويوتا'}
+        preferredViscosity={selectedVehicle ? selectedVehicle.preferred_viscosity : '20W-50'}
+        onAddItemsToCart={(items) => handleAddMultipleToCart(items)}
+      />
+
+      <ProductPickerModal
+        isOpen={pickerModalType !== null}
+        onClose={() => setPickerModalType(null)}
+        type={pickerModalType}
+        inventory={inventory}
+        onAddItemToCart={(item) => handleAddToCart(item)}
+        onAddItemsToCart={(items) => handleAddMultipleToCart(items)}
+        onRefreshData={onRefreshData}
+      />
+
+      <InvoiceReceiptModal
+        isOpen={completedInvoice !== null}
+        onClose={() => setCompletedInvoice(null)}
+        invoice={completedInvoice}
+        onNewInvoice={handleResetPos}
+      />
+
+      {/* Vehicle Service History Drawer */}
+      <VehicleHistoryDrawer
+        isOpen={showHistoryDrawer}
+        onClose={() => setShowHistoryDrawer(false)}
+        vehicleId={selectedVehicle?.id}
+        onRepeatService={(items) => handleRepeatItemsIntoCart(items)}
+      />
+
+      {/* Official Receipt Voucher Modal */}
+      <ReceiptVoucherModal
+        isOpen={showReceiptModal}
+        onClose={() => setShowReceiptModal(false)}
+        initialData={selectedVehicle ? {
+          party_type: 'customer',
+          vehicle_id: selectedVehicle.id,
+          customer_name: selectedVehicle.customer_name,
+          plate_number: selectedVehicle.plate_number,
+          balance_due: selectedVehicle.balance_due,
+          description: `تحصيل دفعة نقدية من حساب العميل (${selectedVehicle.plate_number})`,
+        } : null}
+        vehicles={selectedVehicle ? [selectedVehicle] : []}
+        onVoucherCreated={(v) => {
+          if (selectedVehicle && v) {
+            setSelectedVehicle((prev) => prev ? {
+              ...prev,
+              balance_due: Math.max(0, (Number(prev.balance_due) || 0) - (Number(v.amount) || 0)),
+            } : null);
+          }
+          if (onRefreshData) onRefreshData();
+        }}
+      />
+    </div>
+  );
+}
