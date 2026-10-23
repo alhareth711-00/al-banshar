@@ -11,6 +11,8 @@ const DEFAULT_SETTINGS = {
   enableShiftsMode: false, // Default is disabled (Direct daily closing without cashier shifts friction)
   openingHour: 7, // Daily operating start hour (7 AM)
   closingHour: 24, // Daily operating close hour (12 AM midnight)
+  ownerPin: '1234', // Default Manager / Owner PIN for Kiosk Protection
+  autoLockMinutes: 3, // Auto-lock inactivity timeout in minutes (0 = disabled)
 };
 
 export function getShopSettings() {
@@ -31,6 +33,25 @@ export function saveShopSettings(settings) {
   } catch (e) {
     console.error('Error saving settings to localStorage', e);
   }
+}
+
+export function getOwnerPin() {
+  const settings = getShopSettings();
+  return String(settings.ownerPin || '1234');
+}
+
+export function verifyOwnerPin(inputPin) {
+  if (!inputPin) return false;
+  const currentPin = getOwnerPin();
+  return String(inputPin).trim() === currentPin.trim();
+}
+
+export function getAutoLockMinutes() {
+  const settings = getShopSettings();
+  if (settings.autoLockMinutes === undefined || settings.autoLockMinutes === null) {
+    return 3;
+  }
+  return Number(settings.autoLockMinutes);
 }
 
 export function formatYemeniWhatsAppLink(phone, messageText) {

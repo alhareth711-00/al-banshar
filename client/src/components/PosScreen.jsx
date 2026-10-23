@@ -34,7 +34,15 @@ import InvoiceReceiptModal from './InvoiceReceiptModal';
 import VehicleHistoryDrawer from './VehicleHistoryDrawer';
 import ReceiptVoucherModal from './ReceiptVoucherModal';
 
-export default function PosScreen({ inventory = [], workers = [], onRefreshData, initialVehicle = null, onOpenStatement }) {
+export default function PosScreen({
+  inventory = [],
+  workers = [],
+  onRefreshData,
+  initialVehicle = null,
+  onOpenStatement,
+  isOwnerMode = false,
+  onRequireOwnerAuth,
+}) {
   // Vehicle Selection State
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState([]);
@@ -43,6 +51,27 @@ export default function PosScreen({ inventory = [], workers = [], onRefreshData,
   const [showNewVehicleModal, setShowNewVehicleModal] = useState(false);
   const [showHistoryDrawer, setShowHistoryDrawer] = useState(false);
   const [showReceiptModal, setShowReceiptModal] = useState(false);
+
+  // Touch Alert & Confirm Modals State (بدون نوافذ المتصفح الافتراضية)
+  const [touchAlert, setTouchAlert] = useState({
+    isOpen: false,
+    title: '',
+    message: '',
+    type: 'warning', // 'warning' | 'error' | 'info'
+    actionBtnText: '',
+    onAction: null,
+    cancelBtnText: 'حسناً، فهمت',
+    onCancel: null,
+  });
+
+  const [touchConfirm, setTouchConfirm] = useState({
+    isOpen: false,
+    title: '',
+    message: '',
+    confirmText: 'نعم، تأكيد',
+    onConfirm: null,
+    onCancel: null,
+  });
 
   // Free 8-Point Safety Inspection State
   const [safetyPoints, setSafetyPoints] = useState({
@@ -79,6 +108,22 @@ export default function PosScreen({ inventory = [], workers = [], onRefreshData,
   const [paidAmountInput, setPaidAmountInput] = useState('');
   const [isSubmittingInvoice, setIsSubmittingInvoice] = useState(false);
   const [cartNoticeMessage, setCartNoticeMessage] = useState('');
+  const [clearCartConfirmPending, setClearCartConfirmPending] = useState(false); // Double-Tap Clear Cart Guard (المقترح 2)
+
+  // Handle double-tap clear cart
+  const handleClearCartClick = () => {
+    if (!clearCartConfirmPending) {
+      setClearCartConfirmPending(true);
+      setTimeout(() => {
+        setClearCartConfirmPending(false);
+      }, 4000);
+    } else {
+      setCartItems([]);
+      setClearCartConfirmPending(false);
+      setCartNoticeMessage('تم تفريغ بنود السلة بالكامل.');
+      setTimeout(() => setCartNoticeMessage(''), 3500);
+    }
+  };
 
   // Modals
   const [showOilModal, setShowOilModal] = useState(false);
@@ -147,6 +192,14 @@ export default function PosScreen({ inventory = [], workers = [], onRefreshData,
     return d.toISOString().split('T')[0];
   }, []);
 
+  // Odometer Poka-Yoke: flag if entered reading is less than previous recorded reading
+  const isOdometerSuspicious = useMemo(() => {
+    if (!selectedVehicle || !selectedVehicle.last_odometer || !currentOdometer) return false;
+    const cur = Number(currentOdometer);
+    const prev = Number(selectedVehicle.last_odometer);
+    return cur > 0 && prev > 0 && cur < prev;
+  }, [selectedVehicle, currentOdometer]);
+
   // One-Click Repeat Last Service (into cart, fully editable)
   const handleRepeatItemsIntoCart = (items) => {
     if (!items || items.length === 0) return;
@@ -173,7 +226,13 @@ export default function PosScreen({ inventory = [], workers = [], onRefreshData,
         const lastInvoice = data.data.history[0];
         handleRepeatItemsIntoCart(lastInvoice.items);
       } else {
-        alert('لا يوجد سجل خدمات سابق لهذه السيارة لتكراره');
+        setTouchAlert({
+          isOpen: true,
+          title: 'سجل الخدمات السابقة',
+          message: 'لا يوجد سجل خدمات سابق مسجل لهذه السيارة لتكراره في السلة.',
+          type: 'info',
+          cancelBtnText: 'حسناً، فهمت',
+        });
       }
     } catch (err) {
       console.error('Error repeating last service:', err);
@@ -263,24 +322,91 @@ export default function PosScreen({ inventory = [], workers = [], onRefreshData,
     return Math.max(0, netTotal - effectivePaidAmount);
   }, [netTotal, effectivePaidAmount]);
 
-  // Submit Invoice Transaction
+  // Poka-Yoke Validated Invoice Submission (الجزء الأول: مانع الأخطاء وحماية المالك)
   const handleSubmitInvoice = async () => {
     if (!selectedVehicle) {
-      alert('يرجى اختيار أو تسجيل سيارة أولاً قبل إصدار الفاتورة');
+      setTouchAlert({
+        isOpen: true,
+        title: 'يرجى اختيار السيارة أولاً',
+        message: 'يجب اختيار سيارة مسجلة بالبحث أو الضغط على "+ سيارة جديدة" لإصدار الفاتورة.',
+        type: 'warning',
+        cancelBtnText: 'حسناً',
+      });
       return;
     }
 
     if (cartItems.length === 0) {
-      alert('يرجى إضافة خدمة أو صنف إلى الفاتورة');
+      setTouchAlert({
+        isOpen: true,
+        title: 'سلة الفاتورة فارغة',
+        message: 'يرجى إضافة خدمة غيار زيت أو أصناف وخدمات إلى السلة قبل الحفظ.',
+        type: 'warning',
+        cancelBtnText: 'حسناً',
+      });
       return;
     }
 
     if (!selectedWorkerId) {
-      alert('يرجى تحديد الفني المسؤول عن تنفيذ الخدمة');
+      setTouchAlert({
+        isOpen: true,
+        title: 'تحديد الفني المنفذ',
+        message: 'يرجى اختيار الفني المسؤول عن تنفيذ الخدمة من قائمة العمال بالأعلى.',
+        type: 'warning',
+        cancelBtnText: 'حسناً',
+      });
       return;
     }
 
-    // Safeguard check 1: Below Cost Confirmation (Upgrade 4)
+    // Poka-Yoke 1: Credit Sale Protection (حماية البيع الآجل)
+    if (paymentMethod === 'credit') {
+      const hasCustomerName =
+        selectedVehicle.customer_name &&
+        selectedVehicle.customer_name.trim() !== '' &&
+        selectedVehicle.customer_name !== 'عميل نقدي';
+      const hasPhone =
+        selectedVehicle.phone &&
+        selectedVehicle.phone.trim().length >= 7;
+
+      if (!hasCustomerName || !hasPhone) {
+        setTouchAlert({
+          isOpen: true,
+          title: '⚠️ مانع الأخطاء: لا يمكن البيع بالآجل لعميل غير مسجل!',
+          message:
+            'لحفظ أموال المركز وضمان حق الاسترداد، يُمنع تسجيل مديونية آجلة بدون اسم عميل حقيقي ورقم هاتف فعال. يرجى إكمال بيانات العميل والسيارة أولاً.',
+          type: 'error',
+          actionBtnText: 'إكمال بيانات العميل ورقم الهاتف 📝',
+          onAction: () => {
+            setTouchAlert((prev) => ({ ...prev, isOpen: false }));
+            setShowNewVehicleModal(true);
+          },
+          cancelBtnText: 'تغيير السداد إلى كاش 💵',
+          onCancel: () => {
+            setPaymentMethod('cash');
+          },
+        });
+        return;
+      }
+    }
+
+    // Poka-Yoke 2: Odometer Safety Check (تأكيد القراءة السفلية)
+    if (isOdometerSuspicious) {
+      setTouchConfirm({
+        isOpen: true,
+        title: '⚠️ تنبيه عداد الكيلومترات (Odometer Guard)',
+        message: `قراءة العداد المدخلة (${Number(currentOdometer).toLocaleString()} كم) أقل من القراءة السابقة المسجلة لهذه السيارة (${Number(selectedVehicle.last_odometer).toLocaleString()} كم)!\n\nهل تؤكد صحة القراءة الحالية واستمرار حفظ الفاتورة بهذا العداد؟`,
+        confirmText: 'نعم، القراءة صحيحة واستمرار',
+        onConfirm: () => {
+          checkPriceAndCreditLimitThenSubmit();
+        },
+      });
+      return;
+    }
+
+    checkPriceAndCreditLimitThenSubmit();
+  };
+
+  const checkPriceAndCreditLimitThenSubmit = () => {
+    // Poka-Yoke 3: Below Cost Guard (حماية سعر البيع)
     const belowCostItem = cartItems.find((ci) => {
       if (!ci.inventory_id || ci.item_type === 'service') return false;
       const inv = inventory.find((i) => i.id === ci.inventory_id);
@@ -289,25 +415,69 @@ export default function PosScreen({ inventory = [], workers = [], onRefreshData,
 
     if (belowCostItem) {
       const inv = inventory.find((i) => i.id === belowCostItem.inventory_id);
-      const ok = window.confirm(
-        `⚠️ تنبيه حماية الأرباح (Loss Prevention Guard):\nالصنف "${belowCostItem.description}" يُباع بسعر (${belowCostItem.unit_price.toLocaleString()} ر.ي) وهو أقل من سعر التكلفة (${inv.cost_price.toLocaleString()} ر.ي).\n\nهل تريد تأكيد إصدار الفاتورة بهذا السعر؟`
-      );
-      if (!ok) return;
+      if (!isOwnerMode) {
+        // Strictly blocked in Cashier Mode
+        setTouchAlert({
+          isOpen: true,
+          title: '⚠️ حماية أرباح المركز (مانع الخسارة)',
+          message: `الصنف "${belowCostItem.description}" مسعر للبيع بـ (${Number(belowCostItem.unit_price).toLocaleString()} ر.ي) وهو أقل من سعر التكلفة (${Number(inv.cost_price).toLocaleString()} ر.ي)!\n\nفي وضع الكاشير، يمنع النظام تماماً البيع بالخسارة لحماية أرباح المركز. يُسمح بهذا الإجراء فقط لصاحب المركز بعد إدخال رمز PIN.`,
+          type: 'error',
+          actionBtnText: 'فتح صلاحية المالك بالرمز السري 🔓',
+          onAction: () => {
+            setTouchAlert((prev) => ({ ...prev, isOpen: false }));
+            if (onRequireOwnerAuth) {
+              onRequireOwnerAuth(
+                () => checkPriceAndCreditLimitThenSubmit(),
+                'تفويض البيع بأقل من التكلفة',
+                'أدخل رمز المالك للسماح ببيع الصنف بأقل من التكلفة استثنائياً'
+              );
+            }
+          },
+          cancelBtnText: 'تعديل السعر',
+        });
+        return;
+      } else {
+        // In Owner Mode, ask touch confirmation
+        setTouchConfirm({
+          isOpen: true,
+          title: '⚠️ تأكيد بيع بأقل من التكلفة (Owner Override)',
+          message: `الصنف "${belowCostItem.description}" يباع بـ (${Number(belowCostItem.unit_price).toLocaleString()} ر.ي) وهو أقل من سعر التكلفة (${Number(inv.cost_price).toLocaleString()} ر.ي).\n\nهل تؤكد موافقتك كمدير على اعتماد هذا البيع الاستثنائي؟`,
+          confirmText: 'تأكيد البيع الاستثنائي',
+          onConfirm: () => {
+            checkCreditLimitThenSubmit();
+          },
+        });
+        return;
+      }
     }
 
+    checkCreditLimitThenSubmit();
+  };
+
+  const checkCreditLimitThenSubmit = () => {
     // Safeguard check 2: Customer Credit Ceiling (Upgrade 4)
     if (paymentMethod === 'credit' && selectedVehicle) {
       const currentDebt = Number(selectedVehicle.balance_due) || 0;
       const creditLimit = Number(selectedVehicle.credit_limit) || 50000;
       const projected = currentDebt + remainingDebt;
       if (projected > creditLimit) {
-        const ok = window.confirm(
-          `⚠️ تنبيه سقف المديونية (Credit Ceiling Guard):\nإجمالي دين العميل المتوقع (${projected.toLocaleString()} ر.ي) سيتجاوز سقف الائتمان (${creditLimit.toLocaleString()} ر.ي) بمقدار (${(projected - creditLimit).toLocaleString()} ر.ي).\n\nهل تؤكد منح هذا الائتمان الاستثنائي؟`
-        );
-        if (!ok) return;
+        setTouchConfirm({
+          isOpen: true,
+          title: '⚠️ تنبيه سقف المديونية (Credit Ceiling Guard)',
+          message: `إجمالي دين العميل المتوقع (${projected.toLocaleString()} ر.ي) سيتجاوز سقف الائتمان (${creditLimit.toLocaleString()} ر.ي) بمقدار (${(projected - creditLimit).toLocaleString()} ر.ي).\n\nهل تؤكد منح هذا الائتمان الاستثنائي؟`,
+          confirmText: 'تأكيد منح الائتمان والاستمرار',
+          onConfirm: () => {
+            executeSubmitInvoice();
+          },
+        });
+        return;
       }
     }
 
+    executeSubmitInvoice();
+  };
+
+  const executeSubmitInvoice = async () => {
     try {
       setIsSubmittingInvoice(true);
 
@@ -319,7 +489,7 @@ export default function PosScreen({ inventory = [], workers = [], onRefreshData,
         next_service_date: nextServiceDate,
         items_total: goodsTotal,
         labor_total: servicesTotal,
-        scrap_battery_deduction: 0, // Cancelled completely
+        scrap_battery_deduction: 0,
         discount: Number(specialDiscount) || 0,
         payment_method: paymentMethod,
         wallet_ref_number: walletRefNumber || null,
@@ -356,7 +526,13 @@ export default function PosScreen({ inventory = [], workers = [], onRefreshData,
       });
       if (onRefreshData) onRefreshData();
     } catch (err) {
-      alert(err.message);
+      setTouchAlert({
+        isOpen: true,
+        title: 'خطأ في حفظ الفاتورة',
+        message: err.message || 'تعذر حفظ الفاتورة وتحديث القيود',
+        type: 'error',
+        cancelBtnText: 'إغلاق',
+      });
     } finally {
       setIsSubmittingInvoice(false);
     }
@@ -592,8 +768,8 @@ export default function PosScreen({ inventory = [], workers = [], onRefreshData,
         {/* LEFT COLUMN: SERVICE BUTTONS & ODOMETER (7 COLS) */}
         <div className="lg:col-span-7 flex flex-col gap-3 pr-0.5">
           {/* Odometer Tracker Bar (Strictly 3000 km default with full manual freedom) */}
-          <div className="apple-glass rounded-3xl p-4 border border-white/10 space-y-2.5">
-            <div className="flex items-center justify-between">
+          <div className="apple-glass rounded-3xl p-4 border border-white/10 space-y-3">
+            <div className="flex items-center justify-between flex-wrap gap-2">
               <span className="text-xs font-bold text-slate-300 flex items-center gap-1.5">
                 <Gauge className="w-4 h-4 text-amber-400" />
                 <span>قراءة العداد وموعد الغيار القادم:</span>
@@ -607,7 +783,7 @@ export default function PosScreen({ inventory = [], workers = [], onRefreshData,
                       setKmInterval(interval);
                       setManualNextOdometer('');
                     }}
-                    className={`px-2.5 py-1 rounded-lg text-xs font-mono font-bold transition border ${
+                    className={`px-2.5 py-1.5 rounded-lg text-xs font-mono font-bold transition border ${
                       kmInterval === interval && !manualNextOdometer
                         ? 'bg-amber-500 text-slate-950 border-amber-400 shadow-sm'
                         : 'bg-slate-900 text-slate-400 border-white/5 hover:text-white'
@@ -619,6 +795,25 @@ export default function PosScreen({ inventory = [], workers = [], onRefreshData,
               </div>
             </div>
 
+            {/* Poka-Yoke Visual Alert Banner: Odometer lower than previous */}
+            {isOdometerSuspicious && (
+              <div className="p-3 bg-amber-500/15 border border-amber-500/40 rounded-2xl flex items-center justify-between gap-3 text-amber-300 animate-in fade-in">
+                <div className="flex items-center gap-2 text-xs font-bold">
+                  <AlertTriangle className="w-5 h-5 text-amber-400 shrink-0" />
+                  <span>
+                    تنبيه: قراءة العداد المدخلة ({Number(currentOdometer).toLocaleString()} كم) أقل من القراءة السابقة لهذه السيارة ({Number(selectedVehicle?.last_odometer).toLocaleString()} كم)!
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setCurrentOdometer(String(selectedVehicle?.last_odometer || ''))}
+                  className="px-3 py-1.5 bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs font-black rounded-xl shrink-0 transition active:scale-95 shadow-sm"
+                >
+                  تصحيح لآخر قراءة ({selectedVehicle?.last_odometer?.toLocaleString()} كم)
+                </button>
+              </div>
+            )}
+
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
               <div>
                 <label className="block text-[11px] text-slate-400 mb-1">العداد الحالي للسيارة (كم):</label>
@@ -627,7 +822,9 @@ export default function PosScreen({ inventory = [], workers = [], onRefreshData,
                   placeholder="مثال: 125000"
                   value={currentOdometer}
                   onChange={(e) => setCurrentOdometer(e.target.value)}
-                  className="w-full min-h-[46px] px-3 rounded-xl bg-slate-900 border border-white/10 font-mono text-base font-extrabold text-white focus:outline-none focus:border-amber-400 text-center"
+                  className={`w-full min-h-[46px] px-3 rounded-xl bg-slate-900 border font-mono text-base font-extrabold text-white focus:outline-none text-center ${
+                    isOdometerSuspicious ? 'border-amber-500 ring-1 ring-amber-500/50' : 'border-white/10 focus:border-amber-400'
+                  }`}
                 />
               </div>
 
@@ -845,13 +1042,39 @@ export default function PosScreen({ inventory = [], workers = [], onRefreshData,
               </p>
             </div>
             {cartItems.length > 0 && (
-              <button
-                type="button"
-                onClick={() => setCartItems([])}
-                className="text-xs text-rose-400 hover:text-rose-300 font-semibold transition"
-              >
-                تفريغ السلة
-              </button>
+              <div className="flex items-center gap-1.5">
+                {clearCartConfirmPending ? (
+                  <div className="flex items-center gap-1 animate-in fade-in zoom-in-95 duration-150">
+                    <button
+                      type="button"
+                      onClick={handleClearCartClick}
+                      className="px-2.5 py-1 rounded-xl bg-rose-500 hover:bg-rose-600 text-white text-xs font-black transition active:scale-95 shadow-md shadow-rose-500/30 animate-pulse flex items-center gap-1"
+                      title="انقر لتأكيد مسح كافة بنود الفاتورة"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                      <span>تأكيد المسح؟ (اضغط ثانية)</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setClearCartConfirmPending(false)}
+                      className="px-2 py-1 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold transition"
+                      title="إلغاء التراجع"
+                    >
+                      تراجع
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={handleClearCartClick}
+                    className="text-xs text-rose-400/90 hover:text-rose-300 font-bold px-2 py-1 rounded-lg hover:bg-rose-500/10 transition flex items-center gap-1 border border-transparent hover:border-rose-500/20"
+                    title="تفريغ جميع محتويات السلة الحالية"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                    <span>تفريغ السلة</span>
+                  </button>
+                )}
+              </div>
             )}
           </div>
 
@@ -1150,6 +1373,102 @@ export default function PosScreen({ inventory = [], workers = [], onRefreshData,
           if (onRefreshData) onRefreshData();
         }}
       />
+
+      {/* In-App Touch Alert Dialog (بدون نوافذ المتصفح الافتراضية) */}
+      {touchAlert.isOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/85 backdrop-blur-md animate-in fade-in duration-200">
+          <div className="w-full max-w-md bg-slate-900 border border-white/15 rounded-3xl p-6 shadow-2xl space-y-4 text-center">
+            <div
+              className={`w-16 h-16 mx-auto rounded-2xl flex items-center justify-center border shadow-lg ${
+                touchAlert.type === 'error'
+                  ? 'bg-rose-500/20 text-rose-400 border-rose-500/30 shadow-rose-500/10'
+                  : touchAlert.type === 'info'
+                  ? 'bg-sky-500/20 text-sky-400 border-sky-500/30 shadow-sky-500/10'
+                  : 'bg-amber-500/20 text-amber-400 border-amber-500/30 shadow-amber-500/10'
+              }`}
+            >
+              {touchAlert.type === 'error' ? (
+                <AlertCircle className="w-9 h-9" />
+              ) : touchAlert.type === 'info' ? (
+                <Info className="w-9 h-9" />
+              ) : (
+                <AlertTriangle className="w-9 h-9" />
+              )}
+            </div>
+
+            <div>
+              <h3 className="text-lg font-black text-white">{touchAlert.title}</h3>
+              <p className="text-sm text-slate-300 mt-2 whitespace-pre-line leading-relaxed font-medium">
+                {touchAlert.message}
+              </p>
+            </div>
+
+            <div className="flex flex-col sm:flex-row gap-2 pt-2">
+              {touchAlert.actionBtnText && touchAlert.onAction && (
+                <button
+                  type="button"
+                  onClick={touchAlert.onAction}
+                  className="flex-1 min-h-[48px] px-4 py-2.5 rounded-xl font-black text-sm bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 transition active:scale-95 shadow-lg shadow-amber-500/20"
+                >
+                  {touchAlert.actionBtnText}
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={() => {
+                  if (touchAlert.onCancel) touchAlert.onCancel();
+                  setTouchAlert((prev) => ({ ...prev, isOpen: false }));
+                }}
+                className="flex-1 min-h-[48px] px-4 py-2.5 rounded-xl font-bold text-sm bg-slate-800 hover:bg-slate-700 text-slate-200 transition active:scale-95 border border-white/10"
+              >
+                {touchAlert.cancelBtnText || 'حسناً، فهمت'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* In-App Touch Confirm Dialog (بدون نوافذ المتصفح الافتراضية) */}
+      {touchConfirm.isOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/85 backdrop-blur-md animate-in fade-in duration-200">
+          <div className="w-full max-w-md bg-slate-900 border border-white/15 rounded-3xl p-6 shadow-2xl space-y-4 text-center">
+            <div className="w-16 h-16 mx-auto rounded-2xl flex items-center justify-center bg-amber-500/20 text-amber-400 border border-amber-500/30 shadow-lg shadow-amber-500/10">
+              <AlertTriangle className="w-9 h-9" />
+            </div>
+
+            <div>
+              <h3 className="text-lg font-black text-white">{touchConfirm.title}</h3>
+              <p className="text-sm text-slate-300 mt-2 whitespace-pre-line leading-relaxed font-medium">
+                {touchConfirm.message}
+              </p>
+            </div>
+
+            <div className="flex flex-col sm:flex-row gap-2 pt-2">
+              <button
+                type="button"
+                onClick={() => {
+                  const cb = touchConfirm.onConfirm;
+                  setTouchConfirm((prev) => ({ ...prev, isOpen: false }));
+                  if (cb) cb();
+                }}
+                className="flex-1 min-h-[48px] px-4 py-2.5 rounded-xl font-black text-sm bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 transition active:scale-95 shadow-lg shadow-amber-500/20"
+              >
+                {touchConfirm.confirmText || 'نعم، تأكيد'}
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  if (touchConfirm.onCancel) touchConfirm.onCancel();
+                  setTouchConfirm((prev) => ({ ...prev, isOpen: false }));
+                }}
+                className="flex-1 min-h-[48px] px-4 py-2.5 rounded-xl font-bold text-sm bg-slate-800 hover:bg-slate-700 text-slate-300 transition active:scale-95 border border-white/10"
+              >
+                إلغاء وتراجع
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

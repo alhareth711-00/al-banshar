@@ -86,13 +86,13 @@ export default function BayProfitabilityModal({ isOpen, onClose }) {
             </div>
             <div>
               <h2 className="text-base sm:text-lg font-extrabold text-white flex items-center gap-2">
-                <span>مؤشر كفاءة ربحية الحفرة والخدمات (Bay Profitability & Services Margin)</span>
-                <span className="text-[10px] px-2 py-0.5 rounded-full bg-purple-500/20 text-purple-300 font-bold border border-purple-500/30 font-mono">
-                  PRO MARGIN
+                <span>نشاط وحركة الحفرة ومبيعات الزيوت (Daily Pit Activity & Sales)</span>
+                <span className="text-[10px] px-2.5 py-0.5 rounded-full bg-purple-500/20 text-purple-300 font-bold border border-purple-500/30 font-mono">
+                  كفاءة الحفرة والتشغيل
                 </span>
               </h2>
-              <p className="text-[11px] text-slate-400">
-                فصل أرباح الخدمات النقية (100% ربح صافٍ) عن أرباح السلع وقياس كفاءة تغطية المصاريف
+              <p className="text-[11px] text-slate-300 mt-0.5">
+                💡 تلميح: تحليل حركة سيارات الحفرة ومبيعات الزيوت والفلاتر ومدى تغطية الأرباح لمصاريف وإيجار المحل ورواتب العمال.
               </p>
             </div>
           </div>
@@ -136,7 +136,7 @@ export default function BayProfitabilityModal({ isOpen, onClose }) {
           {loading ? (
             <div className="h-64 flex items-center justify-center text-slate-400 text-xs">
               <div className="w-6 h-6 border-2 border-purple-400 border-t-transparent rounded-full animate-spin ml-2" />
-              <span>جاري تحليل ربحية خدمات الحفرة والورشة...</span>
+              <span>جاري تحليل نشاط ومبيعات الحفرة...</span>
             </div>
           ) : (
             <>
@@ -148,26 +148,26 @@ export default function BayProfitabilityModal({ isOpen, onClose }) {
                   </div>
                   <div>
                     <div className="text-xs text-slate-300 font-bold">
-                      مؤشر تغطية المصاريف من الخدمات (Services-to-OpEx Coverage):
+                      مؤشر تغطية المصاريف التشغيلية من أرباح الحفرة:
                     </div>
                     <div className={`text-2xl font-black font-mono mt-0.5 ${isHealthyCoverage ? 'text-emerald-400' : 'text-amber-400'}`}>
                       {summary.labor_coverage_ratio_percent}%
                     </div>
                     <div className="text-xs text-slate-300 mt-0.5">
                       {isHealthyCoverage
-                        ? `ممتاز! إيرادات الخدمات تغطي كامل المصاريف التشغيلية (${summary.operating_expenses.toLocaleString()} ر.ي) بفائض نقدي!`
-                        : `تنبيه: الخدمات تغطي ${summary.labor_coverage_ratio_percent}% من المصاريف، ويوصى بزيادة خدمات البنشر والترصيص.`}
+                        ? `ممتاز! إيرادات وأرباح الحفرة تغطي كامل مصاريف وإيجار المحل (${summary.operating_expenses.toLocaleString()} ر.ي) بفائض نقدي!`
+                        : `تنبيه: الأرباح تغطي ${summary.labor_coverage_ratio_percent}% من المصاريف، ويوصى بزيادة مبيعات الزيوت والخدمات.`}
                     </div>
                   </div>
                 </div>
 
                 <div className="text-center p-3 rounded-2xl bg-slate-900/80 border border-white/10 w-full md:w-auto flex-shrink-0 text-xs">
-                  <div className="text-slate-400">متوسط دخل الخدمات لكل سيارة:</div>
+                  <div className="text-slate-400">متوسط دخل السيارة الواحدة في الحفرة:</div>
                   <div className="text-lg font-black font-mono text-purple-400 mt-0.5">
                     {summary.avg_labor_per_car.toLocaleString()} ر.ي
                   </div>
                   <div className="text-[10px] text-slate-500 font-mono mt-0.5">
-                    إجمالي السيارات: {summary.vehicles_served}
+                    إجمالي السيارات المخدومة: {summary.vehicles_served}
                   </div>
                 </div>
               </div>
@@ -177,14 +177,14 @@ export default function BayProfitabilityModal({ isOpen, onClose }) {
                 {/* Card 1: Pure Services Revenue */}
                 <div className="apple-glass-card rounded-2xl p-4 border border-purple-500/25">
                   <div className="flex items-center justify-between text-slate-400 text-xs font-bold mb-1">
-                    <span>إيراد الخدمات والتركيب (100% ربح):</span>
+                    <span>إيراد مبيعات الخدمات السريعة:</span>
                     <Wrench className="w-4 h-4 text-purple-400" />
                   </div>
                   <div className="text-xl font-black font-mono text-purple-400">
                     {summary.pure_labor_revenue.toLocaleString()} <span className="text-xs font-sans text-slate-400">ر.ي</span>
                   </div>
                   <div className="text-[11px] text-purple-300 mt-1">
-                    أرباح نقدية خالصة بدون خصم مخزني
+                    خدمات وتشييكات سريعة
                   </div>
                 </div>
 
@@ -198,7 +198,7 @@ export default function BayProfitabilityModal({ isOpen, onClose }) {
                     {summary.goods_gross_profit.toLocaleString()} <span className="text-xs font-sans text-slate-400">ر.ي</span>
                   </div>
                   <div className="text-[11px] text-slate-400 mt-1">
-                    صافي مبيعات البضائع ناقص تكلفة COGS
+                    صافي أرباح بيع الزيوت والفلاتر بعد خصم التكلفة
                   </div>
                 </div>
 

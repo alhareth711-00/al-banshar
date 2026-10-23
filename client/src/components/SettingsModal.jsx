@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Settings, Store, Phone, Smartphone, MapPin, Check } from 'lucide-react';
+import { X, Settings, Store, Phone, Smartphone, MapPin, Check, Lock, KeyRound } from 'lucide-react';
 import { getShopSettings, saveShopSettings } from '../utils/settings';
 
 export default function SettingsModal({ isOpen, onClose, onSettingsUpdated }) {
@@ -151,6 +151,56 @@ export default function SettingsModal({ isOpen, onClose, onSettingsUpdated }) {
                 <option value={24}>12:00 منتصف الليل (مساءً)</option>
                 <option value={25}>01:00 فجراً (بعد منتصف الليل)</option>
                 <option value={26}>02:00 فجراً</option>
+              </select>
+            </div>
+          </div>
+
+          {/* Owner PIN Protection (الجزء الأول) */}
+          <div className="p-3.5 rounded-2xl bg-gradient-to-r from-amber-500/10 via-amber-500/5 to-transparent border border-amber-500/25 space-y-2">
+            <div className="flex items-center justify-between">
+              <label className="text-slate-200 font-extrabold flex items-center gap-1.5 text-xs">
+                <Lock className="w-4 h-4 text-amber-400" />
+                <span>رمز المالك السري (PIN Lock):</span>
+              </label>
+              <span className="text-[10px] text-amber-300 font-mono bg-amber-500/20 px-2 py-0.5 rounded-full border border-amber-500/30">
+                افتراضي: 1234
+              </span>
+            </div>
+            <p className="text-[11px] text-slate-400 leading-relaxed">
+              رمز أمان مكون من 4 أرقام لحماية الأرباح، شاشة الخزينة، وتعديل أسعار وكميات المخزون.
+            </p>
+            <input
+              type="password"
+              maxLength={4}
+              value={formData.ownerPin || ''}
+              onChange={(e) => {
+                const val = e.target.value.replace(/\D/g, '').slice(0, 4);
+                setFormData({ ...formData, ownerPin: val });
+              }}
+              placeholder="1234"
+              className="w-full min-h-[46px] px-3.5 rounded-xl bg-slate-950 border border-white/20 text-amber-400 font-mono text-center text-lg font-black tracking-widest focus:outline-none focus:border-amber-400 shadow-inner"
+              required
+            />
+
+            {/* Auto-Lock Inactivity Setting (المقترح 1) */}
+            <div className="pt-2 border-t border-amber-500/20">
+              <label className="block text-slate-300 font-bold mb-1.5 text-[11px] flex items-center justify-between">
+                <span>⏱️ مدة القفل التلقائي لوضع المدير عند عدم النشاط:</span>
+                <span className="text-[10px] text-amber-300 font-mono">
+                  {formData.autoLockMinutes === 0 ? 'معطل' : `${formData.autoLockMinutes || 3} دقائق`}
+                </span>
+              </label>
+              <select
+                value={formData.autoLockMinutes !== undefined ? formData.autoLockMinutes : 3}
+                onChange={(e) => setFormData({ ...formData, autoLockMinutes: Number(e.target.value) })}
+                className="w-full min-h-[42px] px-3 rounded-xl bg-slate-950 border border-white/15 text-white text-xs font-bold focus:outline-none focus:border-amber-400"
+              >
+                <option value={1}>دقيقة واحدة (أعلى درجات الحماية)</option>
+                <option value={2}>دقيقتان</option>
+                <option value={3}>3 دقائق (موصى به لمحلات الخدمة السريعة)</option>
+                <option value={5}>5 دقائق</option>
+                <option value={10}>10 دقائق</option>
+                <option value={0}>تعطيل القفل التلقائي</option>
               </select>
             </div>
           </div>

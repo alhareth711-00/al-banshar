@@ -69,9 +69,9 @@ export default function ReorderOrderSheetModal({
               <FileText className="w-5 h-5 stroke-[2.2]" />
             </div>
             <div>
-              <h3 className="font-extrabold text-white text-base">ورقة أمر شراء ومطالبة توريد نواقص المخزن</h3>
-              <p className="text-xs text-slate-400">
-                استخراج وطباعة كشف النواقص للتواصل مع المورد والاتفاق على التوريد قبل إدخال الفاتورة
+              <h3 className="font-extrabold text-white text-base">كشف نواقص البضاعة لطلب التوريد</h3>
+              <p className="text-xs text-amber-300 font-medium">
+                💡 تلميح: كشف تلقائي بالزيوت والفلاتر الناقصة في المحل لإرسالها بالواتساب للموردين وتجهيز طلبيتك.
               </p>
             </div>
           </div>

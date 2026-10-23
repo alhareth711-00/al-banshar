@@ -73,6 +73,8 @@ function initDb() {
       if (!colNames.includes('dot_code')) db.exec("ALTER TABLE inventory ADD COLUMN dot_code TEXT");
       if (!colNames.includes('battery_capacity_ah')) db.exec("ALTER TABLE inventory ADD COLUMN battery_capacity_ah TEXT");
       if (!colNames.includes('location_shelf')) db.exec("ALTER TABLE inventory ADD COLUMN location_shelf TEXT");
+      if (!colNames.includes('is_consignment')) db.exec("ALTER TABLE inventory ADD COLUMN is_consignment INTEGER NOT NULL DEFAULT 0");
+      if (!colNames.includes('consignment_supplier_name')) db.exec("ALTER TABLE inventory ADD COLUMN consignment_supplier_name TEXT");
       if (!colNames.includes('is_active')) db.exec("ALTER TABLE inventory ADD COLUMN is_active INTEGER NOT NULL DEFAULT 1");
       if (!colNames.includes('notes')) db.exec("ALTER TABLE inventory ADD COLUMN notes TEXT");
       if (!colNames.includes('created_at')) db.exec("ALTER TABLE inventory ADD COLUMN created_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime'))");

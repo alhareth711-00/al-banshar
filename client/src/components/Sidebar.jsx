@@ -11,6 +11,7 @@ import {
   Settings,
   Landmark,
   BookOpen,
+  Lock,
 } from 'lucide-react';
 
 export default function Sidebar({
@@ -20,12 +21,13 @@ export default function Sidebar({
   lowStockCount = 0,
   onOpenSettings,
   onOpenUserGuide,
+  isOwnerMode = false,
 }) {
   const navItems = [
     {
       id: 'pos',
       label: 'نقطة البيع السريعة',
-      shortLabel: 'الـ POS',
+      shortLabel: 'نقطة البيع',
       icon: Gauge,
       accent: 'from-amber-500 to-orange-500',
       badge: null,
@@ -97,7 +99,7 @@ export default function Sidebar({
                 PRO
               </span>
             </h1>
-            <p className="text-[11px] text-slate-400 font-medium truncate">Quick Lube & Tire Touch</p>
+            <p className="text-[11px] text-slate-400 font-medium truncate">نظام إدارة البناشر ومراكز الزيوت</p>
           </div>
         </div>
 
@@ -135,6 +137,12 @@ export default function Sidebar({
                 <span className="hidden lg:block font-bold text-sm tracking-wide flex-1 truncate">
                   {item.label}
                 </span>
+
+                {item.id === 'vault' && !isOwnerMode && (
+                  <span className="hidden lg:inline-flex p-1 rounded-md bg-amber-500/10 text-amber-400 border border-amber-500/20" title="محمي برمز المالك">
+                    <Lock className="w-3 h-3" />
+                  </span>
+                )}
 
                 {item.badge !== null && (
                   <span
@@ -178,7 +186,13 @@ export default function Sidebar({
             <Settings className="w-4 h-4 text-amber-400" />
             <span>إعدادات وهوية المركز ⚙️</span>
           </div>
-          <span className="text-[10px] text-slate-400 font-mono">واتساب</span>
+          {!isOwnerMode ? (
+            <span className="p-1 rounded bg-amber-500/15 text-amber-400 border border-amber-500/25" title="محمي برمز المالك">
+              <Lock className="w-3 h-3" />
+            </span>
+          ) : (
+            <span className="text-[10px] text-slate-400 font-mono">واتساب</span>
+          )}
         </button>
 
         <div className="px-3 py-2 rounded-xl bg-slate-900/60 border border-white/5 flex items-center justify-between text-xs text-slate-400">

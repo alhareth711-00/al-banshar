@@ -138,9 +138,9 @@ export default function CashDrawerReconciliationModal({ isOpen, onClose, onRecon
               <Scale className="w-5 h-5" />
             </span>
             <div>
-              <h3 className="font-extrabold text-white text-base">جرد ومطابقة الصندوق النقدي</h3>
-              <p className="text-[11px] text-slate-400">
-                مقارنة المبلغ الإجمالي الفعلي الموجود في الصندوق مع الرصيد الدفتري (حساب 1101)
+              <h3 className="font-extrabold text-white text-base">جرد ومطابقة فلوس الصندوق النقدي</h3>
+              <p className="text-[11px] text-amber-300 font-medium">
+                💡 تلميح: عدّ الفلوس الموجودة فعلياً في الدرج الآن واكتبها هنا ليتأكد النظام أن الحساب مضبوط ومطابق.
               </p>
             </div>
           </div>

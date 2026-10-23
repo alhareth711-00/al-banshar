@@ -132,10 +132,10 @@ export default function GeneralPaymentVoucherModal({
               <h3 className="font-extrabold text-white text-base">
                 {printedVoucher ? 'سند صرف رسمي معتمد' : 'إصدار سند صرف نقدية رسمي'}
               </h3>
-              <p className="text-[11px] text-slate-400">
+              <p className="text-[11px] text-amber-300 font-medium">
                 {printedVoucher
                   ? `رقم السند: ${printedVoucher.voucher_number}`
-                  : 'صرف من الصندوق للمالك، الموردين، أو المصروفات مع قيد مزدوج آلي'}
+                  : '💡 تلميح: استخدم هذا السند عند إخراج مبالغ من الصندوق لمصاريف الورشة (كهرباء، ماء، صيانة) أو مسحوبات المالك.'}
               </p>
             </div>
           </div>

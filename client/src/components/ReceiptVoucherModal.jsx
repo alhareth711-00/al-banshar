@@ -131,10 +131,10 @@ export default function ReceiptVoucherModal({
               <h3 className="font-extrabold text-white text-base">
                 {printedVoucher ? 'سند قبض رسمي معتمد' : 'إصدار سند قبض نقدية رسمي'}
               </h3>
-              <p className="text-[11px] text-slate-400">
+              <p className="text-[11px] text-amber-300 font-medium">
                 {printedVoucher
                   ? `رقم السند: ${printedVoucher.voucher_number}`
-                  : 'توثيق مقبوضات نقدية أو بنكية وترحيلها تلقائياً للقيود وذمم العملاء'}
+                  : '💡 تلميح: استخدم هذا السند عند استلام مبالغ كاش أو حوالات من الزبائن لتسديد دين سابق أو دفعة مقدماً.'}
               </p>
             </div>
           </div>

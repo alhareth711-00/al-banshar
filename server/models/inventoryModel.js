@@ -46,6 +46,14 @@ const inventoryModel = {
       query += ' AND item_type = "product" AND stock_qty <= min_stock_alert';
     }
 
+    if (filters.is_consignment !== undefined) {
+      if (filters.is_consignment === '1' || filters.is_consignment === 1 || filters.is_consignment === true) {
+        query += ' AND is_consignment = 1';
+      } else if (filters.is_consignment === '0' || filters.is_consignment === 0 || filters.is_consignment === false) {
+        query += ' AND is_consignment = 0';
+      }
+    }
+
     if (filters.search) {
       query += ` AND (
         name LIKE ? OR 
@@ -54,10 +62,11 @@ const inventoryModel = {
         brand LIKE ? OR 
         viscosity LIKE ? OR 
         tire_battery_spec LIKE ? OR
-        dot_code LIKE ?
+        dot_code LIKE ? OR
+        consignment_supplier_name LIKE ?
       )`;
       const s = `%${filters.search.trim()}%`;
-      params.push(s, s, s, s, s, s, s);
+      params.push(s, s, s, s, s, s, s, s);
     }
 
     query += ' ORDER BY category ASC, brand ASC, name ASC';
@@ -96,12 +105,14 @@ const inventoryModel = {
         sku, barcode, name, category, item_type, brand, viscosity, oil_type, api_grade,
         pack_size, carton_pack_qty, tire_battery_spec, country_of_origin, dot_code,
         battery_capacity_ah, warranty_months, cost_price, sell_price, stock_qty,
-        min_stock_alert, location_shelf, is_active, notes, created_at
+        min_stock_alert, location_shelf, is_consignment, consignment_supplier_name,
+        is_active, notes, created_at
       ) VALUES (
         @sku, @barcode, @name, @category, @item_type, @brand, @viscosity, @oil_type, @api_grade,
         @pack_size, @carton_pack_qty, @tire_battery_spec, @country_of_origin, @dot_code,
         @battery_capacity_ah, @warranty_months, @cost_price, @sell_price, @stock_qty,
-        @min_stock_alert, @location_shelf, @is_active, @notes, datetime('now', 'localtime')
+        @min_stock_alert, @location_shelf, @is_consignment, @consignment_supplier_name,
+        @is_active, @notes, datetime('now', 'localtime')
       )
     `);
 
@@ -127,6 +138,8 @@ const inventoryModel = {
       stock_qty: isService ? 9999 : Math.max(0, safeNum(data.stock_qty, 0)),
       min_stock_alert: isService ? 0 : Math.max(0, safeNum(data.min_stock_alert, 5)),
       location_shelf: data.location_shelf ? data.location_shelf.trim() : null,
+      is_consignment: data.is_consignment ? 1 : 0,
+      consignment_supplier_name: data.is_consignment && data.consignment_supplier_name ? data.consignment_supplier_name.trim() : null,
       is_active: data.is_active !== undefined ? (data.is_active ? 1 : 0) : 1,
       notes: data.notes ? data.notes.trim() : null,
     });
@@ -163,6 +176,8 @@ const inventoryModel = {
         stock_qty = @stock_qty,
         min_stock_alert = @min_stock_alert,
         location_shelf = @location_shelf,
+        is_consignment = @is_consignment,
+        consignment_supplier_name = @consignment_supplier_name,
         is_active = @is_active,
         notes = @notes
       WHERE id = @id
@@ -191,6 +206,10 @@ const inventoryModel = {
       stock_qty: data.stock_qty !== undefined ? safeNum(data.stock_qty, existing.stock_qty) : existing.stock_qty,
       min_stock_alert: data.min_stock_alert !== undefined ? Math.max(0, safeNum(data.min_stock_alert, 5)) : existing.min_stock_alert,
       location_shelf: data.location_shelf !== undefined ? data.location_shelf : existing.location_shelf,
+      is_consignment: data.is_consignment !== undefined ? (data.is_consignment ? 1 : 0) : (existing.is_consignment || 0),
+      consignment_supplier_name: data.is_consignment !== undefined
+        ? (data.is_consignment && data.consignment_supplier_name ? data.consignment_supplier_name.trim() : null)
+        : existing.consignment_supplier_name,
       is_active: data.is_active !== undefined ? (data.is_active ? 1 : 0) : existing.is_active,
       notes: data.notes !== undefined ? data.notes : existing.notes,
     });

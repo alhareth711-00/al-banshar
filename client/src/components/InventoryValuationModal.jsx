@@ -54,8 +54,8 @@ export default function InventoryValuationModal({ isOpen, onClose, inventory = [
               <FileText className="w-5 h-5 stroke-[2.2]" />
             </div>
             <div>
-              <h3 className="font-extrabold text-white text-base">تقرير تقييم المخزون وكشف الجرد الشامل</h3>
-              <p className="text-xs text-slate-400">كشف محاسبي تفصيلي بقيمة البضاعة بسعر الشراء، وسعر البيع، وهامش الربح</p>
+              <h3 className="font-extrabold text-white text-base">إجمالي قيمة بضاعة المحل (رأس المال والجرد)</h3>
+              <p className="text-xs text-amber-300 font-medium">💡 تلميح: كشف بقيمة البضاعة بالكامل بسعر التكلفة وبسعر البيع، مع صافي الربح المتوقع عند بيعها.</p>
             </div>
           </div>
           <div className="flex items-center gap-2">

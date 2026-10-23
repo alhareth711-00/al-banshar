@@ -62,6 +62,8 @@ CREATE TABLE IF NOT EXISTS inventory (
     stock_qty REAL NOT NULL DEFAULT 0,
     min_stock_alert REAL NOT NULL DEFAULT 5,
     location_shelf TEXT,
+    is_consignment INTEGER NOT NULL DEFAULT 0 CHECK(is_consignment IN (0, 1)),
+    consignment_supplier_name TEXT,
     is_active INTEGER NOT NULL DEFAULT 1 CHECK(is_active IN (0, 1)),
     notes TEXT,
     created_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime'))

@@ -66,8 +66,8 @@ export default function StockAdjustmentModal({ isOpen, onClose, item, onAdjustCo
               <Scale className="w-5 h-5 stroke-[2.2]" />
             </div>
             <div>
-              <h3 className="font-extrabold text-white text-base">تسوية جردية رسمية (مع قيد محاسبي)</h3>
-              <p className="text-xs text-slate-400">تحديث رصيد الصنف وترحيل الأثر المالي في الأرباح والخسائر فوراً</p>
+              <h3 className="font-extrabold text-white text-base">تعديل كميات الجرد الفعلي وتسوية الفوارق</h3>
+              <p className="text-xs text-amber-300 font-medium">💡 تلميح: إذا جردت الرف ووجدت الكمية تختلف عن النظام، اكتب الكمية الصحيحة هنا لتعديلها فوراً.</p>
             </div>
           </div>
           <button onClick={onClose} className="text-slate-400 hover:text-white">

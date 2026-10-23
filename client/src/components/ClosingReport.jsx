@@ -311,10 +311,10 @@ export default function ClosingReport({ onOpenBayProfitability }) {
               type="button"
               onClick={onOpenBayProfitability}
               className="min-h-[44px] px-3.5 rounded-2xl bg-purple-500/20 hover:bg-purple-500/30 text-purple-300 border border-purple-500/30 font-bold text-xs flex items-center gap-1.5 transition active:scale-95"
-              title="عرض مؤشرات كفاءة ربحية الحفرة والخدمات"
+              title="عرض مؤشرات ونشاط حركة سيارات الحفرة ومبيعات الزيوت"
             >
               <Wrench className="w-4 h-4 text-purple-400" />
-              <span className="hidden sm:inline">ربحية الحفرة 🚗</span>
+              <span className="hidden sm:inline">حركة سيارات الحفرة 🚗</span>
             </button>
           )}
 

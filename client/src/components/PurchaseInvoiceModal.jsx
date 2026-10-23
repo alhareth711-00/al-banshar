@@ -587,31 +587,77 @@ export default function PurchaseInvoiceModal({
 
                     {/* Carton Unpacking Manual Capacity Details (Requested by User) */}
                     {line.is_carton && (
-                      <div className="p-2 rounded-xl bg-amber-500/10 border border-amber-500/20 flex flex-wrap items-center justify-between gap-2 text-xs">
-                        <div className="flex items-center gap-2">
-                          <span className="text-slate-300 font-bold">سعة الكرتون يدوياً (عدد العلب في الكرتون):</span>
-                          <input
-                            type="number"
-                            min="1"
-                            value={line.units_per_carton}
-                            onChange={(e) => handleUpdateLine(idx, 'units_per_carton', e.target.value)}
-                            className="w-20 px-2 py-1 rounded-lg bg-slate-950 border border-amber-400/40 text-amber-300 font-mono font-bold text-center"
-                          />
-                          <span className="text-slate-400">علبة لكل كرتون</span>
+                      <div className="p-3 rounded-2xl bg-amber-500/10 border border-amber-500/25 space-y-2 text-xs">
+                        {/* Row 1: Carton Capacity Presets & Custom Input */}
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                          <div className="flex flex-wrap items-center gap-1.5">
+                            <span className="text-amber-300 font-bold flex items-center gap-1">
+                              <Package className="w-3.5 h-3.5" />
+                              <span>سعة الكرتون:</span>
+                            </span>
+                            {[
+                              { label: '24 علبة (1L)', val: 24 },
+                              { label: '12 علبة', val: 12 },
+                              { label: '4 دبات (4L)', val: 4 },
+                              { label: '6 علب', val: 6 },
+                            ].map((preset) => {
+                              const isSelected = Number(line.units_per_carton) === preset.val;
+                              return (
+                                <button
+                                  key={preset.val}
+                                  type="button"
+                                  onClick={() => handleUpdateLine(idx, 'units_per_carton', preset.val)}
+                                  className={`px-2.5 py-1 rounded-lg text-[11px] font-bold border transition ${
+                                    isSelected
+                                      ? 'bg-amber-400 text-slate-950 border-amber-300 shadow-sm'
+                                      : 'bg-slate-900/90 text-slate-300 border-white/10 hover:border-amber-400/50 hover:text-white'
+                                  }`}
+                                >
+                                  {preset.label}
+                                </button>
+                              );
+                            })}
+                          </div>
+
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-slate-400 text-[11px]">أو يدوي:</span>
+                            <input
+                              type="number"
+                              min="1"
+                              value={line.units_per_carton}
+                              onChange={(e) => handleUpdateLine(idx, 'units_per_carton', e.target.value)}
+                              className="w-16 px-2 py-1 rounded-lg bg-slate-950 border border-amber-400/40 text-amber-300 font-mono font-bold text-center text-xs focus:outline-none focus:border-amber-400"
+                              placeholder="سعة"
+                            />
+                            <span className="text-slate-400 text-[11px]">علبة/كرتون</span>
+                          </div>
                         </div>
 
-                        <div className="flex items-center gap-3 font-mono text-[11px]">
-                          <span className="text-slate-300">
-                            إجمالي التوريد الفعلي: <span className="font-bold text-emerald-400">{line.qty} علبة</span>
-                          </span>
-                          <span>&bull;</span>
-                          <span className="text-slate-300">
-                            تكلفة العلبة الواحدة: <span className="font-bold text-amber-300">{Number(line.unit_cost).toLocaleString()} ر.ي</span>
-                          </span>
-                          <span>&bull;</span>
-                          <span className="text-slate-300">
-                            إجمالي السطر: <span className="font-bold text-white">{subtotal.toLocaleString()} ر.ي</span>
-                          </span>
+                        {/* Row 2: Live Breakdown & Profit Preview */}
+                        <div className="p-2 rounded-xl bg-slate-950/70 border border-white/5 flex flex-wrap items-center justify-between gap-2 font-mono text-[11px]">
+                          <div className="flex items-center gap-1.5 text-slate-300">
+                            <span>معادلة التفكيك:</span>
+                            <span className="text-amber-300 font-bold">{line.carton_qty || 0} كرتون</span>
+                            <span>&times;</span>
+                            <span className="text-amber-300 font-bold">{line.units_per_carton || 1} علبة</span>
+                            <span>=</span>
+                            <span className="px-2 py-0.5 rounded-md bg-emerald-500/20 text-emerald-300 font-black border border-emerald-500/30">
+                              {line.qty} علبة ستدخل المخزن
+                            </span>
+                          </div>
+
+                          <div className="flex items-center gap-2">
+                            <span className="text-slate-400">تكلفة العلبة الفردية:</span>
+                            <span className="text-amber-300 font-bold text-xs">
+                              {Number(line.unit_cost || 0).toLocaleString()} ر.ي
+                            </span>
+                            {line.unit_sell && Number(line.unit_sell) > Number(line.unit_cost) && (
+                              <span className="px-1.5 py-0.5 rounded bg-teal-500/10 text-teal-300 text-[10px] border border-teal-500/20">
+                                ربح العلبة: +{(Number(line.unit_sell) - Number(line.unit_cost)).toLocaleString()} ر.ي (
+                                {Math.round(((Number(line.unit_sell) - Number(line.unit_cost)) / (Number(line.unit_cost) || 1)) * 100)}%)
+                              </span>
+                            )}
+                          </div>
                         </div>
                       </div>
                     )}

@@ -55,8 +55,8 @@ export default function TurnoverAnalyticsModal({ isOpen, onClose, onEditItem }) 
               <TrendingUp className="w-5 h-5 stroke-[2.2]" />
             </div>
             <div>
-              <h3 className="font-extrabold text-white text-base">تحليل حركة وسرعة دوران المخزون (ABC Velocity)</h3>
-              <p className="text-xs text-slate-400">تصنيف الأصناف وكشف رأس المال المجمد في البضاعة الراكدة لاتخاذ قرارات الشراء والتسييل</p>
+              <h3 className="font-extrabold text-white text-base">حركة الأصناف (الأكثر طلباً والراكد في الرفوف)</h3>
+              <p className="text-xs text-amber-300 font-medium">💡 تلميح: كشف الأصناف السريعة التي تمشي يومياً، والبضاعة الراكدة التي حبست رأس مالك دون تصريف.</p>
             </div>
           </div>
           <div className="flex items-center gap-2">

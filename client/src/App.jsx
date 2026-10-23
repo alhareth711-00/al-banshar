@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { Lock } from 'lucide-react';
 import Sidebar from './components/Sidebar';
 import PosScreen from './components/PosScreen';
 import RetentionRadar from './components/RetentionRadar';
@@ -12,6 +13,8 @@ import StatementOfAccountModal from './components/StatementOfAccountModal';
 import BayProfitabilityModal from './components/BayProfitabilityModal';
 import FinancialVaultHub from './components/FinancialVaultHub';
 import UserGuideModal from './components/UserGuideModal';
+import OwnerPinModal from './components/OwnerPinModal';
+import { getAutoLockMinutes } from './utils/settings';
 
 export default function App() {
   const [activeTab, setActiveTab] = useState('pos');
@@ -26,6 +29,130 @@ export default function App() {
   const [showBayModal, setShowBayModal] = useState(false);
   const [showUserGuideModal, setShowUserGuideModal] = useState(false);
   const [pulseRefreshTrigger, setPulseRefreshTrigger] = useState(0);
+
+  // Smart Authority State (الجزء الأول: وضع الكاشير الآمن افتراضياً)
+  const [isOwnerMode, setIsOwnerMode] = useState(false);
+  const [autoLockNotice, setAutoLockNotice] = useState('');
+  const [ownerPinModal, setOwnerPinModal] = useState({
+    isOpen: false,
+    title: 'رمز المالك السري',
+    subtitle: 'يرجى إدخال رمز PIN المكون من 4 أرقام للمتابعة',
+    onSuccess: null,
+  });
+
+  // Smart Inactivity Auto-Lock (المقترح 1: حماية بيانات المالك عند عدم النشاط)
+  useEffect(() => {
+    if (!isOwnerMode) return;
+
+    const timeoutMinutes = getAutoLockMinutes();
+    if (!timeoutMinutes || timeoutMinutes <= 0) return;
+
+    const timeoutMs = timeoutMinutes * 60 * 1000;
+    let timer = null;
+
+    const handleInactivity = () => {
+      setIsOwnerMode(false);
+      setAutoLockNotice('تم قفل وضع المدير تلقائياً لعدم النشاط لحماية بيانات وأرباح المركز 🔒');
+      setTimeout(() => setAutoLockNotice(''), 6000);
+      setActiveTab((currentTab) => (currentTab === 'vault' ? 'pos' : currentTab));
+    };
+
+    const resetTimer = () => {
+      if (timer) clearTimeout(timer);
+      timer = setTimeout(handleInactivity, timeoutMs);
+    };
+
+    const events = ['mousedown', 'mousemove', 'keydown', 'touchstart', 'scroll', 'click'];
+    events.forEach((evt) => window.addEventListener(evt, resetTimer, { passive: true }));
+
+    resetTimer();
+
+    return () => {
+      if (timer) clearTimeout(timer);
+      events.forEach((evt) => window.removeEventListener(evt, resetTimer));
+    };
+  }, [isOwnerMode]);
+
+  // Guard action requiring Owner PIN
+  const requireOwnerAuth = (
+    actionCallback,
+    title = 'رمز المالك السري (محمي)',
+    subtitle = 'يرجى إدخال رمز PIN المكون من 4 أرقام لفتح الصلاحية'
+  ) => {
+    if (isOwnerMode) {
+      if (actionCallback) actionCallback();
+    } else {
+      setOwnerPinModal({
+        isOpen: true,
+        title,
+        subtitle,
+        onSuccess: () => {
+          setIsOwnerMode(true);
+          if (actionCallback) actionCallback();
+        },
+      });
+    }
+  };
+
+  const handleToggleOwnerMode = () => {
+    if (isOwnerMode) {
+      setIsOwnerMode(false);
+    } else {
+      requireOwnerAuth(null, 'التبديل إلى وضع المدير المالي', 'أدخل رمز PIN للمالك لعرض الأرباح والتقارير الحساسة');
+    }
+  };
+
+  const handleTabSelect = (tabId) => {
+    if (tabId === 'vault' && !isOwnerMode) {
+      requireOwnerAuth(
+        () => setActiveTab('vault'),
+        'شاشة الخزينة والمحاسبة (محمية)',
+        'تتضمن هذه الشاشة حركة النقدية وسندات الصرف والقيود المحاسبية'
+      );
+    } else {
+      setActiveTab(tabId);
+    }
+  };
+
+  const handleOpenSettingsGuarded = () => {
+    if (!isOwnerMode) {
+      requireOwnerAuth(
+        () => setShowSettingsModal(true),
+        'إعدادات وهوية المركز (محمية)',
+        'تعديل أسماء وهوية المركز والرمز السري للوردية'
+      );
+    } else {
+      setShowSettingsModal(true);
+    }
+  };
+
+  const handleOpenStatementGuarded = (type = 'customer', id = null) => {
+    if (!isOwnerMode) {
+      requireOwnerAuth(
+        () => {
+          setStatementInitialParty({ type, id });
+          setShowStatementModal(true);
+        },
+        'كشف الحساب والديون (محمي)',
+        'استعراض تفاصيل الديون والمسحوبات وسندات الحسابات'
+      );
+    } else {
+      setStatementInitialParty({ type, id });
+      setShowStatementModal(true);
+    }
+  };
+
+  const handleOpenBayProfitabilityGuarded = () => {
+    if (!isOwnerMode) {
+      requireOwnerAuth(
+        () => setShowBayModal(true),
+        'ربحية الحفر والخدمات (محمية)',
+        'تحليل هوامش أرباح أجور اليد وتغطية تكاليف التشغيل'
+      );
+    } else {
+      setShowBayModal(true);
+    }
+  };
 
   // Fetch initial master data
   const fetchData = useCallback(async () => {
@@ -94,20 +221,23 @@ export default function App() {
       {/* Apple-style Dock / Sidebar */}
       <Sidebar
         activeTab={activeTab}
-        setActiveTab={setActiveTab}
+        setActiveTab={handleTabSelect}
         radarCount={radarCount}
         lowStockCount={lowStockCount}
-        onOpenSettings={() => setShowSettingsModal(false) || setShowSettingsModal(true)}
+        onOpenSettings={handleOpenSettingsGuarded}
         onOpenUserGuide={() => setShowUserGuideModal(true)}
+        isOwnerMode={isOwnerMode}
       />
 
       {/* Main App Workspace with Global Smooth Scrollability */}
       <main className="flex-1 flex flex-col p-3 lg:p-5 overflow-y-auto overflow-x-hidden min-w-0 min-h-0 bg-gradient-to-br from-slate-950 via-slate-900/90 to-slate-950">
         {/* Real-time Financial Pulse Bar (Upgrade 2 & Action Center) */}
         <FinancialPulseBar
-          onOpenStatement={() => handleOpenStatement('customer', null)}
-          onOpenBayProfitability={() => setShowBayModal(true)}
+          onOpenStatement={() => handleOpenStatementGuarded('customer', null)}
+          onOpenBayProfitability={handleOpenBayProfitabilityGuarded}
           refreshTrigger={pulseRefreshTrigger}
+          isOwnerMode={isOwnerMode}
+          onToggleOwnerMode={handleToggleOwnerMode}
         />
 
         {activeTab === 'pos' && (
@@ -116,7 +246,9 @@ export default function App() {
             workers={workers}
             onRefreshData={handleDataRefreshed}
             initialVehicle={posPreselectedVehicle}
-            onOpenStatement={(vehId) => handleOpenStatement('customer', vehId)}
+            onOpenStatement={(vehId) => handleOpenStatementGuarded('customer', vehId)}
+            isOwnerMode={isOwnerMode}
+            onRequireOwnerAuth={requireOwnerAuth}
           />
         )}
 
@@ -125,7 +257,12 @@ export default function App() {
         )}
 
         {activeTab === 'inventory' && (
-          <InventoryView inventory={inventory} onRefreshData={handleDataRefreshed} />
+          <InventoryView
+            inventory={inventory}
+            onRefreshData={handleDataRefreshed}
+            isOwnerMode={isOwnerMode}
+            onRequireOwnerAuth={requireOwnerAuth}
+          />
         )}
 
         {activeTab === 'purchases' && (
@@ -185,6 +322,25 @@ export default function App() {
         isOpen={showUserGuideModal}
         onClose={() => setShowUserGuideModal(false)}
       />
+
+      {/* Owner PIN Verification Modal (حماية صلاحيات المالك) */}
+      <OwnerPinModal
+        isOpen={ownerPinModal.isOpen}
+        onClose={() => setOwnerPinModal((prev) => ({ ...prev, isOpen: false }))}
+        onSuccess={() => {
+          if (ownerPinModal.onSuccess) ownerPinModal.onSuccess();
+        }}
+        title={ownerPinModal.title}
+        subtitle={ownerPinModal.subtitle}
+      />
+
+      {/* Auto-Lock Inactivity Toast Notice */}
+      {autoLockNotice && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 px-5 py-3 rounded-2xl bg-slate-900/95 border border-amber-500/40 text-amber-300 text-xs font-bold shadow-2xl flex items-center gap-2.5 animate-in fade-in slide-in-from-bottom duration-300">
+          <Lock className="w-4 h-4 text-amber-400 shrink-0" />
+          <span>{autoLockNotice}</span>
+        </div>
+      )}
     </div>
   );
 }
