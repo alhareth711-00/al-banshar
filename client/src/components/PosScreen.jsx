@@ -25,6 +25,9 @@ import {
   Wrench,
   Loader2,
   Building2,
+  ChevronDown,
+  ChevronUp,
+  Coins,
 } from 'lucide-react';
 
 import NewVehicleModal from './NewVehicleModal';
@@ -84,6 +87,12 @@ export default function PosScreen({
     leaks: true,        // فحص التهريب السفلي
     battery: true,      // فحص أقطاب وشحن البطارية
   });
+
+  // نمط الإفصاح التدريجي لفحص السلامة (الكبسولة المدمجة)
+  const [isSafetyExpanded, setIsSafetyExpanded] = useState(false);
+  const passedSafetyCount = useMemo(() => {
+    return Object.values(safetyPoints).filter(Boolean).length;
+  }, [safetyPoints]);
 
   useEffect(() => {
     if (initialVehicle) {
@@ -983,51 +992,99 @@ export default function PosScreen({
             </div>
           </div>
 
-          {/* 8-Point Free Touch Safety Inspection Checklist */}
-          <div className="apple-glass rounded-3xl p-3 border border-white/10">
-            <div className="flex items-center justify-between mb-2">
-              <div className="text-xs font-bold text-slate-300 flex items-center gap-1.5">
-                <ShieldCheck className="w-4 h-4 text-emerald-400" />
-                <span>فحص السلامة المجاني (8 نقاط سريعة):</span>
+          {/* 8-Point Free Touch Safety Inspection Capsule (Progressive Disclosure) */}
+          <div className="apple-glass rounded-2xl p-3 border border-white/10 transition-all duration-200">
+            <div className="flex items-center justify-between gap-2 flex-wrap">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-xl bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 flex items-center justify-center">
+                  <ShieldCheck className="w-4 h-4" />
+                </div>
+                <div>
+                  <span className="text-xs font-extrabold text-white">فحص السلامة المجاني (8 نقاط):</span>
+                  <div className="text-[11px] font-mono font-bold flex items-center gap-1.5 mt-0.5">
+                    {passedSafetyCount === 8 ? (
+                      <span className="text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20">
+                        8 / 8 نقاط مجتازة وسليمة بالكامل 🛡️
+                      </span>
+                    ) : (
+                      <span className="text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded-full border border-amber-500/20">
+                        ⚠️ {passedSafetyCount} من 8 نقاط سليمة (تم تسجيل ملاحظة)
+                      </span>
+                    )}
+                  </div>
+                </div>
               </div>
-              <span className="text-[10px] text-emerald-400 font-bold bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20">
-                ميزة تنافسية للزبون 🛡️
-              </span>
+
+              <div className="flex items-center gap-1.5">
+                <button
+                  type="button"
+                  onClick={() => setIsSafetyExpanded(!isSafetyExpanded)}
+                  className="min-h-[38px] px-3 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-200 border border-white/10 font-bold text-xs flex items-center gap-1.5 transition active:scale-95"
+                >
+                  <span>{isSafetyExpanded ? 'إخفاء القائمة' : 'تخصيص الفحص'}</span>
+                  {isSafetyExpanded ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+                </button>
+              </div>
             </div>
 
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5 text-xs">
-              {[
-                { id: 'radiator', label: '💧 ماء الرديتر' },
-                { id: 'brake', label: '🛑 زيت الفرامل' },
-                { id: 'washer', label: '🚿 ماء المساحات' },
-                { id: 'tires', label: '🛞 ضغط الإطارات' },
-                { id: 'air_filter', label: '💨 فلتر الهواء' },
-                { id: 'cabin_filter', label: '❄️ فلتر المكيف' },
-                { id: 'leaks', label: '🔍 فحص التهريب' },
-                { id: 'battery', label: '🔋 فحص البطارية' },
-              ].map((pt) => {
-                const isChecked = safetyPoints[pt.id];
-                return (
+            {/* Expandable Grid */}
+            {isSafetyExpanded && (
+              <div className="mt-3 pt-3 border-t border-white/10 animate-in fade-in duration-150 space-y-2">
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5 text-xs">
+                  {[
+                    { id: 'radiator', label: '💧 ماء الرديتر' },
+                    { id: 'brake', label: '🛑 زيت الفرامل' },
+                    { id: 'washer', label: '🚿 ماء المساحات' },
+                    { id: 'tires', label: '🛞 ضغط الإطارات' },
+                    { id: 'air_filter', label: '💨 فلتر الهواء' },
+                    { id: 'cabin_filter', label: '❄️ فلتر المكيف' },
+                    { id: 'leaks', label: '🔍 فحص التهريب' },
+                    { id: 'battery', label: '🔋 فحص البطارية' },
+                  ].map((pt) => {
+                    const isChecked = safetyPoints[pt.id];
+                    return (
+                      <button
+                        key={pt.id}
+                        type="button"
+                        onClick={() => setSafetyPoints((prev) => ({ ...prev, [pt.id]: !prev[pt.id] }))}
+                        className={`min-h-[40px] px-2 py-1.5 rounded-xl text-[11px] font-bold transition flex items-center justify-between border active:scale-95 ${
+                          isChecked
+                            ? 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30'
+                            : 'bg-slate-900 text-slate-500 border-white/10 line-through'
+                        }`}
+                      >
+                        <span className="truncate">{pt.label}</span>
+                        {isChecked ? (
+                          <Check className="w-3.5 h-3.5 text-emerald-400 stroke-[3] flex-shrink-0" />
+                        ) : (
+                          <span className="text-[10px] text-rose-400 font-black">✕ خلل</span>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+                <div className="flex justify-end pt-1">
                   <button
-                    key={pt.id}
                     type="button"
-                    onClick={() => setSafetyPoints((prev) => ({ ...prev, [pt.id]: !prev[pt.id] }))}
-                    className={`min-h-[36px] px-2 py-1 rounded-xl text-[11px] font-bold transition flex items-center justify-between border ${
-                      isChecked
-                        ? 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30'
-                        : 'bg-slate-900/60 text-slate-500 border-white/5 line-through'
-                    }`}
+                    onClick={() => {
+                      setSafetyPoints({
+                        radiator: true,
+                        brake: true,
+                        washer: true,
+                        tires: true,
+                        air_filter: true,
+                        cabin_filter: true,
+                        leaks: true,
+                        battery: true,
+                      });
+                    }}
+                    className="text-[11px] text-slate-400 hover:text-emerald-400 font-bold transition underline underline-offset-4"
                   >
-                    <span className="truncate">{pt.label}</span>
-                    {isChecked ? (
-                      <Check className="w-3.5 h-3.5 text-emerald-400 stroke-[3] flex-shrink-0" />
-                    ) : (
-                      <span className="text-[10px] text-slate-600">✕</span>
-                    )}
+                    إعادة ضبط جميع النقاط إلى سليم (8/8)
                   </button>
-                );
-              })}
-            </div>
+                </div>
+              </div>
+            )}
           </div>
         </div>
 
@@ -1143,24 +1200,25 @@ export default function PosScreen({
                       <button
                         type="button"
                         onClick={() => handleUpdateItemQty(idx, -1)}
-                        className="w-7 h-7 rounded-lg bg-slate-800 hover:bg-slate-700 text-white flex items-center justify-center font-bold"
+                        className="w-8 h-8 rounded-xl bg-slate-800 hover:bg-slate-700 text-white flex items-center justify-center font-bold text-sm border border-white/10 active:scale-90 transition"
                       >
                         -
                       </button>
-                      <span className="w-6 text-center font-mono font-bold text-sm text-white">
+                      <span className="w-7 text-center font-mono font-extrabold text-sm text-white">
                         {item.qty}
                       </span>
                       <button
                         type="button"
                         onClick={() => handleUpdateItemQty(idx, 1)}
-                        className="w-7 h-7 rounded-lg bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 flex items-center justify-center font-bold"
+                        className="w-8 h-8 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 flex items-center justify-center font-bold text-sm border border-amber-500/30 active:scale-90 transition"
                       >
                         +
                       </button>
                       <button
                         type="button"
                         onClick={() => handleRemoveCartItem(idx)}
-                        className="w-7 h-7 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 flex items-center justify-center mr-1"
+                        className="w-8 h-8 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 flex items-center justify-center mr-1 border border-rose-500/20 active:scale-90 transition"
+                        title="حذف البند من السلة"
                       >
                         <Trash2 className="w-3.5 h-3.5" />
                       </button>
@@ -1176,13 +1234,13 @@ export default function PosScreen({
             {goodsTotal > 0 && (
               <div className="flex justify-between text-slate-300">
                 <span>إجمالي مبيعات الزيوت والقطع:</span>
-                <span className="font-mono font-bold">{goodsTotal.toLocaleString()} ر.ي</span>
+                <span className="font-mono font-bold text-white">{goodsTotal.toLocaleString()} ر.ي</span>
               </div>
             )}
 
             {servicesTotal > 0 && (
               <div className="flex justify-between text-teal-300">
-                <span>إجمالي إيراد الخدمات:</span>
+                <span>إجمالي إيراد خدمات الورشة:</span>
                 <span className="font-mono font-bold">{servicesTotal.toLocaleString()} ر.ي</span>
               </div>
             )}
@@ -1195,27 +1253,54 @@ export default function PosScreen({
               </div>
             )}
 
-            {/* Special Discount Input */}
-            <div className="flex items-center justify-between text-rose-400">
-              <span>خصم إضافي / تعديل الخصم:</span>
-              <div className="flex items-center gap-1">
-                <span>-</span>
-                <input
-                  type="number"
-                  placeholder="0"
-                  value={specialDiscount || ''}
-                  onChange={(e) => setSpecialDiscount(Number(e.target.value) || 0)}
-                  className="w-20 px-2 py-0.5 rounded-lg bg-slate-900 border border-rose-500/30 font-mono text-xs font-bold text-center text-rose-400"
-                />
-                <span>ر.ي</span>
+            {/* Special Discount Input with Quick Touch Pills */}
+            <div className="flex flex-wrap items-center justify-between gap-1 pt-1 border-t border-white/5">
+              <span className="text-xs font-bold text-slate-300">خصم إضافي:</span>
+              <div className="flex items-center gap-1.5 flex-wrap">
+                <div className="flex items-center gap-1">
+                  {[500, 1000].map((amt) => (
+                    <button
+                      key={amt}
+                      type="button"
+                      onClick={() => setSpecialDiscount(amt)}
+                      className={`px-2 py-0.5 rounded-lg text-[10px] font-mono font-bold transition border ${
+                        specialDiscount === amt
+                          ? 'bg-rose-500 text-white border-rose-400'
+                          : 'bg-slate-900 text-slate-300 border-white/10 hover:text-white'
+                      }`}
+                    >
+                      -{amt}
+                    </button>
+                  ))}
+                  {specialDiscount > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => setSpecialDiscount(0)}
+                      className="px-1.5 py-0.5 rounded-lg text-[10px] bg-slate-800 text-slate-400 hover:text-rose-400 border border-white/10"
+                      title="تصفير الخصم"
+                    >
+                      ✕ تصفير
+                    </button>
+                  )}
+                </div>
+                <div className="flex items-center gap-1 text-rose-400">
+                  <input
+                    type="number"
+                    placeholder="0"
+                    value={specialDiscount || ''}
+                    onChange={(e) => setSpecialDiscount(Number(e.target.value) || 0)}
+                    className="w-16 px-1.5 py-0.5 rounded-lg bg-slate-900 border border-rose-500/30 font-mono text-xs font-bold text-center text-rose-400 focus:outline-none"
+                  />
+                  <span className="text-[10px] text-slate-400">ر.ي</span>
+                </div>
               </div>
             </div>
 
             {/* Net Total Display */}
             <div className="pt-2 border-t border-white/10 flex justify-between items-center">
-              <span className="font-extrabold text-sm text-white">الصافي المطلوب دفعه:</span>
-              <span className="font-mono font-extrabold text-xl text-amber-400">
-                {netTotal.toLocaleString()} <span className="text-xs font-sans text-slate-300">ر.ي</span>
+              <span className="font-black text-sm text-white">الصافي المطلوب دفعه:</span>
+              <span className="font-mono font-black text-2xl text-amber-400">
+                {netTotal.toLocaleString()} <span className="text-xs font-sans text-slate-300 font-bold">ر.ي</span>
               </span>
             </div>
           </div>
@@ -1237,10 +1322,10 @@ export default function PosScreen({
                     key={m.id}
                     type="button"
                     onClick={() => setPaymentMethod(m.id)}
-                    className={`min-h-[42px] py-1 px-1.5 rounded-xl text-xs font-bold transition flex items-center justify-center border ${
+                    className={`min-h-[48px] py-1 px-1.5 rounded-xl text-xs font-bold transition flex items-center justify-center border active:scale-95 ${
                       isSelected
-                        ? 'bg-white/20 border-white text-white shadow-md'
-                        : 'bg-slate-900/60 border-white/10 text-slate-400 hover:text-white'
+                        ? 'bg-amber-400 text-slate-950 font-black border-amber-300 shadow-md shadow-amber-400/20'
+                        : 'bg-slate-900 border-white/10 text-slate-300 hover:text-white hover:bg-slate-800'
                     }`}
                   >
                     {m.label}
@@ -1251,8 +1336,8 @@ export default function PosScreen({
 
             {/* Wallet Reference Input */}
             {['jeeb', 'jawali', 'kuraimi'].includes(paymentMethod) && (
-              <div className="p-2 rounded-xl bg-slate-900 border border-white/10 animate-in fade-in">
-                <label className="block text-[11px] text-slate-400 mb-1">
+              <div className="p-2.5 rounded-2xl bg-slate-900 border border-white/10 animate-in fade-in space-y-1">
+                <label className="block text-[11px] text-slate-400">
                   رقم إشعار الحوالة للمحفظة:
                 </label>
                 <input
@@ -1260,27 +1345,67 @@ export default function PosScreen({
                   placeholder="مثال: KUR-9988112"
                   value={walletRefNumber}
                   onChange={(e) => setWalletRefNumber(e.target.value)}
-                  className="w-full min-h-[36px] px-3 rounded-lg bg-slate-800 border border-white/10 text-white font-mono text-xs font-bold"
+                  className="w-full min-h-[42px] px-3 rounded-xl bg-slate-800 border border-white/10 text-white font-mono text-xs font-bold focus:border-amber-400 focus:outline-none"
                 />
               </div>
             )}
 
-            {/* Partial / Debt Amount Input */}
+            {/* Partial / Debt Amount Input with Touch Amount Chips */}
             {paymentMethod === 'credit' && (
-              <div className="p-2.5 rounded-xl bg-rose-500/10 border border-rose-500/25 space-y-1.5 animate-in fade-in text-xs">
-                <div className="flex items-center justify-between">
-                  <span className="text-slate-300">المبلغ المدفوع فعلياً (كاش/محفظة):</span>
-                  <input
-                    type="number"
-                    placeholder="0"
-                    value={paidAmountInput}
-                    onChange={(e) => setPaidAmountInput(e.target.value)}
-                    className="w-24 px-2 py-1 rounded-lg bg-slate-900 border border-white/20 font-mono text-xs font-bold text-white text-center"
-                  />
+              <div className="p-3 rounded-2xl bg-rose-500/10 border border-rose-500/30 space-y-2 animate-in fade-in text-xs">
+                <div className="flex items-center justify-between gap-2 flex-wrap">
+                  <span className="text-slate-200 font-bold">المبلغ المدفوع فعلياً (كاش/محفظة):</span>
+                  <div className="flex items-center gap-1.5">
+                    <input
+                      type="number"
+                      placeholder="0"
+                      value={paidAmountInput}
+                      onChange={(e) => setPaidAmountInput(e.target.value)}
+                      className="w-28 min-h-[40px] px-2.5 rounded-xl bg-slate-900 border border-white/20 font-mono text-sm font-black text-white text-center focus:border-amber-400 focus:outline-none"
+                    />
+                    <span className="font-mono text-slate-400">ر.ي</span>
+                  </div>
                 </div>
-                <div className="flex justify-between font-bold text-rose-300">
+
+                {/* Quick Touch Amount Chips */}
+                <div className="flex items-center gap-1 flex-wrap pt-0.5">
+                  <span className="text-[11px] text-slate-400">خيارات سريعة:</span>
+                  <button
+                    type="button"
+                    onClick={() => setPaidAmountInput('0')}
+                    className="px-2 py-1 rounded-lg bg-slate-900 hover:bg-slate-800 text-slate-300 text-[11px] font-mono border border-white/10 active:scale-95"
+                  >
+                    آجل كامل (0)
+                  </button>
+                  {netTotal > 0 && (
+                    <>
+                      <button
+                        type="button"
+                        onClick={() => setPaidAmountInput(String(Math.round(netTotal / 2)))}
+                        className="px-2 py-1 rounded-lg bg-slate-900 hover:bg-slate-800 text-amber-300 text-[11px] font-mono font-bold border border-white/10 active:scale-95"
+                      >
+                        نصف ({Math.round(netTotal / 2).toLocaleString()})
+                      </button>
+                      {[1000, 2000, 5000].map((step) => {
+                        if (step >= netTotal) return null;
+                        return (
+                          <button
+                            key={step}
+                            type="button"
+                            onClick={() => setPaidAmountInput(String(step))}
+                            className="px-2 py-1 rounded-lg bg-slate-900 hover:bg-slate-800 text-emerald-300 text-[11px] font-mono border border-white/10 active:scale-95"
+                          >
+                            +{step.toLocaleString()}
+                          </button>
+                        );
+                      })}
+                    </>
+                  )}
+                </div>
+
+                <div className="flex justify-between font-bold text-rose-300 pt-1.5 border-t border-rose-500/20 text-xs">
                   <span>المبلغ المتبقي كدين على العميل:</span>
-                  <span className="font-mono">{remainingDebt.toLocaleString()} ر.ي</span>
+                  <span className="font-mono text-sm font-black text-rose-400">{remainingDebt.toLocaleString()} ر.ي</span>
                 </div>
               </div>
             )}
@@ -1290,10 +1415,10 @@ export default function PosScreen({
               type="button"
               disabled={isSubmittingInvoice || cartItems.length === 0 || !selectedVehicle}
               onClick={handleSubmitInvoice}
-              className={`w-full min-h-[52px] rounded-2xl font-black text-sm shadow-xl flex items-center justify-center gap-2 transition active:scale-95 ${
+              className={`w-full min-h-[56px] rounded-2xl font-black text-base shadow-xl flex items-center justify-center gap-2 transition active:scale-[0.98] ${
                 !selectedVehicle || cartItems.length === 0 || isSubmittingInvoice
                   ? 'bg-slate-800 text-slate-500 cursor-not-allowed border border-white/5'
-                  : 'bg-gradient-to-r from-emerald-500 to-green-600 hover:from-emerald-400 hover:to-green-500 text-slate-950 shadow-emerald-500/25'
+                  : 'bg-gradient-to-r from-emerald-500 to-green-600 hover:from-emerald-400 hover:to-green-500 text-slate-950 shadow-emerald-500/25 ring-1 ring-emerald-400/40'
               }`}
             >
               {isSubmittingInvoice ? (
