@@ -339,27 +339,27 @@ export default function PurchasesView({ inventory = [], onRefreshData, onOpenSup
     <div className="min-h-full flex flex-col gap-4 select-none pb-8">
       {/* 1. Header Bar */}
       <div className="apple-glass rounded-3xl p-5 border border-white/10 flex flex-wrap items-center justify-between gap-4 flex-shrink-0">
-        <div className="flex items-center gap-3">
-          <div className="w-12 h-12 rounded-2xl bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 flex items-center justify-center shadow-lg shadow-emerald-500/10">
-            <ShoppingBag className="w-6 h-6 stroke-[2.2]" />
+        <div className="flex items-center gap-3.5">
+          <div className="w-13 h-13 rounded-2xl bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 flex items-center justify-center shadow-lg shadow-emerald-500/10">
+            <ShoppingBag className="w-7 h-7 stroke-[2.2]" />
           </div>
           <div>
-            <h2 className="text-xl font-extrabold text-white">إدارة المشتريات والموردين والتوريد المخزني</h2>
-            <p className="text-xs text-slate-400">
-              توزيع أجور الشحن (Landed Cost) &bull; أرشيف سندات الصرف &bull; جدولة الديون وتتبع أعمار الذمم
+            <h2 className="text-2xl font-black text-white">إدارة المشتريات والموردين والتوريد المخزني</h2>
+            <p className="text-xs text-slate-300 font-medium mt-0.5">
+              توزيع أجور الشحن (Landed Cost) &bull; تفكيك الكراتين للعلب &bull; أرشيف سندات الصرف &bull; جدولة الديون وتتبع أعمار الذمم
             </p>
           </div>
         </div>
 
         {/* Action Buttons */}
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2.5 flex-wrap">
           <button
             type="button"
             onClick={() => {
               setSelectedPurchaseForReturn(null);
               setShowReturnModal(true);
             }}
-            className="min-h-[48px] px-4 rounded-2xl bg-rose-500/20 hover:bg-rose-500/30 text-rose-300 border border-rose-500/30 font-bold text-xs flex items-center gap-2 transition active:scale-95"
+            className="min-h-[50px] px-4 rounded-2xl bg-rose-500/15 hover:bg-rose-500/25 text-rose-300 border border-rose-500/30 font-bold text-xs flex items-center gap-2 transition active:scale-95"
           >
             <RotateCcw className="w-4 h-4" />
             <span>تسجيل مرتجع مشتريات ↩️</span>
@@ -368,9 +368,9 @@ export default function PurchasesView({ inventory = [], onRefreshData, onOpenSup
           <button
             type="button"
             onClick={() => setShowPurchaseModal(true)}
-            className="min-h-[48px] px-5 rounded-2xl bg-gradient-to-r from-emerald-500 to-green-600 hover:from-emerald-400 hover:to-green-500 text-slate-950 font-extrabold text-sm shadow-xl shadow-emerald-500/25 flex items-center gap-2 transition active:scale-95"
+            className="min-h-[52px] px-6 rounded-2xl bg-gradient-to-r from-emerald-500 to-green-600 hover:from-emerald-400 hover:to-green-500 text-slate-950 font-black text-sm shadow-xl shadow-emerald-500/25 flex items-center gap-2 transition active:scale-95 ring-1 ring-emerald-400/40"
           >
-            <Plus className="w-5 h-5 stroke-[2.5]" />
+            <Plus className="w-5 h-5 stroke-[3]" />
             <span>تسجيل فاتورة مشتريات وتوريد 📥</span>
           </button>
         </div>
@@ -378,15 +378,15 @@ export default function PurchasesView({ inventory = [], onRefreshData, onOpenSup
 
       {/* Overdue Payables Alert Banner (if any) */}
       {overdueSummary.total_overdue_count > 0 && (
-        <div className="p-3.5 rounded-2xl bg-rose-500/10 border border-rose-500/30 flex items-center justify-between gap-3 text-xs text-rose-200 flex-shrink-0 animate-in fade-in">
-          <div className="flex items-center gap-2.5">
-            <span className="p-1.5 rounded-xl bg-rose-500/20 text-rose-400 border border-rose-500/40">
-              <BadgeAlert className="w-5 h-5" />
+        <div className="p-4 rounded-2xl bg-rose-500/15 border border-rose-500/30 flex items-center justify-between gap-3 text-sm text-rose-200 flex-shrink-0 animate-in fade-in">
+          <div className="flex items-center gap-3">
+            <span className="p-2 rounded-xl bg-rose-500/20 text-rose-400 border border-rose-500/40">
+              <BadgeAlert className="w-6 h-6" />
             </span>
             <div>
-              <span className="font-extrabold text-rose-300">تنبيه مستحقات آجلة متأخرة: </span>
-              يوجد <span className="font-bold underline text-white">{overdueSummary.total_overdue_count}</span> فواتير مشتريات تجاوزت تاريخ الاستحقاق بمبلغ إجمالي{' '}
-              <span className="font-mono font-black text-rose-300">{Number(overdueSummary.total_overdue_debt).toLocaleString()} ر.ي</span>.
+              <span className="font-black text-white text-sm">⚠️ تنبيه مستحقات آجلة متأخرة: </span>
+              يوجد <span className="font-black underline text-amber-300">{overdueSummary.total_overdue_count}</span> فواتير مشتريات تجاوزت موعد الاستحقاق بمبلغ إجمالي{' '}
+              <span className="font-mono font-black text-rose-300 text-base">{Number(overdueSummary.total_overdue_debt).toLocaleString()} ر.ي</span>.
             </div>
           </div>
           <button
@@ -395,66 +395,66 @@ export default function PurchasesView({ inventory = [], onRefreshData, onOpenSup
               setActiveTab('bills');
               setDueDateFilter('overdue');
             }}
-            className="px-3 py-1.5 rounded-xl bg-rose-500/20 hover:bg-rose-500/30 border border-rose-500/30 text-rose-200 font-bold text-[11px] whitespace-nowrap transition"
+            className="min-h-[38px] px-3.5 rounded-xl bg-rose-500 hover:bg-rose-600 text-white font-black text-xs whitespace-nowrap transition active:scale-95 shadow-md shadow-rose-500/20"
           >
-            عرض الفواتير المتأخرة وسدادها &larr;
+            عرض الفواتير وسدادها &larr;
           </button>
         </div>
       )}
 
       {/* 2. Top Stats Bar */}
-      <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 flex-shrink-0">
+      <div className="grid grid-cols-1 sm:grid-cols-4 gap-3.5 flex-shrink-0">
         <div className="apple-glass-card rounded-3xl p-4 border border-emerald-500/30">
-          <div className="text-xs font-bold text-slate-400">إجمالي المشتريات المسجلة:</div>
-          <div className="text-2xl font-black font-mono text-emerald-400 mt-1">
-            {totalPurchasesValue.toLocaleString()} <span className="text-xs font-sans text-slate-300">ر.ي</span>
+          <div className="text-xs font-bold text-slate-300">إجمالي المشتريات المسجلة:</div>
+          <div className="text-2xl sm:text-3xl font-black font-mono text-emerald-400 mt-1">
+            {totalPurchasesValue.toLocaleString()} <span className="text-xs font-sans text-slate-300 font-bold">ر.ي</span>
           </div>
-          <div className="text-[11px] text-slate-400 mt-1">
-            عدد فواتير التوريد: <span className="font-bold text-white">{purchases.length}</span>
+          <div className="text-xs text-slate-400 mt-1 font-semibold">
+            فواتير التوريد: <span className="font-black text-white font-mono">{purchases.length}</span>
           </div>
         </div>
 
         <div className="apple-glass-card rounded-3xl p-4 border border-rose-500/30">
-          <div className="text-xs font-bold text-slate-400">مرتجعات المشتريات:</div>
-          <div className="text-2xl font-black font-mono text-rose-400 mt-1">
-            {totalReturnsValue.toLocaleString()} <span className="text-xs font-sans text-slate-300">ر.ي</span>
+          <div className="text-xs font-bold text-slate-300">مرتجعات المشتريات:</div>
+          <div className="text-2xl sm:text-3xl font-black font-mono text-rose-400 mt-1">
+            {totalReturnsValue.toLocaleString()} <span className="text-xs font-sans text-slate-300 font-bold">ر.ي</span>
           </div>
-          <div className="text-[11px] text-rose-300 mt-1">
-            عدد سندات الإرجاع: <span className="font-bold">{purchaseReturns.length}</span>
+          <div className="text-xs text-rose-300 mt-1 font-semibold">
+            سندات الإرجاع: <span className="font-black font-mono">{purchaseReturns.length}</span>
           </div>
         </div>
 
         <div className="apple-glass-card rounded-3xl p-4 border border-blue-500/30">
-          <div className="text-xs font-bold text-slate-400">مسدد كاش من الدرج:</div>
-          <div className="text-2xl font-black font-mono text-blue-400 mt-1">
-            {totalPaidCashFromDrawer.toLocaleString()} <span className="text-xs font-sans text-slate-300">ر.ي</span>
+          <div className="text-xs font-bold text-slate-300">مسدد كاش من الدرج:</div>
+          <div className="text-2xl sm:text-3xl font-black font-mono text-blue-400 mt-1">
+            {totalPaidCashFromDrawer.toLocaleString()} <span className="text-xs font-sans text-slate-300 font-bold">ر.ي</span>
           </div>
-          <div className="text-[11px] text-blue-300 mt-1">
+          <div className="text-xs text-blue-300 mt-1 font-semibold">
             مخصوم آلياً من صندوق الكاشير
           </div>
         </div>
 
         <div className="apple-glass-card rounded-3xl p-4 border border-amber-500/30">
-          <div className="text-xs font-bold text-slate-400">ديون الموردين الآجلة:</div>
-          <div className="text-2xl font-black font-mono text-amber-400 mt-1">
-            {totalSupplierDebts.toLocaleString()} <span className="text-xs font-sans text-slate-300">ر.ي</span>
+          <div className="text-xs font-bold text-slate-300">ديون الموردين الآجلة:</div>
+          <div className="text-2xl sm:text-3xl font-black font-mono text-amber-400 mt-1">
+            {totalSupplierDebts.toLocaleString()} <span className="text-xs font-sans text-slate-300 font-bold">ر.ي</span>
           </div>
-          <div className="text-[11px] text-amber-300 mt-1">
-            موردين دائنين: <span className="font-bold">{suppliers.filter((s) => s.balance_due > 0).length}</span>
+          <div className="text-xs text-amber-300 mt-1 font-semibold">
+            موردين دائنين: <span className="font-black font-mono">{suppliers.filter((s) => s.balance_due > 0).length}</span>
           </div>
         </div>
       </div>
 
       {/* 3. Navigation Tabs & Search */}
       <div className="apple-glass rounded-3xl p-3 border border-white/10 flex flex-wrap items-center justify-between gap-3 flex-shrink-0">
-        <div className="flex items-center gap-1.5 p-1 rounded-2xl bg-slate-900/90 border border-white/10 overflow-x-auto max-w-full">
+        <div className="flex items-center gap-2 p-1.5 rounded-2xl bg-slate-900/90 border border-white/10 overflow-x-auto max-w-full">
           <button
             type="button"
             onClick={() => setActiveTab('bills')}
-            className={`min-h-[42px] px-4 rounded-xl text-xs font-bold transition flex items-center gap-2 whitespace-nowrap ${
+            className={`min-h-[46px] px-4 rounded-xl text-xs sm:text-sm font-bold transition flex items-center gap-2 whitespace-nowrap active:scale-95 ${
               activeTab === 'bills'
-                ? 'bg-emerald-500 text-slate-950 shadow-lg shadow-emerald-500/25'
-                : 'text-slate-400 hover:text-white'
+                ? 'bg-emerald-500 text-slate-950 font-black shadow-lg shadow-emerald-500/25 ring-1 ring-emerald-400'
+                : 'text-slate-300 hover:text-white hover:bg-white/5'
             }`}
           >
             <ShoppingBag className="w-4 h-4" />
@@ -464,10 +464,10 @@ export default function PurchasesView({ inventory = [], onRefreshData, onOpenSup
           <button
             type="button"
             onClick={() => setActiveTab('returns')}
-            className={`min-h-[42px] px-4 rounded-xl text-xs font-bold transition flex items-center gap-2 whitespace-nowrap ${
+            className={`min-h-[46px] px-4 rounded-xl text-xs sm:text-sm font-bold transition flex items-center gap-2 whitespace-nowrap active:scale-95 ${
               activeTab === 'returns'
-                ? 'bg-rose-500 text-slate-950 shadow-lg shadow-rose-500/25'
-                : 'text-slate-400 hover:text-white'
+                ? 'bg-rose-500 text-white font-black shadow-lg shadow-rose-500/25 ring-1 ring-rose-400'
+                : 'text-slate-300 hover:text-white hover:bg-white/5'
             }`}
           >
             <RotateCcw className="w-4 h-4" />
@@ -477,10 +477,10 @@ export default function PurchasesView({ inventory = [], onRefreshData, onOpenSup
           <button
             type="button"
             onClick={() => setActiveTab('vouchers')}
-            className={`min-h-[42px] px-4 rounded-xl text-xs font-bold transition flex items-center gap-2 whitespace-nowrap ${
+            className={`min-h-[46px] px-4 rounded-xl text-xs sm:text-sm font-bold transition flex items-center gap-2 whitespace-nowrap active:scale-95 ${
               activeTab === 'vouchers'
-                ? 'bg-blue-500 text-slate-950 shadow-lg shadow-blue-500/25'
-                : 'text-slate-400 hover:text-white'
+                ? 'bg-blue-500 text-white font-black shadow-lg shadow-blue-500/25 ring-1 ring-blue-400'
+                : 'text-slate-300 hover:text-white hover:bg-white/5'
             }`}
           >
             <Archive className="w-4 h-4" />
@@ -490,10 +490,10 @@ export default function PurchasesView({ inventory = [], onRefreshData, onOpenSup
           <button
             type="button"
             onClick={() => setActiveTab('suppliers')}
-            className={`min-h-[42px] px-4 rounded-xl text-xs font-bold transition flex items-center gap-2 whitespace-nowrap ${
+            className={`min-h-[46px] px-4 rounded-xl text-xs sm:text-sm font-bold transition flex items-center gap-2 whitespace-nowrap active:scale-95 ${
               activeTab === 'suppliers'
-                ? 'bg-amber-500 text-slate-950 shadow-lg shadow-amber-500/25'
-                : 'text-slate-400 hover:text-white'
+                ? 'bg-amber-400 text-slate-950 font-black shadow-lg shadow-amber-400/25 ring-1 ring-amber-300'
+                : 'text-slate-300 hover:text-white hover:bg-white/5'
             }`}
           >
             <Building2 className="w-4 h-4" />
@@ -505,14 +505,14 @@ export default function PurchasesView({ inventory = [], onRefreshData, onOpenSup
           <button
             type="button"
             onClick={() => setShowAddSupplierModal(true)}
-            className="px-3.5 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-white text-xs font-bold flex items-center gap-1"
+            className="min-h-[46px] px-4 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 text-xs font-black flex items-center gap-1.5 transition active:scale-95 shadow-md shadow-amber-500/20"
           >
-            <Plus className="w-3.5 h-3.5" />
-            <span>+ إضافة مورد جديد</span>
+            <Plus className="w-4 h-4 stroke-[3]" />
+            <span>+ إضافة مورد جديد 🏢</span>
           </button>
         )}
 
-        <div className="relative min-w-[240px]">
+        <div className="relative min-w-[260px] flex-1 sm:flex-initial">
           <input
             type="text"
             placeholder={
@@ -526,9 +526,9 @@ export default function PurchasesView({ inventory = [], onRefreshData, onOpenSup
             }
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full min-h-[42px] pr-9 pl-3 rounded-xl bg-slate-900 border border-white/15 text-white placeholder-slate-500 text-xs font-semibold focus:outline-none focus:border-amber-400"
+            className="w-full min-h-[46px] pr-10 pl-3 rounded-xl bg-slate-900 border border-white/15 text-white placeholder-slate-400 text-xs font-semibold focus:outline-none focus:border-amber-400 shadow-inner"
           />
-          <Search className="w-4 h-4 text-slate-500 absolute right-3 top-3 pointer-events-none" />
+          <Search className="w-4 h-4 text-slate-400 absolute right-3.5 top-3.5 pointer-events-none" />
         </div>
       </div>
 
@@ -536,18 +536,18 @@ export default function PurchasesView({ inventory = [], onRefreshData, onOpenSup
       {activeTab === 'bills' && (
         <div className="apple-glass rounded-3xl border border-white/10 flex-1 overflow-hidden flex flex-col">
           {/* Due Date Calendar Filter Sub-Bar (Upgrade 5) */}
-          <div className="px-4 py-2.5 bg-slate-900/60 border-b border-white/10 flex flex-wrap items-center justify-between gap-2 text-xs">
-            <div className="flex items-center gap-2">
-              <span className="text-slate-400 font-bold flex items-center gap-1">
+          <div className="px-5 py-3 bg-slate-900/70 border-b border-white/10 flex flex-wrap items-center justify-between gap-3 text-xs">
+            <div className="flex items-center gap-2.5 flex-wrap">
+              <span className="text-slate-300 font-bold flex items-center gap-1.5">
                 <CalendarDays className="w-4 h-4 text-amber-400" />
                 <span>جدولة سداد الديون:</span>
               </span>
-              <div className="flex items-center gap-1 bg-slate-950 p-1 rounded-xl border border-white/10">
+              <div className="flex items-center gap-1 bg-slate-950 p-1 rounded-xl border border-white/10 flex-wrap">
                 <button
                   type="button"
                   onClick={() => setDueDateFilter('all')}
-                  className={`px-2.5 py-1 rounded-lg font-bold text-[11px] transition ${
-                    dueDateFilter === 'all' ? 'bg-white/20 text-white' : 'text-slate-400 hover:text-white'
+                  className={`min-h-[34px] px-3 py-1 rounded-lg font-bold text-xs transition active:scale-95 ${
+                    dueDateFilter === 'all' ? 'bg-white/20 text-white font-black' : 'text-slate-400 hover:text-white'
                   }`}
                 >
                   الكل ({purchases.length})
@@ -555,9 +555,9 @@ export default function PurchasesView({ inventory = [], onRefreshData, onOpenSup
                 <button
                   type="button"
                   onClick={() => setDueDateFilter('overdue')}
-                  className={`px-2.5 py-1 rounded-lg font-bold text-[11px] transition ${
+                  className={`min-h-[34px] px-3 py-1 rounded-lg font-bold text-xs transition active:scale-95 ${
                     dueDateFilter === 'overdue'
-                      ? 'bg-rose-500 text-slate-950 font-black'
+                      ? 'bg-rose-500 text-white font-black shadow-md shadow-rose-500/20'
                       : 'text-rose-400 hover:bg-rose-500/10'
                   }`}
                 >
@@ -566,9 +566,9 @@ export default function PurchasesView({ inventory = [], onRefreshData, onOpenSup
                 <button
                   type="button"
                   onClick={() => setDueDateFilter('due_7d')}
-                  className={`px-2.5 py-1 rounded-lg font-bold text-[11px] transition ${
+                  className={`min-h-[34px] px-3 py-1 rounded-lg font-bold text-xs transition active:scale-95 ${
                     dueDateFilter === 'due_7d'
-                      ? 'bg-amber-500 text-slate-950 font-black'
+                      ? 'bg-amber-400 text-slate-950 font-black shadow-md shadow-amber-400/20'
                       : 'text-amber-400 hover:bg-amber-500/10'
                   }`}
                 >
@@ -577,9 +577,9 @@ export default function PurchasesView({ inventory = [], onRefreshData, onOpenSup
                 <button
                   type="button"
                   onClick={() => setDueDateFilter('due_30d')}
-                  className={`px-2.5 py-1 rounded-lg font-bold text-[11px] transition ${
+                  className={`min-h-[34px] px-3 py-1 rounded-lg font-bold text-xs transition active:scale-95 ${
                     dueDateFilter === 'due_30d'
-                      ? 'bg-blue-500 text-slate-950 font-black'
+                      ? 'bg-blue-500 text-white font-black shadow-md shadow-blue-500/20'
                       : 'text-blue-400 hover:bg-blue-500/10'
                   }`}
                 >
@@ -589,23 +589,23 @@ export default function PurchasesView({ inventory = [], onRefreshData, onOpenSup
             </div>
 
             {dueCalendar.summary?.due_7d_amount > 0 && (
-              <div className="text-[11px] font-mono text-amber-300 font-bold">
+              <div className="text-xs font-mono text-amber-300 font-bold bg-amber-500/10 px-3 py-1 rounded-xl border border-amber-500/20">
                 السيولة المطلوبة للـ 7 أيام القادمة:{' '}
-                <span className="underline">{Number(dueCalendar.summary.due_7d_amount).toLocaleString()} ر.ي</span>
+                <span className="font-black text-amber-400 underline">{Number(dueCalendar.summary.due_7d_amount).toLocaleString()} ر.ي</span>
               </div>
             )}
           </div>
 
           <div className="overflow-x-auto flex-1">
-            <table className="w-full text-right text-xs">
-              <thead className="bg-white/5 border-b border-white/10 text-slate-400 font-extrabold sticky top-0 backdrop-blur z-10">
+            <table className="w-full text-right text-sm">
+              <thead className="bg-slate-900/90 border-b border-white/10 text-slate-300 font-black text-xs sticky top-0 backdrop-blur z-10">
                 <tr>
                   <th className="p-3.5">رقم الفاتورة</th>
                   <th className="p-3.5">المورد والشركة</th>
                   <th className="p-3.5">فاتورة المورد</th>
                   <th className="p-3.5">طريقة السداد</th>
                   <th className="p-3.5">إجمالي الفاتورة</th>
-                  <th className="p-3.5">أجور الشحن (Landed)</th>
+                  <th className="p-3.5">أجور الشحن</th>
                   <th className="p-3.5">المدفوع</th>
                   <th className="p-3.5">المتبقي آجل</th>
                   <th className="p-3.5">تاريخ الاستحقاق</th>
@@ -616,7 +616,7 @@ export default function PurchasesView({ inventory = [], onRefreshData, onOpenSup
               <tbody className="divide-y divide-white/5 text-slate-200">
                 {filteredPurchases.length === 0 ? (
                   <tr>
-                    <td colSpan={11} className="p-8 text-center text-slate-400">
+                    <td colSpan={11} className="p-10 text-center text-slate-400 font-bold text-sm">
                       لا توجد فواتير مشتريات مسجلة تطابق التصفية.
                     </td>
                   </tr>
@@ -627,72 +627,72 @@ export default function PurchasesView({ inventory = [], onRefreshData, onOpenSup
 
                     return (
                       <React.Fragment key={p.id}>
-                        <tr className={`hover:bg-white/5 transition ${isOverdue ? 'bg-rose-500/5' : ''}`}>
-                          <td className="p-3.5 font-mono font-bold text-amber-300">
+                        <tr className={`hover:bg-white/5 transition ${isOverdue ? 'bg-rose-500/10' : ''}`}>
+                          <td className="p-3.5 font-mono font-black text-amber-300">
                             <div className="flex items-center gap-1.5">
                               <span>{p.purchase_number}</span>
                               {p.is_returned === 1 && (
-                                <span className="px-1.5 py-0.5 rounded text-[10px] bg-rose-500/20 text-rose-300 border border-rose-500/30">
+                                <span className="px-2 py-0.5 rounded-md text-xs bg-rose-500/20 text-rose-300 border border-rose-500/30 font-bold">
                                   مرتجع
                                 </span>
                               )}
                             </div>
                           </td>
                           <td className="p-3.5">
-                            <div className="font-extrabold text-white text-sm">{p.supplier_name}</div>
-                            <div className="text-[11px] text-slate-400">{p.supplier_company || '---'}</div>
+                            <div className="font-black text-white text-base">{p.supplier_name}</div>
+                            <div className="text-xs text-slate-300 mt-0.5">{p.supplier_company || '---'}</div>
                           </td>
-                          <td className="p-3.5 font-mono text-slate-300">
-                            <div>{p.invoice_ref || '---'}</div>
+                          <td className="p-3.5 font-mono text-slate-300 text-xs">
+                            <div className="font-bold">{p.invoice_ref || '---'}</div>
                             {p.paper_bill_number && (
-                              <span className="text-[10px] px-1.5 py-0.2 rounded bg-amber-500/10 text-amber-300 border border-amber-500/20 block w-fit mt-0.5">
+                              <span className="text-xs px-2 py-0.5 rounded-md bg-amber-500/15 text-amber-300 border border-amber-500/30 block w-fit mt-1 font-bold">
                                 دفتر: {p.paper_bill_number}
                               </span>
                             )}
                           </td>
                           <td className="p-3.5">
                             {p.payment_method === 'cash' ? (
-                              <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 font-bold border border-emerald-500/30">
+                              <span className="px-2.5 py-1 rounded-full bg-emerald-500/20 text-emerald-300 font-black text-xs border border-emerald-500/30">
                                 💵 كاش {p.paid_from_cash_drawer ? '(الدرج)' : ''}
                               </span>
                             ) : p.payment_method === 'credit' ? (
-                              <span className="px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 font-bold border border-amber-500/30">
+                              <span className="px-2.5 py-1 rounded-full bg-amber-500/20 text-amber-300 font-black text-xs border border-amber-500/30">
                                 📝 آجل للمورد
                               </span>
                             ) : (
-                              <span className="px-2 py-0.5 rounded-full bg-purple-500/20 text-purple-300 font-bold border border-purple-500/30">
+                              <span className="px-2.5 py-1 rounded-full bg-purple-500/20 text-purple-300 font-black text-xs border border-purple-500/30">
                                 🏦 {p.payment_method}
                               </span>
                             )}
                           </td>
-                          <td className="p-3.5 font-mono font-black text-sm text-emerald-400">
+                          <td className="p-3.5 font-mono font-black text-base text-emerald-400">
                             {Number(p.total_amount).toLocaleString()} ر.ي
                           </td>
                           <td className="p-3.5 font-mono text-xs">
                             {p.shipping_cost > 0 ? (
-                              <span className="px-2 py-0.5 rounded-md bg-blue-500/20 text-blue-300 border border-blue-500/30 font-bold">
-                                🚚 +{Number(p.shipping_cost).toLocaleString()} ر.ي
+                              <span className="px-2 py-0.5 rounded-lg bg-blue-500/20 text-blue-300 border border-blue-500/30 font-bold">
+                                🚚 +{Number(p.shipping_cost).toLocaleString()}
                               </span>
                             ) : (
-                              <span className="text-slate-500">لا يوجد</span>
+                              <span className="text-slate-500">---</span>
                             )}
                           </td>
-                          <td className="p-3.5 font-mono font-bold text-slate-300">
+                          <td className="p-3.5 font-mono font-bold text-slate-200">
                             {Number(p.paid_amount).toLocaleString()} ر.ي
                           </td>
-                          <td className="p-3.5 font-mono font-bold">
+                          <td className="p-3.5 font-mono font-black text-base">
                             {p.remaining_debt > 0 ? (
-                              <span className="text-amber-400 font-bold">
+                              <span className="text-amber-400">
                                 {Number(p.remaining_debt).toLocaleString()} ر.ي
                               </span>
                             ) : (
-                              <span className="text-slate-500">0</span>
+                              <span className="text-emerald-400 font-normal text-xs">خالص 0</span>
                             )}
                           </td>
-                          <td className="p-3.5 font-mono text-[11px]">
+                          <td className="p-3.5 font-mono text-xs">
                             {p.due_date ? (
                               <span
-                                className={`px-2 py-0.5 rounded-md font-bold ${
+                                className={`px-2.5 py-1 rounded-lg font-bold ${
                                   isOverdue
                                     ? 'bg-rose-500/20 text-rose-300 border border-rose-500/40'
                                     : 'text-slate-300'
@@ -704,7 +704,7 @@ export default function PurchasesView({ inventory = [], onRefreshData, onOpenSup
                               <span className="text-slate-500">غير محدد</span>
                             )}
                           </td>
-                          <td className="p-3.5 font-mono text-slate-400 text-[11px]">
+                          <td className="p-3.5 font-mono text-slate-400 text-xs">
                             {p.created_at}
                           </td>
                           <td className="p-3.5 text-center">
@@ -713,7 +713,7 @@ export default function PurchasesView({ inventory = [], onRefreshData, onOpenSup
                                 <button
                                   type="button"
                                   onClick={() => handleQuickPayBill(p)}
-                                  className="px-2 py-1 rounded-lg bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-500/30 font-bold text-[11px] transition active:scale-95"
+                                  className="min-h-[36px] px-3 py-1.5 rounded-xl bg-emerald-500/20 hover:bg-emerald-500 text-emerald-300 hover:text-slate-950 border border-emerald-500/30 font-black text-xs transition active:scale-95 shadow-sm"
                                   title="سداد دين هذه الفاتورة فورياً"
                                 >
                                   سداد 💵
@@ -722,7 +722,7 @@ export default function PurchasesView({ inventory = [], onRefreshData, onOpenSup
                               <button
                                 type="button"
                                 onClick={() => openReturnModalForBill(p)}
-                                className="px-2 py-1 rounded-lg bg-rose-500/15 hover:bg-rose-500/25 text-rose-300 border border-rose-500/30 font-bold text-[11px] transition"
+                                className="min-h-[36px] px-2.5 py-1.5 rounded-xl bg-rose-500/15 hover:bg-rose-500 text-rose-300 hover:text-white border border-rose-500/30 font-bold text-xs transition active:scale-95"
                                 title="إرجاع بضاعة من هذه الفاتورة"
                               >
                                 مرتجع ↩️
@@ -730,7 +730,7 @@ export default function PurchasesView({ inventory = [], onRefreshData, onOpenSup
                               <button
                                 type="button"
                                 onClick={() => toggleExpand(p.id)}
-                                className="p-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-slate-300 transition"
+                                className="min-h-[36px] w-9 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-white/10 flex items-center justify-center transition active:scale-95"
                                 title="عرض أصناف الفاتورة"
                               >
                                 {isExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
@@ -803,8 +803,8 @@ export default function PurchasesView({ inventory = [], onRefreshData, onOpenSup
       {activeTab === 'returns' && (
         <div className="apple-glass rounded-3xl border border-white/10 flex-1 overflow-hidden flex flex-col">
           <div className="overflow-x-auto flex-1">
-            <table className="w-full text-right text-xs">
-              <thead className="bg-white/5 border-b border-white/10 text-slate-400 font-extrabold sticky top-0 backdrop-blur z-10">
+            <table className="w-full text-right text-sm">
+              <thead className="bg-slate-900/90 border-b border-white/10 text-slate-300 font-black text-xs sticky top-0 backdrop-blur z-10">
                 <tr>
                   <th className="p-3.5">رقم المرتجع</th>
                   <th className="p-3.5">المورد والشركة</th>
@@ -819,7 +819,7 @@ export default function PurchasesView({ inventory = [], onRefreshData, onOpenSup
               <tbody className="divide-y divide-white/5 text-slate-200">
                 {filteredReturns.length === 0 ? (
                   <tr>
-                    <td colSpan={8} className="p-8 text-center text-slate-400">
+                    <td colSpan={8} className="p-10 text-center text-slate-400 font-bold text-sm">
                       لا توجد سندات مرتجع مشتريات مسجلة حتى الآن.
                     </td>
                   </tr>
@@ -830,41 +830,42 @@ export default function PurchasesView({ inventory = [], onRefreshData, onOpenSup
                     return (
                       <React.Fragment key={r.id}>
                         <tr className="hover:bg-white/5 transition">
-                          <td className="p-3.5 font-mono font-bold text-rose-300">
+                          <td className="p-3.5 font-mono font-black text-rose-300">
                             {r.return_number}
                           </td>
                           <td className="p-3.5">
-                            <div className="font-extrabold text-white text-sm">{r.supplier_name || 'مورد عام'}</div>
-                            <div className="text-[11px] text-slate-400">{r.supplier_company || '---'}</div>
+                            <div className="font-black text-white text-base">{r.supplier_name || 'مورد عام'}</div>
+                            <div className="text-xs text-slate-300 mt-0.5">{r.supplier_company || '---'}</div>
                           </td>
-                          <td className="p-3.5 font-mono text-slate-300">
+                          <td className="p-3.5 font-mono text-slate-300 text-xs font-bold">
                             {r.purchase_number || 'مرتجع مباشر'}
                           </td>
                           <td className="p-3.5">
                             {r.refund_method === 'cash' ? (
-                              <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 font-bold border border-emerald-500/30">
+                              <span className="px-2.5 py-1 rounded-full bg-emerald-500/20 text-emerald-300 font-black text-xs border border-emerald-500/30">
                                 💵 استرداد كاش للصندوق
                               </span>
                             ) : (
-                              <span className="px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 font-bold border border-amber-500/30">
+                              <span className="px-2.5 py-1 rounded-full bg-amber-500/20 text-amber-300 font-black text-xs border border-amber-500/30">
                                 📝 خصم من دين المورد
                               </span>
                             )}
                           </td>
-                          <td className="p-3.5 font-mono font-black text-sm text-rose-400">
+                          <td className="p-3.5 font-mono font-black text-base text-rose-400">
                             {Number(r.total_amount).toLocaleString()} ر.ي
                           </td>
-                          <td className="p-3.5 text-slate-300">
+                          <td className="p-3.5 text-slate-200 text-xs">
                             {r.reason || 'بضاعة تالفة / تاريخ انتهاء / غير مطابقة'}
                           </td>
-                          <td className="p-3.5 font-mono text-slate-400 text-[11px]">
+                          <td className="p-3.5 font-mono text-slate-400 text-xs">
                             {r.created_at}
                           </td>
                           <td className="p-3.5 text-center">
                             <button
                               type="button"
                               onClick={() => toggleExpandReturn(r.id)}
-                              className="p-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-slate-300 transition"
+                              className="min-h-[36px] w-9 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-white/10 inline-flex items-center justify-center transition active:scale-95"
+                              title="عرض الأصناف المرجوعة"
                             >
                               {isExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
                             </button>
@@ -875,7 +876,7 @@ export default function PurchasesView({ inventory = [], onRefreshData, onOpenSup
                         {isExpanded && r.items && (
                           <tr className="bg-slate-900/90">
                             <td colSpan={8} className="p-4 border-y border-white/10">
-                              <div className="text-xs font-bold text-rose-300 mb-2">
+                              <div className="text-xs font-black text-rose-300 mb-2">
                                 تفاصيل الأصناف المرتجعة للمورد:
                               </div>
                               <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2.5">
@@ -885,15 +886,15 @@ export default function PurchasesView({ inventory = [], onRefreshData, onOpenSup
                                     className="p-3 rounded-2xl bg-slate-950 border border-white/10 flex justify-between items-center text-xs"
                                   >
                                     <div>
-                                      <div className="font-bold text-white">{it.product_name}</div>
-                                      <div className="text-[11px] text-slate-400 font-mono mt-0.5">
+                                      <div className="font-black text-white text-sm">{it.product_name}</div>
+                                      <div className="text-xs text-slate-300 font-mono mt-0.5">
                                         كمية الإرجاع: <span className="text-rose-400 font-bold">{it.qty}</span> عبوة
                                       </div>
-                                      <div className="text-[10px] text-slate-500 font-mono">
-                                        سعر الوحدة المرتجعة: {Number(it.unit_cost).toLocaleString()} ر.ي
+                                      <div className="text-xs text-slate-400 font-mono mt-0.5">
+                                        سعر الوحدة: {Number(it.unit_cost).toLocaleString()} ر.ي
                                       </div>
                                     </div>
-                                    <div className="font-mono font-black text-rose-400 text-sm">
+                                    <div className="font-mono font-black text-rose-400 text-base">
                                       {(it.qty * it.unit_cost).toLocaleString()} ر.ي
                                     </div>
                                   </div>
@@ -916,8 +917,8 @@ export default function PurchasesView({ inventory = [], onRefreshData, onOpenSup
       {activeTab === 'vouchers' && (
         <div className="apple-glass rounded-3xl border border-white/10 flex-1 overflow-hidden flex flex-col">
           <div className="overflow-x-auto flex-1">
-            <table className="w-full text-right text-xs">
-              <thead className="bg-white/5 border-b border-white/10 text-slate-400 font-extrabold sticky top-0 backdrop-blur z-10">
+            <table className="w-full text-right text-sm">
+              <thead className="bg-slate-900/90 border-b border-white/10 text-slate-300 font-black text-xs sticky top-0 backdrop-blur z-10">
                 <tr>
                   <th className="p-3.5">رقم سند الصرف</th>
                   <th className="p-3.5">المورد / المستلم</th>
@@ -933,34 +934,34 @@ export default function PurchasesView({ inventory = [], onRefreshData, onOpenSup
               <tbody className="divide-y divide-white/5 text-slate-200">
                 {filteredVouchers.length === 0 ? (
                   <tr>
-                    <td colSpan={9} className="p-8 text-center text-slate-400">
+                    <td colSpan={9} className="p-10 text-center text-slate-400 font-bold text-sm">
                       لا توجد سندات صرف محفوظة حتى الآن.
                     </td>
                   </tr>
                 ) : (
                   filteredVouchers.map((v) => (
                     <tr key={v.id} className="hover:bg-white/5 transition">
-                      <td className="p-3.5 font-mono font-bold text-blue-300">
+                      <td className="p-3.5 font-mono font-black text-blue-300">
                         {v.voucher_number}
                       </td>
                       <td className="p-3.5">
-                        <div className="font-extrabold text-white text-sm">{v.supplier_name}</div>
-                        <div className="text-[11px] text-slate-400">{v.supplier_company || '---'}</div>
+                        <div className="font-black text-white text-base">{v.supplier_name}</div>
+                        <div className="text-xs text-slate-300 mt-0.5">{v.supplier_company || '---'}</div>
                       </td>
-                      <td className="p-3.5 font-mono font-black text-sm text-emerald-400">
+                      <td className="p-3.5 font-mono font-black text-base text-emerald-400">
                         {Number(v.amount).toLocaleString()} ر.ي
                       </td>
                       <td className="p-3.5">
                         {v.payment_method === 'cash' ? (
-                          <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 font-bold border border-emerald-500/30">
+                          <span className="px-2.5 py-1 rounded-full bg-emerald-500/20 text-emerald-300 font-black text-xs border border-emerald-500/30">
                             💵 كاش
                           </span>
                         ) : v.payment_method === 'kuraimi' ? (
-                          <span className="px-2 py-0.5 rounded-full bg-blue-500/20 text-blue-300 font-bold border border-blue-500/30">
+                          <span className="px-2.5 py-1 rounded-full bg-blue-500/20 text-blue-300 font-black text-xs border border-blue-500/30">
                             🏦 بنك الكريمي
                           </span>
                         ) : (
-                          <span className="px-2 py-0.5 rounded-full bg-purple-500/20 text-purple-300 font-bold border border-purple-500/30">
+                          <span className="px-2.5 py-1 rounded-full bg-purple-500/20 text-purple-300 font-black text-xs border border-purple-500/30">
                             📱 {v.payment_method}
                           </span>
                         )}
@@ -968,13 +969,13 @@ export default function PurchasesView({ inventory = [], onRefreshData, onOpenSup
                       <td className="p-3.5 font-mono text-slate-300">
                         {Number(v.prev_balance).toLocaleString()} ر.ي
                       </td>
-                      <td className="p-3.5 font-mono font-bold text-amber-300">
+                      <td className="p-3.5 font-mono font-black text-amber-300">
                         {Number(v.new_balance).toLocaleString()} ر.ي
                       </td>
-                      <td className="p-3.5 text-slate-300">
+                      <td className="p-3.5 text-slate-300 text-xs">
                         {v.notes || 'سداد دفعة من الحساب الآجل للمورد'}
                       </td>
-                      <td className="p-3.5 font-mono text-slate-400 text-[11px]">
+                      <td className="p-3.5 font-mono text-slate-400 text-xs">
                         {v.created_at}
                       </td>
                       <td className="p-3.5 text-center">
@@ -994,7 +995,7 @@ export default function PurchasesView({ inventory = [], onRefreshData, onOpenSup
                             });
                             setShowVoucherModal(true);
                           }}
-                          className="px-3 py-1.5 rounded-xl bg-blue-500/20 hover:bg-blue-500/30 text-blue-300 border border-blue-500/30 font-bold text-xs flex items-center gap-1.5 mx-auto transition active:scale-95"
+                          className="min-h-[36px] px-3.5 py-1.5 rounded-xl bg-blue-500/20 hover:bg-blue-500 text-blue-300 hover:text-white border border-blue-500/30 font-black text-xs flex items-center gap-1.5 mx-auto transition active:scale-95 shadow-sm"
                         >
                           <Printer className="w-3.5 h-3.5" />
                           <span>طباعة 🖨️</span>
@@ -1013,8 +1014,8 @@ export default function PurchasesView({ inventory = [], onRefreshData, onOpenSup
       {activeTab === 'suppliers' && (
         <div className="apple-glass rounded-3xl border border-white/10 flex-1 overflow-hidden flex flex-col">
           <div className="overflow-x-auto flex-1">
-            <table className="w-full text-right text-xs">
-              <thead className="bg-white/5 border-b border-white/10 text-slate-400 font-extrabold sticky top-0 backdrop-blur z-10">
+            <table className="w-full text-right text-sm">
+              <thead className="bg-slate-900/90 border-b border-white/10 text-slate-300 font-black text-xs sticky top-0 backdrop-blur z-10">
                 <tr>
                   <th className="p-3.5">اسم المورد والمسؤول</th>
                   <th className="p-3.5">الشركة والتخصص</th>
@@ -1030,43 +1031,47 @@ export default function PurchasesView({ inventory = [], onRefreshData, onOpenSup
               <tbody className="divide-y divide-white/5 text-slate-200">
                 {filteredSuppliers.length === 0 ? (
                   <tr>
-                    <td colSpan={9} className="p-8 text-center text-slate-400">
+                    <td colSpan={9} className="p-10 text-center text-slate-400 font-bold text-sm">
                       لا يوجد موردين مطابقين للبحث.
                     </td>
                   </tr>
                 ) : (
                   filteredSuppliers.map((s) => (
                     <tr key={s.id} className="hover:bg-white/5 transition">
-                      <td className="p-3.5 font-extrabold text-white text-sm">
+                      <td className="p-3.5">
                         <div className="flex items-center gap-2">
-                          <Building2 className="w-4 h-4 text-emerald-400" />
-                          <span>{s.name}</span>
+                          <div className="w-8 h-8 rounded-xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center border border-emerald-500/30">
+                            <Building2 className="w-4 h-4" />
+                          </div>
+                          <div>
+                            <span className="font-black text-white text-base block">{s.name}</span>
+                          </div>
                         </div>
                       </td>
-                      <td className="p-3.5 text-slate-300">{s.company_name || '---'}</td>
-                      <td className="p-3.5 text-slate-300">
-                        <div>{s.agency_brand || '---'}</div>
+                      <td className="p-3.5 text-slate-300 text-xs font-semibold">{s.company_name || '---'}</td>
+                      <td className="p-3.5 text-slate-300 text-xs">
+                        <div className="font-bold">{s.agency_brand || '---'}</div>
                         {s.commercial_reg && (
-                          <div className="text-[10px] text-slate-500 font-mono">س.ت: {s.commercial_reg}</div>
+                          <div className="text-xs text-slate-400 font-mono mt-0.5">س.ت: {s.commercial_reg}</div>
                         )}
                       </td>
-                      <td className="p-3.5 font-mono text-slate-300">
+                      <td className="p-3.5 font-mono text-slate-300 text-xs">
                         {s.credit_days ? `${s.credit_days} يوم` : '30 يوم'}
                       </td>
-                      <td className="p-3.5 font-mono text-slate-400">{s.phone || '---'}</td>
-                      <td className="p-3.5 text-center font-mono font-bold text-amber-300">
+                      <td className="p-3.5 font-mono text-slate-300 text-xs font-bold">{s.phone || '---'}</td>
+                      <td className="p-3.5 text-center font-mono font-black text-amber-300 text-sm">
                         {s.total_bills || 0}
                       </td>
-                      <td className="p-3.5 font-mono font-bold text-slate-200">
+                      <td className="p-3.5 font-mono font-bold text-slate-200 text-sm">
                         {Number(s.total_purchased || 0).toLocaleString()} ر.ي
                       </td>
-                      <td className="p-3.5 font-mono font-black text-sm">
+                      <td className="p-3.5 font-mono font-black text-base">
                         {s.balance_due > 0 ? (
-                          <span className="text-rose-400 font-bold bg-rose-500/10 px-2.5 py-1 rounded-full border border-rose-500/20">
+                          <span className="text-rose-400 bg-rose-500/15 px-3 py-1 rounded-full border border-rose-500/30 inline-block">
                             {Number(s.balance_due).toLocaleString()} ر.ي
                           </span>
                         ) : (
-                          <span className="text-emerald-400">خالي من الديون</span>
+                          <span className="text-emerald-400 text-xs font-normal">خالي من الديون</span>
                         )}
                       </td>
                       <td className="p-3.5 text-center">
@@ -1075,7 +1080,7 @@ export default function PurchasesView({ inventory = [], onRefreshData, onOpenSup
                             <button
                               type="button"
                               onClick={() => onOpenSupplierStatement(s.id)}
-                              className="px-2.5 py-1.5 rounded-xl bg-blue-500/15 hover:bg-blue-500/25 text-blue-300 border border-blue-500/30 font-bold text-xs transition active:scale-95"
+                              className="min-h-[36px] px-3 py-1.5 rounded-xl bg-blue-500/15 hover:bg-blue-500 text-blue-300 hover:text-white border border-blue-500/30 font-bold text-xs transition active:scale-95 shadow-sm"
                               title="عرض كشف حساب المورد التفصيلي"
                             >
                               كشف حساب 🧾
@@ -1089,12 +1094,12 @@ export default function PurchasesView({ inventory = [], onRefreshData, onOpenSup
                                 setPayAmount(String(s.balance_due));
                                 setShowPaySupplierModal(true);
                               }}
-                              className="px-3 py-1.5 rounded-xl bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-500/30 font-bold text-xs transition active:scale-95"
+                              className="min-h-[36px] px-3 py-1.5 rounded-xl bg-emerald-500/20 hover:bg-emerald-500 text-emerald-300 hover:text-slate-950 border border-emerald-500/30 font-black text-xs transition active:scale-95 shadow-sm"
                             >
                               سداد دفعة 💵
                             </button>
                           ) : (
-                            <span className="text-slate-500 text-[11px]">مكتمل</span>
+                            <span className="text-slate-500 text-xs font-medium">مكتمل</span>
                           )}
                         </div>
                       </td>
@@ -1139,72 +1144,111 @@ export default function PurchasesView({ inventory = [], onRefreshData, onOpenSup
         voucherData={voucherData}
       />
 
-      {/* Pay Supplier Modal */}
+      {/* Pay Supplier Modal with Quick Touch Amount Chips */}
       {showPaySupplierModal && selectedSupplierForPay && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
-          <div className="apple-glass border border-white/20 rounded-3xl w-full max-w-md overflow-hidden shadow-2xl animate-in fade-in zoom-in-95">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/85 backdrop-blur-md animate-in fade-in duration-200">
+          <div className="apple-glass border border-white/20 rounded-3xl w-full max-w-md overflow-hidden shadow-2xl animate-in zoom-in-95">
             <div className="px-6 py-4 border-b border-white/10 flex items-center justify-between bg-white/5">
-              <h3 className="font-extrabold text-white text-base">سداد دفعة حساب للمورد</h3>
-              <button onClick={() => setShowPaySupplierModal(false)} className="text-slate-400 hover:text-white">
+              <h3 className="font-black text-white text-base flex items-center gap-2">
+                <span>سداد دفعة حساب للمورد</span>
+                <span>💵</span>
+              </h3>
+              <button
+                onClick={() => setShowPaySupplierModal(false)}
+                className="w-8 h-8 rounded-xl bg-white/5 hover:bg-white/10 text-slate-400 hover:text-white flex items-center justify-center"
+              >
                 &times;
               </button>
             </div>
 
             <form onSubmit={handlePaySupplier} className="p-6 space-y-4 text-xs">
-              <div className="p-3 rounded-2xl bg-slate-900 border border-white/10">
-                <div className="font-bold text-white text-sm">{selectedSupplierForPay.name}</div>
-                <div className="text-rose-400 font-mono font-bold mt-1">
+              <div className="p-3.5 rounded-2xl bg-slate-900 border border-white/10">
+                <div className="font-black text-white text-base">{selectedSupplierForPay.name}</div>
+                <div className="text-rose-400 font-mono font-black text-sm mt-1">
                   إجمالي الدين المستحق له: {Number(selectedSupplierForPay.balance_due).toLocaleString()} ر.ي
                 </div>
               </div>
 
               <div>
-                <label className="block text-slate-300 font-bold mb-1.5">مبلغ السداد (ريال يمني):</label>
+                <label className="block text-slate-200 font-bold mb-1.5 text-xs">مبلغ السداد (ريال يمني):</label>
                 <input
                   type="number"
                   placeholder="مثال: 50000"
                   value={payAmount}
                   onChange={(e) => setPayAmount(e.target.value)}
-                  className="w-full min-h-[44px] px-3 rounded-xl bg-slate-900 border border-white/15 text-white font-mono text-base font-extrabold"
+                  className="w-full min-h-[50px] px-3.5 rounded-xl bg-slate-900 border border-white/20 text-emerald-400 font-mono text-xl font-black focus:outline-none focus:border-amber-400"
                   required
                 />
+
+                {/* Quick Touch Amount Chips */}
+                <div className="flex items-center gap-1.5 flex-wrap pt-2">
+                  <button
+                    type="button"
+                    onClick={() => setPayAmount(String(selectedSupplierForPay.balance_due))}
+                    className="px-2.5 py-1 rounded-lg bg-slate-900 hover:bg-slate-800 text-rose-300 font-mono font-bold text-xs border border-rose-500/30 active:scale-95 transition"
+                  >
+                    كامل الدين ({Number(selectedSupplierForPay.balance_due).toLocaleString()})
+                  </button>
+                  {Number(selectedSupplierForPay.balance_due) > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => setPayAmount(String(Math.round(Number(selectedSupplierForPay.balance_due) / 2)))}
+                      className="px-2.5 py-1 rounded-lg bg-slate-900 hover:bg-slate-800 text-amber-300 font-mono font-bold text-xs border border-amber-500/30 active:scale-95 transition"
+                    >
+                      النصف ({Math.round(Number(selectedSupplierForPay.balance_due) / 2).toLocaleString()})
+                    </button>
+                  )}
+                  {[10000, 25000, 50000].map((amt) => {
+                    if (amt >= Number(selectedSupplierForPay.balance_due)) return null;
+                    return (
+                      <button
+                        key={amt}
+                        type="button"
+                        onClick={() => setPayAmount(String(amt))}
+                        className="px-2.5 py-1 rounded-lg bg-slate-900 hover:bg-slate-800 text-emerald-300 font-mono font-bold text-xs border border-white/10 active:scale-95 transition"
+                      >
+                        {amt.toLocaleString()}
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
 
               <div>
-                <label className="block text-slate-300 font-bold mb-1.5">طريقة الدفع:</label>
+                <label className="block text-slate-200 font-bold mb-1.5 text-xs">طريقة الدفع:</label>
                 <select
                   value={payMethod}
                   onChange={(e) => setPayMethod(e.target.value)}
-                  className="w-full min-h-[44px] px-3 rounded-xl bg-slate-900 border border-white/15 text-white text-xs cursor-pointer"
+                  className="w-full min-h-[46px] px-3 rounded-xl bg-slate-900 border border-white/20 text-white text-xs font-bold cursor-pointer focus:border-amber-400 focus:outline-none"
                 >
-                  <option value="cash">💵 كاش (يخصم من الدرج فورياً)</option>
+                  <option value="cash">💵 كاش (يخصم من درج الكاشير فورياً)</option>
                   <option value="kuraimi">🏦 حساب الكريمي</option>
                   <option value="jeeb">📱 محفظة جيب</option>
                 </select>
               </div>
 
               <div>
-                <label className="block text-slate-300 font-bold mb-1.5">ملاحظات / رقم السند أو الحوالة:</label>
+                <label className="block text-slate-200 font-bold mb-1.5 text-xs">ملاحظات / رقم السند أو الحوالة:</label>
                 <input
                   type="text"
                   placeholder="سند قبض المورد أو رقم الإشعار"
                   value={payNotes}
                   onChange={(e) => setPayNotes(e.target.value)}
-                  className="w-full min-h-[44px] px-3 rounded-xl bg-slate-900 border border-white/15 text-white text-xs"
+                  className="w-full min-h-[46px] px-3.5 rounded-xl bg-slate-900 border border-white/20 text-white text-xs font-semibold focus:border-amber-400 focus:outline-none"
                 />
               </div>
 
-              <div className="pt-3 flex gap-2">
+              <div className="pt-3 flex gap-2.5">
                 <button
                   type="button"
                   onClick={() => setShowPaySupplierModal(false)}
-                  className="flex-1 min-h-[44px] rounded-xl bg-white/5 text-slate-300 font-bold"
+                  className="flex-1 min-h-[48px] rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-xs transition active:scale-95"
                 >
                   إلغاء
                 </button>
                 <button
                   type="submit"
-                  className="flex-1 min-h-[44px] rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-extrabold shadow-lg shadow-emerald-500/20"
+                  className="flex-1 min-h-[48px] rounded-xl bg-gradient-to-r from-emerald-500 to-green-600 hover:from-emerald-400 hover:to-green-500 text-slate-950 font-black text-sm shadow-lg shadow-emerald-500/25 transition active:scale-95"
                 >
                   تأكيد وطباعة السند 🖨️
                 </button>
@@ -1216,36 +1260,42 @@ export default function PurchasesView({ inventory = [], onRefreshData, onOpenSup
 
       {/* Add Supplier Modal */}
       {showAddSupplierModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
-          <div className="apple-glass border border-white/20 rounded-3xl w-full max-w-md overflow-hidden shadow-2xl animate-in fade-in zoom-in-95">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/85 backdrop-blur-md animate-in fade-in duration-200">
+          <div className="apple-glass border border-white/20 rounded-3xl w-full max-w-md overflow-hidden shadow-2xl animate-in zoom-in-95">
             <div className="px-6 py-4 border-b border-white/10 flex items-center justify-between bg-white/5">
-              <h3 className="font-extrabold text-white text-base">إضافة مورد جديد</h3>
-              <button onClick={() => setShowAddSupplierModal(false)} className="text-slate-400 hover:text-white">
+              <h3 className="font-black text-white text-base flex items-center gap-2">
+                <span>إضافة مورد جديد</span>
+                <span>🏢</span>
+              </h3>
+              <button
+                onClick={() => setShowAddSupplierModal(false)}
+                className="w-8 h-8 rounded-xl bg-white/5 hover:bg-white/10 text-slate-400 hover:text-white flex items-center justify-center"
+              >
                 &times;
               </button>
             </div>
 
             <form onSubmit={handleCreateSupplier} className="p-6 space-y-4 text-xs">
               <div>
-                <label className="block text-slate-300 font-bold mb-1.5">اسم المورد / المسؤول:</label>
+                <label className="block text-slate-200 font-bold mb-1.5 text-xs">اسم المورد / المسؤول:</label>
                 <input
                   type="text"
                   placeholder="مثال: شركة بازرعة، وكيل كاسترول..."
                   value={newSupplierName}
                   onChange={(e) => setNewSupplierName(e.target.value)}
-                  className="w-full min-h-[44px] px-3.5 rounded-xl bg-slate-900 border border-white/15 text-white text-xs font-bold"
+                  className="w-full min-h-[46px] px-3.5 rounded-xl bg-slate-900 border border-white/20 text-white text-sm font-bold focus:border-amber-400 focus:outline-none"
                   required
                 />
               </div>
 
               <div>
-                <label className="block text-slate-300 font-bold mb-1.5">اسم الشركة أو التخصص:</label>
+                <label className="block text-slate-200 font-bold mb-1.5 text-xs">اسم الشركة أو التخصص:</label>
                 <input
                   type="text"
                   placeholder="مثال: وكيل تويوتا المعتمد، موزع بطاريات باقر..."
                   value={newSupplierCompany}
                   onChange={(e) => setNewSupplierCompany(e.target.value)}
-                  className="w-full min-h-[44px] px-3.5 rounded-xl bg-slate-900 border border-white/15 text-white text-xs"
+                  className="w-full min-h-[46px] px-3.5 rounded-xl bg-slate-900 border border-white/20 text-white text-xs font-semibold focus:border-amber-400 focus:outline-none"
                 />
               </div>
 
