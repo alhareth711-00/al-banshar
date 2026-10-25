@@ -23,16 +23,6 @@ export default function Sidebar({
   onOpenUserGuide,
   isOwnerMode = false,
 }) {
-  // 3 Live Variants Switcher (Calm | Tactile Kiosk | Apple Glass)
-  const [sidebarStyle, setSidebarStyle] = React.useState(() => {
-    return localStorage.getItem('ql_sidebar_style') || 'tactile';
-  });
-
-  const handleSetStyle = (style) => {
-    setSidebarStyle(style);
-    localStorage.setItem('ql_sidebar_style', style);
-  };
-
   const navItems = [
     {
       id: 'pos',
@@ -97,8 +87,8 @@ export default function Sidebar({
   return (
     <aside className="w-20 lg:w-64 flex-shrink-0 bg-slate-950/95 border-l border-slate-800/80 flex flex-col justify-between p-3 lg:p-4 z-40 select-none">
       <div>
-        {/* Calm Header */}
-        <div className="flex items-center gap-3 px-3 py-2.5 mb-3 rounded-xl bg-slate-900/90 border border-slate-800">
+        {/* Brand Header - Calm Industrial Standard (الخيار 1 المعتمد) */}
+        <div className="flex items-center gap-3 px-3 py-2.5 mb-4 rounded-xl bg-slate-900/90 border border-slate-800">
           <div className="w-9 h-9 rounded-lg bg-amber-400 text-slate-950 flex items-center justify-center font-black shadow-sm flex-shrink-0">
             <Wrench className="w-5 h-5 stroke-[2.3]" />
           </div>
@@ -111,100 +101,37 @@ export default function Sidebar({
           </div>
         </div>
 
-        {/* Live Variant Selector Pills (اختيار مباشر بين الأشكال الثلاثة) */}
-        <div className="hidden lg:flex items-center justify-between p-1 mb-3 rounded-xl bg-slate-900/90 border border-slate-800 text-xs">
-          <span className="text-slate-400 text-[11px] font-bold px-1">الشكل:</span>
-          <div className="flex items-center gap-1">
-            <button
-              type="button"
-              onClick={() => handleSetStyle('calm')}
-              className={`px-2 py-0.5 rounded-lg text-[11px] font-bold transition ${
-                sidebarStyle === 'calm'
-                  ? 'bg-slate-800 text-amber-300 border border-amber-400/40'
-                  : 'text-slate-400 hover:text-white'
-              }`}
-              title="النمط الصناعي الهادئ"
-            >
-              1. هادئ
-            </button>
-            <button
-              type="button"
-              onClick={() => handleSetStyle('tactile')}
-              className={`px-2 py-0.5 rounded-lg text-[11px] font-black transition ${
-                sidebarStyle === 'tactile'
-                  ? 'bg-amber-400 text-slate-950 shadow-sm'
-                  : 'text-slate-400 hover:text-white'
-              }`}
-              title="النمط اللمسي البارز عالي التباين"
-            >
-              2. لمسي بارز
-            </button>
-            <button
-              type="button"
-              onClick={() => handleSetStyle('glass')}
-              className={`px-2 py-0.5 rounded-lg text-[11px] font-bold transition ${
-                sidebarStyle === 'glass'
-                  ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-400/40'
-                  : 'text-slate-400 hover:text-white'
-              }`}
-              title="نمط آبل الزجاجي الفاخر"
-            >
-              3. زجاجي
-            </button>
-          </div>
-        </div>
-
-        {/* Nav Items */}
-        <nav className="space-y-1.5 max-h-[calc(100vh-270px)] overflow-y-auto pr-0.5 custom-scrollbar">
+        {/* Nav Items - Calm & Focused (النمط الهادئ) */}
+        <nav className="space-y-1.5 max-h-[calc(100vh-250px)] overflow-y-auto pr-0.5 custom-scrollbar">
           {navItems.map((item) => {
             const Icon = item.icon;
             const isActive = activeTab === item.id;
-
-            // Compute dynamic button styling based on chosen variant
-            let buttonClass = 'bg-slate-900/50 text-slate-400 hover:text-slate-200 hover:bg-slate-800/50 border border-transparent';
-            let iconBoxClass = 'bg-slate-800/80 text-slate-400 group-hover:text-white';
-
-            if (sidebarStyle === 'tactile') {
-              if (isActive) {
-                buttonClass = 'bg-amber-400 text-slate-950 font-black border-2 border-amber-300 shadow-lg shadow-amber-400/20';
-                iconBoxClass = 'bg-slate-950 text-amber-400 font-black';
-              } else {
-                buttonClass = 'bg-slate-900/90 text-white hover:bg-slate-800 font-bold border border-white/10';
-                iconBoxClass = 'bg-slate-800 text-slate-200 group-hover:text-white';
-              }
-            } else if (sidebarStyle === 'glass') {
-              if (isActive) {
-                buttonClass = 'apple-glass bg-gradient-to-r from-amber-500/25 to-orange-500/15 text-amber-300 font-extrabold border border-amber-400/40 shadow-lg';
-                iconBoxClass = 'bg-amber-400/20 text-amber-300 border border-amber-400/30';
-              } else {
-                buttonClass = 'text-slate-300 hover:text-white hover:bg-white/5 border border-transparent';
-                iconBoxClass = 'bg-white/5 text-slate-300 group-hover:text-white';
-              }
-            } else {
-              // calm
-              if (isActive) {
-                buttonClass = 'bg-amber-400/10 text-amber-300 font-bold border border-amber-400/30 shadow-sm';
-                iconBoxClass = 'bg-amber-400 text-slate-950 font-bold';
-              }
-            }
 
             return (
               <button
                 key={item.id}
                 onClick={() => setActiveTab(item.id)}
-                className={`w-full min-h-[50px] flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all duration-150 text-right group relative tap-bounce ${buttonClass}`}
+                className={`w-full min-h-[50px] flex items-center gap-3 px-3 py-2.5 rounded-xl transition-colors duration-150 text-right group relative tap-bounce ${
+                  isActive
+                    ? 'bg-amber-400/10 text-amber-300 font-bold border border-amber-400/30 shadow-sm'
+                    : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50 border border-transparent'
+                }`}
               >
-                {isActive && sidebarStyle !== 'tactile' && (
+                {isActive && (
                   <span className="absolute -right-1 top-2.5 bottom-2.5 w-1 rounded-full bg-amber-400" />
                 )}
 
                 <div
-                  className={`w-8 h-8 rounded-lg flex items-center justify-center transition-colors ${iconBoxClass}`}
+                  className={`w-8 h-8 rounded-lg flex items-center justify-center transition-colors ${
+                    isActive
+                      ? 'bg-amber-400 text-slate-950 font-bold'
+                      : 'bg-slate-800/80 text-slate-400 group-hover:text-white'
+                  }`}
                 >
                   <Icon className="w-4 h-4 stroke-[2.2]" />
                 </div>
 
-                <span className={`hidden lg:block flex-1 truncate ${sidebarStyle === 'tactile' ? 'text-sm font-bold' : 'text-sm'}`}>
+                <span className="hidden lg:block text-sm flex-1 truncate">
                   {item.label}
                 </span>
 
@@ -215,11 +142,7 @@ export default function Sidebar({
                 )}
 
                 {item.badge !== null && (
-                  <span className={`hidden lg:inline-flex items-center justify-center min-w-[20px] h-5 px-1.5 text-xs rounded-full font-bold font-mono tabular-nums ${
-                    sidebarStyle === 'tactile' && isActive
-                      ? 'bg-slate-950 text-white font-black'
-                      : 'bg-rose-500/90 text-white animate-calm-pulse'
-                  }`}>
+                  <span className="hidden lg:inline-flex items-center justify-center min-w-[20px] h-5 px-1.5 text-xs rounded-full font-bold bg-rose-500/90 text-white font-mono tabular-nums animate-calm-pulse">
                     {item.badge}
                   </span>
                 )}

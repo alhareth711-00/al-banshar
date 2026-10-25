@@ -366,10 +366,11 @@ export default function OilSelectorModal({
                     <Minus className="w-4 h-4" />
                   </button>
                   <input
-                    type="number"
-                    min="0"
+                    type="text"
+                    inputMode="numeric"
+                    pattern="[0-9]*"
                     value={qty1L}
-                    onChange={(e) => setQty1L(Math.max(0, parseInt(e.target.value) || 0))}
+                    onChange={(e) => setQty1L(Math.max(0, parseInt(e.target.value.replace(/\D/g, '')) || 0))}
                     className="w-12 h-10 text-center font-mono font-bold text-base bg-slate-800 text-white rounded-xl border border-white/10"
                   />
                   <button
@@ -426,11 +427,13 @@ export default function OilSelectorModal({
                     <Minus className="w-4 h-4" />
                   </button>
                   <input
-                    type="number"
-                    min="0"
-                    step="0.5"
+                    type="text"
+                    inputMode="decimal"
                     value={qtyBulk}
-                    onChange={(e) => setQtyBulk(Math.max(0, parseFloat(e.target.value) || 0))}
+                    onChange={(e) => {
+                      const val = e.target.value.replace(/[^0-9.]/g, '');
+                      setQtyBulk(Math.max(0, parseFloat(val) || 0));
+                    }}
                     className="w-14 h-10 text-center font-mono font-bold text-base bg-slate-800 text-white rounded-xl border border-white/10"
                   />
                   <button

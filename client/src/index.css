@@ -37,6 +37,17 @@
     -webkit-user-select: text;
   }
 
+  /* Hide number input spinners / arrows globally for keyboard entry */
+  input[type="number"]::-webkit-inner-spin-button,
+  input[type="number"]::-webkit-outer-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+  }
+  input[type="number"] {
+    -moz-appearance: textfield;
+    appearance: textfield;
+  }
+
   /* Typography /typeset Rules: Guarantee Monospace & Tabular alignment for financial figures */
   .tabular-nums {
     font-variant-numeric: tabular-nums lining-nums;
@@ -216,4 +227,19 @@
     transition-duration: 0.01ms !important;
     scroll-behavior: auto !important;
   }
+}
+
+/* ========================================================
+   GLOBAL REMOVAL OF NUMBER INPUT SPINNERS / ARROWS
+   Guarantees pure keyboard typing without arrow buttons
+   ======================================================== */
+input[type="number"]::-webkit-outer-spin-button,
+input[type="number"]::-webkit-inner-spin-button {
+  -webkit-appearance: none !important;
+  margin: 0 !important;
+}
+
+input[type="number"] {
+  -moz-appearance: textfield !important;
+  appearance: textfield !important;
 }

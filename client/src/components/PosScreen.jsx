@@ -1382,20 +1382,21 @@ export default function PosScreen({
                     <span>قراءة عداد الكيلومترات وموعد الخدمة القادمة:</span>
                   </span>
 
-                  {/* Single Default Interval Badge - Editable on click */}
+                  {/* Single Default Interval Badge - Editable on click (Keyboard only, no arrows) */}
                   <div className="flex items-center gap-1.5 bg-slate-900 border border-teal-500/40 px-3 py-1.5 rounded-xl shadow-inner">
                     <span className="text-[11px] text-teal-300 font-bold">مسافة الغيار الافتراضية:</span>
                     <span className="text-teal-400 font-bold text-xs">+</span>
                     <input
-                      type="number"
+                      type="text"
+                      inputMode="numeric"
                       value={kmInterval}
                       onChange={(e) => {
-                        const val = Number(e.target.value);
-                        setKmInterval(val >= 0 ? val : 0);
+                        const val = e.target.value.replace(/\D/g, '');
+                        setKmInterval(val ? Number(val) : '');
                         setManualNextOdometer('');
                       }}
-                      className="w-16 min-h-[28px] px-1 bg-slate-950 border border-teal-500/40 rounded-lg text-teal-300 font-mono font-black text-center text-xs focus:outline-none focus:ring-1 focus:ring-teal-400"
-                      title="انقر لتعديل مسافة الكيلومترات الافتراضية"
+                      className="w-16 min-h-[28px] px-1 bg-slate-950 border border-teal-500/40 rounded-lg text-teal-300 font-mono font-black text-center text-xs focus:outline-none focus:ring-1 focus:ring-teal-400 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                      title="أدخل مسافة الكيلومترات الافتراضية بالكيبورد"
                     />
                     <span className="text-[11px] text-teal-300 font-bold">كم (افتراضي)</span>
                   </div>
@@ -1423,17 +1424,19 @@ export default function PosScreen({
                   </div>
                 )}
 
-                {/* Inputs for Laptop Keyboard */}
+                {/* Inputs for Laptop Keyboard (Arrow-free / Keyboard Only) */}
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
                   <div>
                     <label className="block text-[11px] text-slate-300 font-bold mb-1">
                       العداد الحالي للسيارة (كم):
                     </label>
                     <input
-                      type="number"
+                      type="text"
+                      inputMode="numeric"
+                      pattern="[0-9]*"
                       placeholder="مثال: 125000"
                       value={currentOdometer}
-                      onChange={(e) => setCurrentOdometer(e.target.value)}
+                      onChange={(e) => setCurrentOdometer(e.target.value.replace(/\D/g, ''))}
                       className={`w-full min-h-[46px] px-3 rounded-xl bg-slate-900 border font-mono text-base font-extrabold text-white focus:outline-none text-center ${
                         isOdometerSuspicious
                           ? 'border-amber-500 ring-1 ring-amber-500/50'
@@ -1447,10 +1450,12 @@ export default function PosScreen({
                       عداد الغيار القادم (+{kmInterval || 3000} تلقائي):
                     </label>
                     <input
-                      type="number"
+                      type="text"
+                      inputMode="numeric"
+                      pattern="[0-9]*"
                       placeholder={nextOdometer ? String(nextOdometer) : 'يُحسب بعد إدخال الحالي'}
                       value={manualNextOdometer || nextOdometer || ''}
-                      onChange={(e) => setManualNextOdometer(e.target.value)}
+                      onChange={(e) => setManualNextOdometer(e.target.value.replace(/\D/g, ''))}
                       className="w-full min-h-[46px] px-3 rounded-xl bg-slate-900 border border-teal-500/30 font-mono text-base font-extrabold text-teal-300 focus:outline-none focus:border-teal-400 text-center"
                     />
                   </div>
@@ -1771,15 +1776,17 @@ export default function PosScreen({
                 </div>
               )}
 
-              {/* Extra Discount Input */}
+              {/* Extra Discount Input (Keyboard Only, No Spinners) */}
               <div className="flex items-center justify-between gap-1 pt-1 border-t border-white/5">
                 <span className="text-slate-300 font-bold">خصم إضافي:</span>
                 <div className="flex items-center gap-1 text-rose-400">
                   <input
-                    type="number"
+                    type="text"
+                    inputMode="numeric"
+                    pattern="[0-9]*"
                     placeholder="0"
                     value={specialDiscount || ''}
-                    onChange={(e) => setSpecialDiscount(Number(e.target.value) || 0)}
+                    onChange={(e) => setSpecialDiscount(Number(e.target.value.replace(/\D/g, '')) || 0)}
                     className="w-16 px-1.5 py-0.5 rounded-lg bg-slate-900 border border-rose-500/30 font-mono text-xs font-bold text-center text-rose-400 focus:outline-none"
                   />
                   <span className="text-[10px] text-slate-400">ر.ي</span>
@@ -1853,10 +1860,12 @@ export default function PosScreen({
                   <div className="flex items-center justify-between">
                     <span className="text-slate-300 font-bold">المبلغ المدفوع كاش/محفظة:</span>
                     <input
-                      type="number"
+                      type="text"
+                      inputMode="numeric"
+                      pattern="[0-9]*"
                       placeholder="0"
                       value={paidAmountInput}
-                      onChange={(e) => setPaidAmountInput(e.target.value)}
+                      onChange={(e) => setPaidAmountInput(e.target.value.replace(/\D/g, ''))}
                       className="w-24 min-h-[34px] px-2 rounded-lg bg-slate-900 border border-white/20 font-mono text-xs font-black text-white text-center focus:border-amber-400 focus:outline-none"
                     />
                   </div>
