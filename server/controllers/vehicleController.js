@@ -25,15 +25,18 @@ const vehicleController = {
     });
   }),
 
-  createVehicle: asyncHandler(async (req, res) => {
-    const { plate_number, car_make_model, customer_name, phone } = req.body;
+  getLastService: asyncHandler(async (req, res) => {
+    const id = parseInt(req.params.id, 10);
+    const lastService = vehicleModel.getLastService(id);
+    res.json({
+      success: true,
+      data: lastService,
+    });
+  }),
 
-    if (!plate_number || !plate_number.trim()) {
-      throw new AppError('رقم لوحة السيارة مطلوب', 400);
-    }
-    if (!car_make_model || !car_make_model.trim()) {
-      throw new AppError('نوع وموديل السيارة مطلوب', 400);
-    }
+  createVehicle: asyncHandler(async (req, res) => {
+    let { plate_number, car_make_model, customer_name, phone } = req.body;
+
     if (!customer_name || !customer_name.trim()) {
       throw new AppError('اسم العميل مطلوب', 400);
     }
@@ -41,16 +44,33 @@ const vehicleController = {
       throw new AppError('رقم هاتف العميل مطلوب', 400);
     }
 
-    // Check if plate already exists
-    const existing = vehicleModel.getByPlate(plate_number);
-    if (existing) {
-      throw new AppError(`رقم اللوحة "${plate_number}" مسجل مسبقاً للعميل ${existing.customer_name}`, 400);
+    // Plate number is OPTIONAL. If empty, generate internal unique ID e.g. "بدون-771234567"
+    let finalPlate = (plate_number && plate_number.trim()) || '';
+    if (!finalPlate) {
+      const cleanPhone = phone.trim().replace(/\D/g, '');
+      finalPlate = `بدون-${cleanPhone || Date.now().toString().slice(-6)}`;
+      const existingAuto = vehicleModel.getByPlate(finalPlate);
+      if (existingAuto) {
+        finalPlate = `${finalPlate}-${Date.now().toString().slice(-4)}`;
+      }
+    } else {
+      // Check if real plate already exists
+      const existing = vehicleModel.getByPlate(finalPlate);
+      if (existing) {
+        throw new AppError(`رقم اللوحة "${finalPlate}" مسجل مسبقاً للعميل ${existing.customer_name}`, 400);
+      }
     }
 
-    const newVehicle = vehicleModel.create(req.body);
+    const payload = {
+      ...req.body,
+      plate_number: finalPlate,
+      car_make_model: car_make_model && car_make_model.trim() ? car_make_model.trim() : 'سيارة بدون تحديد',
+    };
+
+    const newVehicle = vehicleModel.create(payload);
     res.status(201).json({
       success: true,
-      message: 'تم تسجيل العميل والمركبة بنجاح',
+      message: 'تم تسجيل العميل بنجاح',
       data: newVehicle,
     });
   }),

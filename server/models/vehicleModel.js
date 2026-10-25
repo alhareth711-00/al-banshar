@@ -74,6 +74,29 @@ const vehicleModel = {
     return db.prepare('SELECT * FROM customers_vehicles WHERE plate_number = ?').get(plateNumber.trim());
   },
 
+  getLastService(vehicleId) {
+    const lastInvoice = db.prepare(`
+      SELECT * FROM invoices 
+      WHERE vehicle_id = ? 
+      ORDER BY id DESC 
+      LIMIT 1
+    `).get(vehicleId);
+
+    if (!lastInvoice) return null;
+
+    const items = db.prepare(`
+      SELECT ii.*, inv.brand, inv.viscosity, inv.category 
+      FROM invoice_items ii
+      LEFT JOIN inventory inv ON ii.inventory_id = inv.id
+      WHERE ii.invoice_id = ?
+    `).all(lastInvoice.id);
+
+    return {
+      ...lastInvoice,
+      items,
+    };
+  },
+
   create(data) {
     const stmt = db.prepare(`
       INSERT INTO customers_vehicles (

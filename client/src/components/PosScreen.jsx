@@ -28,6 +28,7 @@ import {
   ChevronDown,
   ChevronUp,
   Coins,
+  GraduationCap,
 } from 'lucide-react';
 
 import NewVehicleModal from './NewVehicleModal';
@@ -36,6 +37,7 @@ import ProductPickerModal from './ProductPickerModal';
 import InvoiceReceiptModal from './InvoiceReceiptModal';
 import VehicleHistoryDrawer from './VehicleHistoryDrawer';
 import ReceiptVoucherModal from './ReceiptVoucherModal';
+import { isDemoMode, setDemoMode, recordBackupDownloaded } from '../utils/settings';
 
 export default function PosScreen({
   inventory = [],
@@ -54,6 +56,106 @@ export default function PosScreen({
   const [showNewVehicleModal, setShowNewVehicleModal] = useState(false);
   const [showHistoryDrawer, setShowHistoryDrawer] = useState(false);
   const [showReceiptModal, setShowReceiptModal] = useState(false);
+
+  // Training Mode State (الجزء الثالث)
+  const [demoMode, setDemoModeState] = useState(isDemoMode());
+
+  // Backup Sentinel State (الجزء الرابع: تنبيه 7 أيام)
+  const [backupStatus, setBackupStatus] = useState(null);
+  const [dismissedBackupAlert, setDismissedBackupAlert] = useState(false);
+
+  const fetchBackupStatus = async () => {
+    try {
+      const res = await fetch('/api/backup/status');
+      const data = await res.json();
+      if (data.success) {
+        setBackupStatus(data.data);
+      }
+    } catch (e) {
+      // Ignore background network error
+    }
+  };
+
+  useEffect(() => {
+    fetchBackupStatus();
+    const handleBackupUpdate = () => fetchBackupStatus();
+    window.addEventListener('quick_lube_backup_updated', handleBackupUpdate);
+    return () => window.removeEventListener('quick_lube_backup_updated', handleBackupUpdate);
+  }, []);
+
+  useEffect(() => {
+    const handleSettingsUpdate = () => {
+      setDemoModeState(isDemoMode());
+    };
+    window.addEventListener('quick_lube_settings_updated', handleSettingsUpdate);
+    return () => window.removeEventListener('quick_lube_settings_updated', handleSettingsUpdate);
+  }, []);
+
+  const DEMO_CARS = [
+    {
+      id: 'demo-1',
+      plate_number: '1-45892',
+      plate_type: 'خصوصي',
+      car_make_model: 'تويوتا هايلوكس 2021',
+      customer_name: 'أحمد صالح اليافعي (تجريبي)',
+      phone: '777123456',
+      preferred_oil_brand: 'تويوتا',
+      preferred_viscosity: '20W-50',
+      last_odometer: 62000,
+    },
+    {
+      id: 'demo-2',
+      plate_number: '2-98711',
+      plate_type: 'أجرة',
+      car_make_model: 'هيونداي توسان 2019',
+      customer_name: 'محمد قائد العديني (تجريبي)',
+      phone: '771234567',
+      preferred_oil_brand: 'بترومين',
+      preferred_viscosity: '10W-40',
+      last_odometer: 114000,
+    },
+    {
+      id: 'demo-3',
+      plate_number: '1-12093',
+      plate_type: 'خصوصي',
+      car_make_model: 'تويوتا لاندكروزر V8',
+      customer_name: 'عبدالله السنيدار (تجريبي)',
+      phone: '733456789',
+      preferred_oil_brand: 'كاسترول إيدج',
+      preferred_viscosity: '5W-30',
+      last_odometer: 85000,
+    },
+    {
+      id: 'demo-4',
+      plate_number: '3-55410',
+      plate_type: 'نقل',
+      car_make_model: 'هيونداي إلنترا 2018',
+      customer_name: 'عصام الحيمي (تجريبي)',
+      phone: '775678901',
+      preferred_oil_brand: 'فوكس تيتان',
+      preferred_viscosity: '20W-50',
+      last_odometer: 98000,
+    },
+  ];
+
+  const handleSelectDemoVehicle = (demoCar) => {
+    setSelectedVehicle({
+      id: demoCar.id,
+      plate_number: demoCar.plate_number,
+      plate_type: demoCar.plate_type || 'خصوصي',
+      car_make_model: demoCar.car_make_model,
+      customer_name: demoCar.customer_name,
+      phone: demoCar.phone,
+      preferred_oil_brand: demoCar.preferred_oil_brand || 'تويوتا',
+      preferred_viscosity: demoCar.preferred_viscosity || '20W-50',
+      last_odometer: demoCar.last_odometer || 45000,
+      next_due_odometer: (demoCar.last_odometer || 45000) + 3000,
+      balance_due: 0,
+      customer_type: 'individual',
+    });
+    setCurrentOdometer(String(demoCar.last_odometer || 45000));
+    setNextOdometer(String((demoCar.last_odometer || 45000) + 3000));
+  };
 
   // Touch Alert & Confirm Modals State (بدون نوافذ المتصفح الافتراضية)
   const [touchAlert, setTouchAlert] = useState({
@@ -580,6 +682,80 @@ export default function PosScreen({
 
   return (
     <div className="min-h-full flex flex-col gap-3.5 select-none pb-8">
+      {/* 0. TRAINING / DEMO MODE ALERT BANNER (الجزء الثالث) */}
+      {demoMode && (
+        <div className="p-3.5 rounded-2xl bg-gradient-to-r from-amber-500/20 via-orange-500/20 to-amber-500/20 border-2 border-amber-500/50 flex flex-wrap items-center justify-between gap-3 text-xs shadow-lg animate-in fade-in">
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-xl bg-amber-500 text-slate-950 font-black flex items-center justify-center text-sm shadow">
+              🎓
+            </div>
+            <div>
+              <div className="text-amber-300 font-extrabold text-sm flex items-center gap-2">
+                <span>وضع التدريب مفعل (Demo Mode)</span>
+                <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-500/30 text-amber-200 border border-amber-500/40">بيئة تجريبية آمنة</span>
+              </div>
+              <div className="text-slate-300 text-[11px] mt-0.5">
+                يمكنك تجربة البيع وتدريب العمال الجدد بحرية دون التأثير على أرقام المحل الحقيقية.
+              </div>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={() => {
+              setDemoMode(false);
+              setDemoModeState(false);
+            }}
+            className="px-3 py-1.5 rounded-xl bg-slate-950/80 hover:bg-slate-950 text-amber-300 border border-amber-500/40 font-bold text-xs transition active:scale-95"
+          >
+            إيقاف وضع التدريب ✕
+          </button>
+        </div>
+      )}
+
+      {/* 0.1 BACKUP SENTINEL ALERT (الجزء الرابع: تنبيه مرور أكثر من 7 أيام دون نسخ احتياطي) */}
+      {backupStatus?.isStale && !dismissedBackupAlert && (
+        <div className="p-3.5 rounded-2xl bg-gradient-to-r from-rose-950/40 via-slate-900 to-rose-950/40 border border-rose-500/40 flex flex-wrap items-center justify-between gap-3 text-xs shadow-lg animate-in fade-in">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-xl bg-rose-500/20 text-rose-300 border border-rose-500/40 flex items-center justify-center text-base shadow">
+              🛡️
+            </div>
+            <div>
+              <div className="text-rose-300 font-extrabold text-xs flex items-center gap-2">
+                <span>درع الأمان: تنبيه حفظ نسخة احتياطية</span>
+                <span className="text-[10px] px-2 py-0.5 rounded-full bg-rose-500/20 text-rose-300 border border-rose-500/40 font-mono font-bold">
+                  {backupStatus.daysAgo !== null && backupStatus.daysAgo !== undefined
+                    ? `مضى ${backupStatus.daysAgo} أيام`
+                    : 'لم يتم الحفظ بعد'}
+                </span>
+              </div>
+              <div className="text-slate-300 text-[11px] mt-0.5">
+                مرّ أكثر من 7 أيام دون تنزيل نسخة احتياطية محلية لحفظ فواتير وسجلات المركز من أي طارئ.
+              </div>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <a
+              href="/api/backup"
+              download
+              onClick={() => {
+                recordBackupDownloaded();
+                setDismissedBackupAlert(true);
+              }}
+              className="min-h-[38px] px-3.5 rounded-xl bg-gradient-to-r from-rose-500 to-rose-600 hover:from-rose-400 hover:to-rose-500 text-slate-950 font-black text-xs transition active:scale-95 shadow flex items-center gap-1.5"
+            >
+              <span>تحميل نسخة احتياطية فوراً 💾</span>
+            </a>
+            <button
+              type="button"
+              onClick={() => setDismissedBackupAlert(true)}
+              className="text-slate-400 hover:text-white px-2.5 py-1 text-xs font-bold transition"
+            >
+              تخطي ✕
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* 1. TOP BAR: VEHICLE SEARCH & CONTEXT */}
       <div className="apple-glass rounded-3xl p-4 border border-white/10 flex-shrink-0">
         <div className="flex flex-col md:flex-row gap-3 items-stretch md:items-center justify-between">
@@ -641,6 +817,37 @@ export default function PosScreen({
             <span>تسجيل سيارة جديدة 🚗</span>
           </button>
         </div>
+
+        {/* Quick Demo Vehicle Chips (Only displayed when demoMode === true) */}
+        {!selectedVehicle && demoMode && (
+          <div className="mt-3 pt-3 border-t border-amber-500/20 space-y-2 animate-in fade-in">
+            <div className="flex items-center justify-between text-xs">
+              <span className="text-amber-300 font-bold flex items-center gap-1.5">
+                <span>⚡ نماذج سيارات تجريبية (اختر للتجربة والتدريب بلمسة واحدة):</span>
+              </span>
+              <span className="text-[10px] text-slate-400">تختفي تلقائياً عند إيقاف وضع التدريب</span>
+            </div>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+              {DEMO_CARS.map((car) => (
+                <button
+                  key={car.id}
+                  type="button"
+                  onClick={() => handleSelectDemoVehicle(car)}
+                  className="p-2.5 rounded-xl bg-slate-900/90 hover:bg-amber-500/20 border border-white/10 hover:border-amber-400 text-right transition active:scale-95 group"
+                >
+                  <div className="font-extrabold text-white text-xs flex items-center justify-between">
+                    <span className="group-hover:text-amber-300">{car.plate_number}</span>
+                    <span className="text-[10px] text-amber-400 font-mono">({car.plate_type})</span>
+                  </div>
+                  <div className="text-[11px] text-slate-300 font-bold mt-0.5 truncate">{car.car_make_model}</div>
+                  <div className="text-[10px] text-slate-400 mt-0.5 truncate">
+                    {car.customer_name} &bull; <span className="font-mono">{car.preferred_viscosity}</span>
+                  </div>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Selected Vehicle Card */}
         {selectedVehicle && (
@@ -1247,14 +1454,14 @@ export default function PosScreen({
 
             {/* Corporate Fleet Discount Indicator (Upgrade 3) */}
             {selectedVehicle && Number(selectedVehicle.discount_percent) > 0 && (
-              <div className="p-2 rounded-xl bg-indigo-500/15 border border-indigo-500/30 text-indigo-300 text-[11px] font-bold flex items-center justify-between">
+              <div className="p-2 rounded-xl bg-indigo-500/15 border border-indigo-500/30 text-indigo-300 text-xs font-bold flex items-center justify-between">
                 <span>🏢 خصم تسعير الأسطول ({selectedVehicle.discount_percent}%):</span>
-                <span className="font-mono text-amber-300">-{specialDiscount.toLocaleString()} ر.ي</span>
+                <span className="font-mono text-amber-300 tabular-nums">-{specialDiscount.toLocaleString()} ر.ي</span>
               </div>
             )}
 
             {/* Special Discount Input with Quick Touch Pills */}
-            <div className="flex flex-wrap items-center justify-between gap-1 pt-1 border-t border-white/5">
+            <div className="flex flex-wrap items-center justify-between gap-1.5 pt-1.5 border-t border-white/5">
               <span className="text-xs font-bold text-slate-300">خصم إضافي:</span>
               <div className="flex items-center gap-1.5 flex-wrap">
                 <div className="flex items-center gap-1">
@@ -1263,7 +1470,7 @@ export default function PosScreen({
                       key={amt}
                       type="button"
                       onClick={() => setSpecialDiscount(amt)}
-                      className={`px-2 py-0.5 rounded-lg text-[10px] font-mono font-bold transition border ${
+                      className={`min-h-[32px] px-2.5 py-1 rounded-lg text-xs font-mono font-bold tap-bounce border ${
                         specialDiscount === amt
                           ? 'bg-rose-500 text-white border-rose-400'
                           : 'bg-slate-900 text-slate-300 border-white/10 hover:text-white'
@@ -1276,22 +1483,22 @@ export default function PosScreen({
                     <button
                       type="button"
                       onClick={() => setSpecialDiscount(0)}
-                      className="px-1.5 py-0.5 rounded-lg text-[10px] bg-slate-800 text-slate-400 hover:text-rose-400 border border-white/10"
+                      className="min-h-[32px] px-2 py-1 rounded-lg text-xs bg-slate-800 text-slate-300 hover:text-rose-400 border border-white/10 tap-bounce"
                       title="تصفير الخصم"
                     >
                       ✕ تصفير
                     </button>
                   )}
                 </div>
-                <div className="flex items-center gap-1 text-rose-400">
+                <div className="flex items-center gap-1.5 text-rose-400">
                   <input
                     type="number"
                     placeholder="0"
                     value={specialDiscount || ''}
                     onChange={(e) => setSpecialDiscount(Number(e.target.value) || 0)}
-                    className="w-16 px-1.5 py-0.5 rounded-lg bg-slate-900 border border-rose-500/30 font-mono text-xs font-bold text-center text-rose-400 focus:outline-none"
+                    className="w-20 px-2 py-1 rounded-lg bg-slate-900 border border-rose-500/30 font-mono text-xs font-bold text-center text-rose-400 focus:outline-none"
                   />
-                  <span className="text-[10px] text-slate-400">ر.ي</span>
+                  <span className="text-xs text-slate-400">ر.ي</span>
                 </div>
               </div>
             </div>
@@ -1299,7 +1506,7 @@ export default function PosScreen({
             {/* Net Total Display */}
             <div className="pt-2 border-t border-white/10 flex justify-between items-center">
               <span className="font-black text-sm text-white">الصافي المطلوب دفعه:</span>
-              <span className="font-mono font-black text-2xl text-amber-400">
+              <span className="font-mono font-black text-2xl text-amber-400 tabular-nums">
                 {netTotal.toLocaleString()} <span className="text-xs font-sans text-slate-300 font-bold">ر.ي</span>
               </span>
             </div>
@@ -1307,7 +1514,7 @@ export default function PosScreen({
 
           {/* 4. YEMENI PAYMENT GATEWAY UI */}
           <div className="pt-2.5 border-t border-white/10 space-y-2 flex-shrink-0">
-            <div className="text-[11px] font-bold text-slate-400">طريقة الدفع في السوق اليمني:</div>
+            <div className="text-xs font-bold text-slate-300">طريقة الدفع في السوق اليمني:</div>
             <div className="grid grid-cols-3 sm:grid-cols-5 gap-1.5">
               {[
                 { id: 'cash', label: '💵 كاش' },
@@ -1322,7 +1529,7 @@ export default function PosScreen({
                     key={m.id}
                     type="button"
                     onClick={() => setPaymentMethod(m.id)}
-                    className={`min-h-[48px] py-1 px-1.5 rounded-xl text-xs font-bold transition flex items-center justify-center border active:scale-95 ${
+                    className={`min-h-[48px] py-1.5 px-2 rounded-xl text-xs font-bold tap-bounce flex items-center justify-center border ${
                       isSelected
                         ? 'bg-amber-400 text-slate-950 font-black border-amber-300 shadow-md shadow-amber-400/20'
                         : 'bg-slate-900 border-white/10 text-slate-300 hover:text-white hover:bg-slate-800'

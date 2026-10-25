@@ -269,6 +269,76 @@ const invoiceModel = {
     const newInvoiceId = executeTransaction();
     return this.getById(newInvoiceId);
   },
+
+  voidInvoice(id) {
+    const executeTransaction = db.transaction(() => {
+      const invoice = this.getById(id);
+      if (!invoice) {
+        throw new Error(`الفاتورة رقم ${id} غير موجودة`);
+      }
+
+      // 1. Restock items back to inventory
+      const restockStmt = db.prepare(`
+        UPDATE inventory 
+        SET stock_qty = stock_qty + ? 
+        WHERE id = ?
+      `);
+
+      for (const item of invoice.items || []) {
+        if (item.inventory_id && item.item_type !== 'service' && item.product_category !== 'service') {
+          restockStmt.run(item.qty, item.inventory_id);
+        }
+      }
+
+      // 2. Adjust customer debt if remaining_debt was logged
+      if (invoice.remaining_debt > 0 && invoice.vehicle_id) {
+        db.prepare(`
+          UPDATE customers_vehicles 
+          SET balance_due = MAX(0, balance_due - ?) 
+          WHERE id = ?
+        `).run(invoice.remaining_debt, invoice.vehicle_id);
+      }
+
+      // 3. Remove accounting journal entry lines & entry
+      try {
+        const jv = db.prepare("SELECT id FROM journal_entries WHERE ref_type = 'invoice' AND ref_id = ?").get(id);
+        if (jv) {
+          db.prepare("DELETE FROM journal_entry_lines WHERE journal_entry_id = ?").run(jv.id);
+          db.prepare("DELETE FROM journal_entries WHERE id = ?").run(jv.id);
+        }
+      } catch (jvErr) {
+        console.warn('[Void] Reversing journal entry warning:', jvErr.message);
+      }
+
+      // 4. Delete invoice items and invoice
+      db.prepare("DELETE FROM invoice_items WHERE invoice_id = ?").run(id);
+      db.prepare("DELETE FROM invoices WHERE id = ?").run(id);
+
+      // 5. Audit log
+      try {
+        db.prepare(`
+          INSERT INTO financial_audit_logs (
+            action, entity_type, entity_id, old_data, new_data, performed_by, created_at
+          ) VALUES (?, 'invoice', ?, ?, ?, 'cashier', datetime('now', 'localtime'))
+        `).run(
+          'INVOICE_VOIDED',
+          id,
+          JSON.stringify({ invoice_number: invoice.invoice_number, net_total: invoice.net_total, customer_name: invoice.customer_name }),
+          JSON.stringify({ status: 'voided_and_restocked' })
+        );
+      } catch (auditErr) {
+        // Non-fatal
+      }
+
+      return {
+        id,
+        invoice_number: invoice.invoice_number,
+        message: 'تم إلغاء الفاتورة واسترجاع المخزون وتسوية الحسابات بنجاح',
+      };
+    });
+
+    return executeTransaction();
+  },
 };
 
 module.exports = invoiceModel;

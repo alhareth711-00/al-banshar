@@ -153,6 +153,33 @@ const backupEngine = {
       })
       .sort((a, b) => new Date(b.modifiedAt) - new Date(a.modifiedAt));
   },
+
+  getBackupStatus() {
+    ensureBackupsDir();
+    const list = this.listBackups();
+    if (!list || list.length === 0) {
+      return {
+        hasBackup: false,
+        lastBackupDate: null,
+        daysAgo: null,
+        isStale: true,
+        totalBackups: 0,
+      };
+    }
+    const latest = list[0];
+    const latestDate = new Date(latest.modifiedAt || latest.createdAt);
+    const now = new Date();
+    const diffDays = Math.floor((now - latestDate) / (1000 * 60 * 60 * 24));
+    return {
+      hasBackup: true,
+      lastBackupDate: latestDate.toISOString().slice(0, 10),
+      latestFileName: latest.fileName,
+      sizeFormatted: latest.sizeFormatted,
+      daysAgo: Math.max(0, diffDays),
+      isStale: diffDays >= 7,
+      totalBackups: list.length,
+    };
+  },
 };
 
 module.exports = backupEngine;

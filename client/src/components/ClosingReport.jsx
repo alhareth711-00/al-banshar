@@ -27,6 +27,8 @@ import {
   Flame,
   Activity,
   BarChart2,
+  PieChart,
+  ShieldCheck,
 } from 'lucide-react';
 import { getShopSettings, formatYemeniWhatsAppLink } from '../utils/settings';
 import ShiftHandoverModal from './ShiftHandoverModal';
@@ -126,7 +128,17 @@ export default function ClosingReport({ onOpenBayProfitability }) {
     debts_and_payables,
     comparison,
     hourly_analytics,
+    executive_pulse,
   } = reportData;
+
+  const execPulse = executive_pulse || {
+    total_cogs: 0,
+    gross_profit: 0,
+    net_profit: 0,
+    net_margin_pct: 0,
+    expense_coverage_ratio: 100,
+    category_breakdown: { oil: 0, filter: 0, tire: 0, battery: 0, service: 0 },
+  };
 
   // Build the critical low stock alert text
   const lowStockText = (low_stock_alerts || []).length > 0
@@ -167,7 +179,7 @@ export default function ClosingReport({ onOpenBayProfitability }) {
 
   const maxTimelineCars = Math.max(...filteredTimeline.map((t) => t.cars_count), 1);
 
-  // Executive Owner Brief Message 2.0 (Enhanced with Ticket & Peak Stats)
+  // Executive Owner Brief Message 3.0 (الجزء الرابع: مدمج مع النبض المالي وصافي الأرباح التقديري)
   const ownerBriefMessage =
 `📊 إغلاق مالي لمركز ${settings.shopName} - ${reportDate}
 🚗 حركة العمليات والخدمة:
@@ -177,6 +189,12 @@ export default function ClosingReport({ onOpenBayProfitability }) {
 - إجمالي المبيعات الصافية: ${summary.total_net_sales.toLocaleString()} ر.ي
 - ⏱️ ساعة الذروة اليومية: ${peakHour.label || '04:00 م'} (${peakHour.cars_count || 0} سيارات)
 - 🎫 متوسط الفاتورة للسيارة: ${avgTicket.toLocaleString()} ر.ي
+
+💼 النبض المالي وصافي الأرباح (Executive Pulse):
+- تكلفة البضاعة المباعة (COGS): ${execPulse.total_cogs.toLocaleString()} ر.ي
+- الربح التشغيلي الإجمالي: ${execPulse.gross_profit.toLocaleString()} ر.ي
+- 💰 صافي الربح اليومي التقديري: ${execPulse.net_profit.toLocaleString()} ر.ي (${execPulse.net_margin_pct}%)
+- 🛡️ معدل تغطية المصروفات: ${execPulse.expense_coverage_ratio}%
 
 💵 حركة الصندوق النقدي (1101):
 - إجمالي الكاش المقبوض من المبيعات: ${cash_register.inflow_cash_invoices.toLocaleString()} ر.ي
@@ -433,6 +451,136 @@ export default function ClosingReport({ onOpenBayProfitability }) {
                 <span>إرسال لواتساب المشرف 📲</span>
               </a>
             )}
+          </div>
+        </div>
+
+        {/* EXECUTIVE PULSE & FINANCIAL HEALTH (الجزء الرابع: النبض المالي وصافي الأرباح التقديري ومعدل تغطية المصروفات) */}
+        <div className="apple-glass rounded-3xl p-5 border border-amber-500/30 bg-gradient-to-r from-amber-500/10 via-slate-900/80 to-slate-900/90 space-y-4 shadow-xl">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2.5">
+              <div className="w-9 h-9 rounded-xl bg-amber-500/20 text-amber-400 border border-amber-500/30 flex items-center justify-center">
+                <BarChart2 className="w-5 h-5 stroke-[2.2]" />
+              </div>
+              <div>
+                <h3 className="font-black text-sm text-white flex items-center gap-2">
+                  <span>النبض المالي والتقرير التنفيذي الشامل (Executive Profitability Pulse)</span>
+                  <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 font-bold border border-amber-500/30 font-mono">
+                    اليوم {reportDate}
+                  </span>
+                </h3>
+                <p className="text-[11px] text-slate-400">
+                  تحليل فوري لصافي العائد والربح التشغيلي بعد خصم تكلفة البضاعة (COGS) والمصروفات اليومية
+                </p>
+              </div>
+            </div>
+
+            <div className="hidden sm:flex items-center gap-2">
+              <span className={`px-2.5 py-1 rounded-xl text-xs font-mono font-bold border flex items-center gap-1.5 ${
+                execPulse.net_profit >= 0
+                  ? 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30'
+                  : 'bg-rose-500/15 text-rose-300 border-rose-500/30'
+              }`}>
+                <ShieldCheck className="w-3.5 h-3.5" />
+                <span>{execPulse.net_profit >= 0 ? 'نشاط رابح اليوم' : 'عجز تشغيلي'}</span>
+              </span>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 text-xs">
+            {/* Card 1: Estimated Net Profit */}
+            <div className="p-4 rounded-2xl bg-slate-900/90 border border-white/10 space-y-2 shadow-inner">
+              <div className="flex justify-between items-center text-slate-400">
+                <span className="font-bold flex items-center gap-1">
+                  <DollarSign className="w-3.5 h-3.5 text-emerald-400" />
+                  <span>صافي الربح التقديري:</span>
+                </span>
+                <span className="text-[10px] px-1.5 py-0.2 rounded bg-emerald-500/20 text-emerald-300 font-mono font-bold">
+                  هامش {execPulse.net_margin_pct}%
+                </span>
+              </div>
+              <div className={`font-mono text-xl font-black ${execPulse.net_profit >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+                {execPulse.net_profit.toLocaleString()} <span className="text-xs font-normal">ر.ي</span>
+              </div>
+              <div className="text-[11px] text-slate-400 pt-1 border-t border-white/5 flex justify-between">
+                <span>الربح الإجمالي:</span>
+                <span className="font-mono font-bold text-slate-200">{execPulse.gross_profit.toLocaleString()} ر.ي</span>
+              </div>
+            </div>
+
+            {/* Card 2: Expense Coverage Ratio */}
+            <div className="p-4 rounded-2xl bg-slate-900/90 border border-white/10 space-y-2 shadow-inner">
+              <div className="flex justify-between items-center text-slate-400">
+                <span className="font-bold flex items-center gap-1">
+                  <ShieldCheck className="w-3.5 h-3.5 text-blue-400" />
+                  <span>تغطية المصروفات:</span>
+                </span>
+                <span className={`text-[10px] px-1.5 py-0.2 rounded font-mono font-bold ${
+                  execPulse.expense_coverage_ratio >= 100
+                    ? 'bg-blue-500/20 text-blue-300 border border-blue-500/30'
+                    : 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
+                }`}>
+                  {execPulse.expense_coverage_ratio >= 100 ? 'تغطية آمنة' : 'دون التغطية'}
+                </span>
+              </div>
+              <div className="font-mono text-xl font-black text-blue-400">
+                {execPulse.expense_coverage_ratio}%
+              </div>
+              <div className="text-[11px] text-slate-400 pt-1 border-t border-white/5 flex justify-between">
+                <span>المصاريف المنصرفة:</span>
+                <span className="font-mono font-bold text-rose-300">{transactions_summary.expenses_total.toLocaleString()} ر.ي</span>
+              </div>
+            </div>
+
+            {/* Card 3: COGS vs Sales */}
+            <div className="p-4 rounded-2xl bg-slate-900/90 border border-white/10 space-y-2 shadow-inner">
+              <div className="flex justify-between items-center text-slate-400">
+                <span className="font-bold flex items-center gap-1">
+                  <Layers className="w-3.5 h-3.5 text-amber-400" />
+                  <span>تكلفة البضاعة (COGS):</span>
+                </span>
+                <span className="text-[10px] text-slate-400 font-mono">سعر الشراء</span>
+              </div>
+              <div className="font-mono text-xl font-black text-amber-400">
+                {execPulse.total_cogs.toLocaleString()} <span className="text-xs font-normal">ر.ي</span>
+              </div>
+              <div className="text-[11px] text-slate-400 pt-1 border-t border-white/5 flex justify-between">
+                <span>إجمالي المبيعات:</span>
+                <span className="font-mono font-bold text-white">{summary.total_net_sales.toLocaleString()} ر.ي</span>
+              </div>
+            </div>
+
+            {/* Card 4: Sales Mix Breakdown */}
+            <div className="p-4 rounded-2xl bg-slate-900/90 border border-white/10 space-y-1.5 shadow-inner">
+              <div className="flex justify-between items-center text-slate-400 mb-1">
+                <span className="font-bold flex items-center gap-1">
+                  <PieChart className="w-3.5 h-3.5 text-purple-400" />
+                  <span>توزيع مبيعات النشاط:</span>
+                </span>
+                <span className="text-[10px] text-purple-300 font-mono font-bold">5 تصنيفات</span>
+              </div>
+              <div className="space-y-1 text-[11px] font-mono">
+                <div className="flex justify-between text-slate-300">
+                  <span className="text-slate-400">🛢️ زيوت:</span>
+                  <span className="font-bold">{execPulse.category_breakdown.oil.toLocaleString()} ر.ي</span>
+                </div>
+                <div className="flex justify-between text-slate-300">
+                  <span className="text-slate-400">🔧 فلاتر:</span>
+                  <span className="font-bold">{execPulse.category_breakdown.filter.toLocaleString()} ر.ي</span>
+                </div>
+                <div className="flex justify-between text-slate-300">
+                  <span className="text-slate-400">🛞 إطارات:</span>
+                  <span className="font-bold">{execPulse.category_breakdown.tire.toLocaleString()} ر.ي</span>
+                </div>
+                <div className="flex justify-between text-slate-300">
+                  <span className="text-slate-400">⚡ بطاريات:</span>
+                  <span className="font-bold">{execPulse.category_breakdown.battery.toLocaleString()} ر.ي</span>
+                </div>
+                <div className="flex justify-between text-slate-300">
+                  <span className="text-slate-400">🛠️ خدمات ومصنعية:</span>
+                  <span className="font-bold text-purple-300">{execPulse.category_breakdown.service.toLocaleString()} ر.ي</span>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
 

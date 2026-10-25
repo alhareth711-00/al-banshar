@@ -84,12 +84,12 @@ export default function InvoiceReceiptModal({ isOpen, onClose, invoice, onNewInv
     if (tabTarget) setActiveTab(tabTarget);
     setTimeout(() => {
       window.print();
-    }, 100);
+    }, 150);
   };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-5 bg-black/85 backdrop-blur-md">
-      {/* Scoped CSS for Thermal Printing & Sticker Printing */}
+      {/* Scoped CSS for Thermal Receipt (80mm) & Windshield Sticker Printing */}
       <style>{`
         @media print {
           body * {
@@ -102,13 +102,14 @@ export default function InvoiceReceiptModal({ isOpen, onClose, invoice, onNewInv
             position: fixed;
             left: 0;
             top: 0;
-            width: 80mm;
-            padding: 4mm;
+            width: ${activeTab === 'sticker' ? '68mm' : '80mm'};
+            padding: ${activeTab === 'sticker' ? '3mm' : '4mm'};
             margin: 0;
             background: #fff !important;
             color: #000 !important;
             box-shadow: none !important;
-            border: none !important;
+            border: ${activeTab === 'sticker' ? '2px solid #000 !important' : 'none !important'};
+            border-radius: ${activeTab === 'sticker' ? '4mm !important' : '0 !important'};
           }
           .no-print {
             display: none !important;
@@ -409,80 +410,109 @@ export default function InvoiceReceiptModal({ isOpen, onClose, invoice, onNewInv
 
           {/* TAB 3: OIL CHANGE REMINDER WINDSHIELD STICKER */}
           {activeTab === 'sticker' && (
-            <div className="printable-area bg-gradient-to-br from-amber-50 to-orange-50 text-slate-950 rounded-3xl p-5 border-2 border-amber-400 max-w-xs mx-auto shadow-2xl font-sans text-xs space-y-3">
+            <div className="printable-area bg-white text-slate-950 rounded-2xl p-4 border-2 border-slate-900 max-w-[280px] mx-auto shadow-xl font-sans text-xs space-y-2.5">
               {/* Sticker Header */}
-              <div className="text-center border-b-2 border-amber-400 pb-2.5">
-                <div className="text-[10px] uppercase font-bold tracking-widest text-amber-700">
-                  ملصق تذكير خدمة الزيت القادم 🏷️
+              <div className="text-center border-b-2 border-slate-900 pb-2">
+                <div className="text-[10px] font-black uppercase tracking-wider text-slate-700">
+                  ملصق تذكير غيار الزيت القادم 🏷️
                 </div>
-                <h4 className="font-black text-sm text-slate-900 mt-0.5">{settings.shopName}</h4>
-                <div className="text-[11px] font-mono text-slate-700 font-bold">هاتف: {settings.shopPhone}</div>
+                <h4 className="font-black text-sm text-slate-950 mt-0.5">{settings.shopName}</h4>
+                <div className="text-[11px] font-mono text-slate-800 font-bold">هاتف: {settings.shopPhone}</div>
               </div>
 
               {/* Vehicle & Date */}
-              <div className="bg-white/80 p-2.5 rounded-xl border border-amber-200 flex justify-between items-center text-xs">
+              <div className="p-2 rounded-lg bg-slate-100 border border-slate-300 flex justify-between items-center text-xs">
                 <div>
-                  <div className="text-[10px] text-slate-500">رقم لوحة المركبة:</div>
-                  <div className="font-mono font-black text-slate-900 text-sm">{invoice.plate_number}</div>
+                  <div className="text-[10px] text-slate-600 font-medium">رقم اللوحة:</div>
+                  <div className="font-mono font-black text-slate-950 text-sm">{invoice.plate_number}</div>
                 </div>
                 <div className="text-left font-mono">
-                  <div className="text-[10px] text-slate-500">تاريخ الخدمة:</div>
-                  <div className="font-bold text-slate-800">{new Date().toISOString().split('T')[0]}</div>
+                  <div className="text-[10px] text-slate-600 font-medium">تاريخ الغيار:</div>
+                  <div className="font-bold text-slate-900">{new Date().toISOString().split('T')[0]}</div>
                 </div>
               </div>
 
-              {/* Prominent Next Odometer Box (The core feature of windshield sticker) */}
-              <div className="p-3.5 rounded-2xl bg-amber-500 text-slate-950 text-center shadow-md">
-                <div className="text-[11px] font-black tracking-wide uppercase opacity-90">
-                  ⚡ موعد التغيير القادم عند العداد:
+              {/* Prominent Next Odometer Box (High Contrast for Windshield visibility) */}
+              <div className="p-3 rounded-xl bg-slate-950 text-white text-center shadow">
+                <div className="text-[10px] font-black tracking-wide uppercase text-amber-400">
+                  ⚡ غيار الزيت القادم عند العداد:
                 </div>
-                <div className="text-2xl font-black font-mono mt-0.5 tracking-tight">
-                  {Number(invoice.next_odometer).toLocaleString()} <span className="text-xs font-sans">كم</span>
+                <div className="text-2xl font-black font-mono mt-0.5 tracking-tight text-white">
+                  {Number(invoice.next_odometer).toLocaleString()} <span className="text-xs font-sans font-bold">كم</span>
                 </div>
-                <div className="text-[11px] font-bold font-mono mt-1 opacity-90">
-                  أو بتاريخ: {invoice.next_service_date}
+                <div className="text-[10px] font-bold font-mono mt-0.5 text-slate-300">
+                  أو بحلول تاريخ: {invoice.next_service_date}
                 </div>
               </div>
 
               {/* Oil & Filter Spec */}
-              <div className="p-2.5 rounded-xl bg-white/80 border border-amber-200 text-[11px] space-y-1">
+              <div className="p-2 rounded-lg bg-slate-100 border border-slate-300 text-[11px] space-y-1">
                 <div className="flex justify-between">
-                  <span className="text-slate-500 font-medium">العداد الحالي:</span>
-                  <span className="font-mono font-bold">{Number(invoice.current_odometer).toLocaleString()} كم</span>
+                  <span className="text-slate-600 font-medium">العداد الحالي:</span>
+                  <span className="font-mono font-bold text-slate-950">{Number(invoice.current_odometer).toLocaleString()} كم</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-slate-500 font-medium">الزيت المستخدم:</span>
-                  <span className="font-bold truncate max-w-[150px]">{oilDetailsText}</span>
+                  <span className="text-slate-600 font-medium">الزيت المعبأ:</span>
+                  <span className="font-black text-slate-950 truncate max-w-[150px]">{oilDetailsText}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-slate-500 font-medium">الفلتر:</span>
-                  <span className="font-bold truncate max-w-[150px]">{filterDetailsText}</span>
+                  <span className="text-slate-600 font-medium">الفلتر / السيفون:</span>
+                  <span className="font-bold text-slate-950 truncate max-w-[150px]">{filterDetailsText}</span>
                 </div>
               </div>
 
               {/* Friendly Footer Warning */}
-              <div className="text-center text-[10px] text-slate-600 font-medium pt-1">
-                يرجى الالتزام بالموعد المحدد للحفاظ على محرك سيارتك وعزمها. نتمنى لكم قيادة آمنة 🌹
+              <div className="text-center text-[9px] text-slate-600 font-bold pt-0.5 border-t border-slate-300">
+                يرجى الالتزام بالموعد المحدد لحماية محرك سيارتكم. قيادة آمنة 🌹
               </div>
             </div>
           )}
         </div>
 
         {/* Modal Bottom Actions */}
-        <div className="p-4 border-t border-white/10 bg-slate-950 space-y-2 flex-shrink-0 no-print">
+        <div className="p-4 border-t border-white/10 bg-slate-950 space-y-2.5 flex-shrink-0 no-print">
           {/* PRIMARY ACTION: DIRECT WHATSAPP SENDER */}
           <a
             href={whatsappUrl}
             target="_blank"
             rel="noopener noreferrer"
-            className="w-full min-h-[50px] rounded-2xl bg-gradient-to-r from-emerald-500 to-green-600 hover:from-emerald-400 hover:to-green-500 text-slate-950 font-black text-xs shadow-xl shadow-emerald-500/25 flex items-center justify-center gap-2 transition active:scale-95"
+            className="w-full min-h-[48px] rounded-2xl bg-gradient-to-r from-emerald-500 to-green-600 hover:from-emerald-400 hover:to-green-500 text-slate-950 font-black text-xs shadow-xl shadow-emerald-500/25 flex items-center justify-center gap-2 transition active:scale-95"
           >
             <MessageSquare className="w-4 h-4 fill-current" />
             <span>إرسال كرت الخدمة فورياً عبر واتساب الزبون 📲</span>
           </a>
 
-          {/* SECONDARY ROW */}
-          <div className="grid grid-cols-3 gap-2">
+          {/* SECONDARY ROW: 1-TOUCH DIRECT BUTTONS (الحرارية، ملصق الزجاج، النسخ، فاتورة جديدة) */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+            {/* 1. Direct Print 80mm Thermal */}
+            <button
+              type="button"
+              onClick={() => handlePrint('thermal')}
+              className={`min-h-[44px] px-2 rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 transition active:scale-95 ${
+                activeTab === 'thermal'
+                  ? 'bg-white text-slate-950 font-black shadow-md'
+                  : 'bg-white/10 hover:bg-white/15 text-white'
+              }`}
+            >
+              <Printer className="w-4 h-4 text-amber-400" />
+              <span>فاتورة 80mm 🖨️</span>
+            </button>
+
+            {/* 2. Direct Print Windshield Sticker (الجزء الثالث) */}
+            <button
+              type="button"
+              onClick={() => handlePrint('sticker')}
+              className={`min-h-[44px] px-2 rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 transition active:scale-95 ${
+                activeTab === 'sticker'
+                  ? 'bg-amber-400 text-slate-950 font-black shadow-md shadow-amber-400/20'
+                  : 'bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/30'
+              }`}
+            >
+              <Tag className="w-4 h-4 text-amber-400" />
+              <span>ملصق الزجاج 🏷️</span>
+            </button>
+
+            {/* 3. Copy Message */}
             <button
               type="button"
               onClick={handleCopyMessage}
@@ -492,31 +522,17 @@ export default function InvoiceReceiptModal({ isOpen, onClose, invoice, onNewInv
               <span>{copied ? 'تم النسخ!' : 'نسخ الرسالة'}</span>
             </button>
 
-            <button
-              type="button"
-              onClick={() => handlePrint(activeTab === 'pass' ? 'thermal' : activeTab)}
-              className="min-h-[44px] px-2 rounded-xl bg-white/10 hover:bg-white/15 text-white font-bold text-xs flex items-center justify-center gap-1.5 transition active:scale-95"
-            >
-              <Printer className="w-4 h-4 text-amber-400" />
-              <span>
-                {activeTab === 'sticker'
-                  ? 'طباعة الملصق 🏷️'
-                  : activeTab === 'thermal'
-                  ? 'طباعة 80mm 🖨️'
-                  : 'معاينة وطباعة 🖨️'}
-              </span>
-            </button>
-
+            {/* 4. New Invoice */}
             <button
               type="button"
               onClick={() => {
                 onClose();
                 onNewInvoice();
               }}
-              className="min-h-[44px] px-2 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/30 font-bold text-xs flex items-center justify-center gap-1.5 transition active:scale-95"
+              className="min-h-[44px] px-2 rounded-xl bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-500/30 font-bold text-xs flex items-center justify-center gap-1.5 transition active:scale-95"
             >
               <Plus className="w-4 h-4 stroke-[2.5]" />
-              <span>فاتورة جديدة</span>
+              <span>فاتورة جديدة 🚗</span>
             </button>
           </div>
         </div>

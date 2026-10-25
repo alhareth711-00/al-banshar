@@ -22,3 +22,5 @@ server/backups/*.sqlite
 Thumbs.db
 .vscode/
 .idea/
+.impeccable/
+client/.impeccable/

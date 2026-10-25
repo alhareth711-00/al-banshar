@@ -1012,6 +1012,34 @@ async function runTests() {
     assert(listBackupsRes.status === 200 && listBackupsRes.body.success, 'Backup Engine: List backups responded 200');
     assert(Array.isArray(listBackupsRes.body.data) && listBackupsRes.body.data.length > 0, `Listed backups found ${listBackupsRes.body.data.length} snapshots`);
 
+    // =========================================================================
+    // PART 4 AUTOMATION & EXECUTIVE REPORTS VERIFICATION TESTS
+    // =========================================================================
+    console.log('\n--- Running Part 4 Automation & Executive Reports Verification Tests ---');
+
+    // 4. Backup Sentinel 7-Day Health Status
+    const backupStatusRes = await request('GET', '/api/backup/status');
+    assert(backupStatusRes.status === 200 && backupStatusRes.body.success, 'Part 4: Backup sentinel status responds 200');
+    assert(backupStatusRes.body.data.hasBackup !== undefined, 'Backup status exposes hasBackup flag');
+    assert(typeof backupStatusRes.body.data.isStale === 'boolean', `Backup sentinel evaluates staleness (isStale: ${backupStatusRes.body.data.isStale})`);
+    assert(backupStatusRes.body.data.totalBackups > 0, `Sentinel counts backups: ${backupStatusRes.body.data.totalBackups}`);
+
+    // 5. Daily Closing Executive Pulse & Profitability
+    const closingPulseRes = await request('GET', '/api/reports/daily-closing');
+    assert(closingPulseRes.status === 200 && closingPulseRes.body.success, 'Part 4: Daily closing with executive pulse responds 200');
+    const pulseData = closingPulseRes.body.data.executive_pulse;
+    assert(pulseData !== undefined, 'Part 4: Executive pulse object attached to daily closing report');
+    assert(typeof pulseData.total_cogs === 'number', `COGS calculated: ${pulseData.total_cogs} YER`);
+    assert(typeof pulseData.gross_profit === 'number', `Gross profit calculated: ${pulseData.gross_profit} YER`);
+    assert(typeof pulseData.net_profit === 'number', `Net profit calculated: ${pulseData.net_profit} YER`);
+    assert(typeof pulseData.expense_coverage_ratio === 'number', `Expense coverage ratio: ${pulseData.expense_coverage_ratio}%`);
+    assert(pulseData.category_breakdown !== undefined, 'Category sales mix breakdown exposed');
+    assert(typeof pulseData.category_breakdown.oil === 'number', 'Sales mix tracks oil');
+    assert(typeof pulseData.category_breakdown.filter === 'number', 'Sales mix tracks filters');
+    assert(typeof pulseData.category_breakdown.tire === 'number', 'Sales mix tracks tires');
+    assert(typeof pulseData.category_breakdown.battery === 'number', 'Sales mix tracks batteries');
+    assert(typeof pulseData.category_breakdown.service === 'number', 'Sales mix tracks services');
+
     console.log(`\n========================================`);
     console.log(`Test Results: ${passed} Passed, ${failed} Failed`);
     console.log(`========================================\n`);

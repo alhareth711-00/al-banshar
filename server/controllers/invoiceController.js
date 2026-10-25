@@ -47,6 +47,16 @@ const invoiceController = {
       data: invoice,
     });
   }),
+
+  voidInvoice: asyncHandler(async (req, res) => {
+    const id = parseInt(req.params.id, 10);
+    const result = invoiceModel.voidInvoice(id);
+    res.json({
+      success: true,
+      message: result.message,
+      data: result,
+    });
+  }),
 };
 
 module.exports = invoiceController;

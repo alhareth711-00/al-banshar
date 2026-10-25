@@ -321,6 +321,25 @@ function initDb() {
     console.warn('[DB] Seeding services warning:', err.message);
   }
 
+  // Seed default Quick Invoice customer record if none exists
+  try {
+    const quickCustomer = db.prepare("SELECT * FROM customers_vehicles WHERE plate_number = 'فاتورة سريعة'").get();
+    if (!quickCustomer) {
+      db.prepare(`
+        INSERT INTO customers_vehicles (
+          plate_number, plate_type, car_make_model, customer_name, phone,
+          last_odometer, next_due_odometer, balance_due, credit_limit, customer_type
+        ) VALUES (
+          'فاتورة سريعة', 'مؤقت', 'مشتريات وخدمات سريعة', 'عميل عام (نقدي)', '---',
+          0, 0, 0, 0, 'individual'
+        )
+      `).run();
+      console.log('[DB] Seeded default Quick Invoice general customer record.');
+    }
+  } catch (err) {
+    console.warn('[DB] Seeding quick customer warning:', err.message);
+  }
+
   // Seed standard Chart of Accounts
   seedChartOfAccounts(db);
 

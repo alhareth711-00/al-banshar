@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { X, Car, Calendar, Gauge, History, Droplets, Wrench, CheckCircle, RotateCcw, AlertTriangle, User, Phone, DollarSign } from 'lucide-react';
+import { X, Car, Calendar, Gauge, History, Droplets, Wrench, CheckCircle, RotateCcw, AlertTriangle, User, Phone, DollarSign, MessageSquare } from 'lucide-react';
+import { generateOilReminderUrl } from '../utils/settings';
 
 export default function VehicleHistoryDrawer({
   isOpen,
@@ -91,6 +92,28 @@ export default function VehicleHistoryDrawer({
                 <span>الدين: {Number(vehicleData.balance_due).toLocaleString()} ر.ي</span>
               </div>
             </div>
+
+            {/* Direct WhatsApp Oil Reminder Action (الجزء الرابع: رادار استعادة الزبائن) */}
+            {vehicleData.phone && (
+              <div className="mt-3 pt-2.5 border-t border-white/10">
+                <a
+                  href={generateOilReminderUrl({
+                    phone: vehicleData.phone,
+                    customerName: vehicleData.customer_name,
+                    carModel: vehicleData.car_make_model,
+                    plateNumber: vehicleData.plate_number,
+                    nextOdometer: Number(vehicleData.last_odometer || 0) + 3000,
+                    preferredOil: vehicleData.preferred_oil_brand ? `${vehicleData.preferred_oil_brand} (${vehicleData.preferred_viscosity || ''})` : '',
+                  })}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="w-full min-h-[44px] px-3.5 rounded-xl bg-gradient-to-r from-emerald-600 to-green-600 hover:from-emerald-500 hover:to-green-500 text-slate-950 font-black text-xs flex items-center justify-center gap-2 shadow-md shadow-emerald-600/20 transition active:scale-95"
+                >
+                  <MessageSquare className="w-4 h-4 fill-current" />
+                  <span>إرسال تذكير واتساب لموعد الزيت القادم 📲</span>
+                </a>
+              </div>
+            )}
           </div>
         )}
 

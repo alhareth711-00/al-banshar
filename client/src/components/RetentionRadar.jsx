@@ -24,7 +24,7 @@ import {
   RefreshCw,
   Zap,
 } from 'lucide-react';
-import { getShopSettings, formatYemeniWhatsAppLink } from '../utils/settings';
+import { getShopSettings, formatYemeniWhatsAppLink, generateOilReminderMessage } from '../utils/settings';
 
 export default function RetentionRadar({ onSelectVehicleForPos }) {
   const [activeTab, setActiveTab] = useState('radar'); // 'radar' | 'fleets' | 'debts' | 'all_vehicles'
@@ -176,7 +176,13 @@ export default function RetentionRadar({ onSelectVehicleForPos }) {
 
   // Helper to generate WhatsApp URL from item custom message
   const getWhatsAppUrl = (item) => {
-    const msg = item.custom_whatsapp_message || `السلام عليكم ورحمة الله أستاذ ${item.customer_name}، نود تذكيركم بموعد خدمة تغيير الزيت لسيارتكم (${item.plate_number}) عند العداد ${item.next_due_odometer || 3000} كم. يسعدنا تشريفكم في مركز ${settings.shopName}.`;
+    const msg = item.custom_whatsapp_message || generateOilReminderMessage({
+      customerName: item.customer_name,
+      carModel: item.car_make_model,
+      plateNumber: item.plate_number,
+      nextOdometer: item.next_due_odometer || 3000,
+      preferredOil: item.preferred_oil_brand ? `${item.preferred_oil_brand} (${item.preferred_viscosity || ''})` : '',
+    });
     return formatYemeniWhatsAppLink(item.phone, msg);
   };
 

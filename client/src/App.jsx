@@ -230,7 +230,7 @@ export default function App() {
       />
 
       {/* Main App Workspace with Global Smooth Scrollability */}
-      <main className="flex-1 flex flex-col p-3 lg:p-5 overflow-y-auto overflow-x-hidden min-w-0 min-h-0 bg-gradient-to-br from-slate-950 via-slate-900/90 to-slate-950">
+      <main className="flex-1 flex flex-col p-3 lg:px-6 lg:py-4 overflow-y-auto overflow-x-hidden min-w-0 min-h-0 bg-[#070b14] space-y-3">
         {/* Real-time Financial Pulse Bar (Upgrade 2 & Action Center) */}
         <FinancialPulseBar
           onOpenStatement={() => handleOpenStatementGuarded('customer', null)}

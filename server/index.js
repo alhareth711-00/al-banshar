@@ -19,6 +19,7 @@ const voucherRoutes = require('./routes/voucherRoutes');
 const expenseCategoryRoutes = require('./routes/expenseCategoryRoutes');
 const accountingRoutes = require('./routes/accountingRoutes');
 const shiftRoutes = require('./routes/shiftRoutes');
+const systemRoutes = require('./routes/systemRoutes');
 const vehicleController = require('./controllers/vehicleController');
 
 const app = express();
@@ -81,6 +82,12 @@ app.get('/api/backup/list', (req, res) => {
   res.json({ success: true, data: list });
 });
 
+// Backup Sentinel: Check if backup is stale (> 7 days)
+app.get('/api/backup/status', (req, res) => {
+  const status = backupEngine.getBackupStatus();
+  res.json({ success: true, data: status });
+});
+
 // API Routes
 app.use('/api/vehicles', vehicleRoutes);
 app.use('/api/inventory', inventoryRoutes);
@@ -95,6 +102,7 @@ app.use('/api/vouchers', voucherRoutes);
 app.use('/api/expense-categories', expenseCategoryRoutes);
 app.use('/api/accounting', accountingRoutes);
 app.use('/api/shifts', shiftRoutes);
+app.use('/api/system', systemRoutes);
 
 // Global Error Handler
 app.use(errorHandler);

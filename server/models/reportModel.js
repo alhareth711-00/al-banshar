@@ -467,8 +467,61 @@ const reportModel = {
     hourlyAnalytics.average_ticket_per_invoice = avgTicketPerInvoice;
     hourlyAnalytics.average_services_per_car = avgServicesPerCar;
 
+    // 16. Executive Pulse & Profitability (الجزء الرابع: التقرير التنفيذي الشامل)
+    const cogsRow = db.prepare(`
+      SELECT 
+        COALESCE(SUM(ii.qty * COALESCE(inv.cost_price, 0)), 0) AS total_cogs
+      FROM invoice_items ii
+      JOIN invoices i ON ii.invoice_id = i.id
+      LEFT JOIN inventory inv ON ii.inventory_id = inv.id
+      WHERE date(i.created_at) = date(?)
+    `).get(date);
+
+    const totalCogs = cogsRow ? roundMoney(cogsRow.total_cogs) : 0;
+    const grossProfit = roundMoney(Math.max(0, invoicesSummary.total_net_sales - totalCogs));
+    const netProfit = roundMoney(grossProfit - expensesTotal);
+    const expenseCoverageRatio = expensesTotal > 0 
+      ? roundMoney((invoicesSummary.total_net_sales / expensesTotal) * 100) 
+      : 100;
+
+    const categoryBreakdownRows = db.prepare(`
+      SELECT 
+        COALESCE(inv.category, 'service') AS category,
+        COALESCE(SUM(ii.subtotal), 0) AS sales_amount
+      FROM invoice_items ii
+      JOIN invoices i ON ii.invoice_id = i.id
+      LEFT JOIN inventory inv ON ii.inventory_id = inv.id
+      WHERE date(i.created_at) = date(?)
+      GROUP BY category
+    `).all(date);
+
+    const categoryBreakdown = {
+      oil: 0,
+      filter: 0,
+      tire: 0,
+      battery: 0,
+      service: invoicesSummary.total_labor_amount || 0,
+    };
+    for (const cb of categoryBreakdownRows) {
+      if (categoryBreakdown[cb.category] !== undefined) {
+        categoryBreakdown[cb.category] += roundMoney(cb.sales_amount);
+      } else {
+        categoryBreakdown.service += roundMoney(cb.sales_amount);
+      }
+    }
+
     return {
       report_date: date,
+      executive_pulse: {
+        total_cogs: totalCogs,
+        gross_profit: grossProfit,
+        net_profit: netProfit,
+        net_margin_pct: invoicesSummary.total_net_sales > 0 
+          ? roundMoney((netProfit / invoicesSummary.total_net_sales) * 100) 
+          : 0,
+        expense_coverage_ratio: expenseCoverageRatio,
+        category_breakdown: categoryBreakdown,
+      },
       summary: {
         total_cars_served: invoicesSummary.total_cars_served,
         total_invoices: invoicesSummary.total_invoices,
