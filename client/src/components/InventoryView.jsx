@@ -586,9 +586,9 @@ export default function InventoryView({
             )}
           </div>
 
-          {/* 4. Live Style Switcher Pills (Calm Table / Tactile Cards / Apple Glass) */}
+          {/* 4. Live Style Switcher Pills (3 Variations of the Table Model) */}
           <div className="flex items-center gap-1 p-1 bg-slate-900/90 rounded-2xl border border-white/10 text-xs">
-            <span className="text-slate-400 text-[11px] font-bold px-1.5">شكل العرض:</span>
+            <span className="text-slate-400 text-[11px] font-bold px-1.5">أسلوب الجدول:</span>
             <button
               type="button"
               onClick={() => handleSetStyle('calm')}
@@ -597,21 +597,21 @@ export default function InventoryView({
                   ? 'bg-amber-400 text-slate-950 font-black shadow-sm'
                   : 'text-slate-300 hover:text-white hover:bg-white/5'
               }`}
-              title="الخيار 1: جدول صناعي هادئ ومضغوط"
+              title="الشكل 1: مسطح هادئ كلاسيكي بدون إجهاد للعين"
             >
-              1. جدول هادئ
+              1. مسطح هادئ
             </button>
             <button
               type="button"
-              onClick={() => handleSetStyle('cards')}
+              onClick={() => handleSetStyle('zebra')}
               className={`px-3 py-1.5 rounded-xl text-xs font-bold transition tap-bounce ${
-                inventoryStyle === 'cards'
-                  ? 'bg-emerald-500 text-slate-950 font-black shadow-sm'
+                inventoryStyle === 'zebra'
+                  ? 'bg-amber-400 text-slate-950 font-black shadow-sm'
                   : 'text-slate-300 hover:text-white hover:bg-white/5'
               }`}
-              title="الخيار 2: بلاطات لمسية عريضة للورشة"
+              title="الشكل 2: مخطط متبادل فائق التباين لمنع خطأ العين"
             >
-              2. بلاطات لمسية
+              2. مخطط عالي التباين
             </button>
             <button
               type="button"
@@ -621,9 +621,9 @@ export default function InventoryView({
                   ? 'bg-cyan-500 text-slate-950 font-black shadow-sm'
                   : 'text-slate-300 hover:text-white hover:bg-white/5'
               }`}
-              title="الخيار 3: نمط آبل الزجاجي التحليلي"
+              title="الشكل 3: صفوف كبسولات زجاجية طافية فخمة"
             >
-              3. زجاجي تحليلي
+              3. صفوف زجاجية طافية
             </button>
           </div>
         </div>
@@ -920,180 +920,33 @@ export default function InventoryView({
         </div>
       )}
 
-      {/* 4. Inventory Display Engine (1. Calm Table | 2. Tactile Cards | 3. Apple Glass Table) */}
-      {inventoryStyle === 'cards' ? (
-        /* ========================================================================= */
-        /* VARIANT 2: TACTILE KIOSK TOUCH CARDS (البلاطات اللمسية العريضة للورشة)   */
-        /* ========================================================================= */
-        <div className="apple-glass rounded-3xl border border-white/10 p-4 shadow-2xl flex-1 overflow-y-auto">
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3.5">
-            {filteredItems.map((item) => {
-              const isService = item.category === 'service' || item.item_type === 'service';
-              const isCritical = !isService && item.stock_qty <= item.min_stock_alert;
-              const isNearAlert = !isService && !isCritical && item.stock_qty <= item.min_stock_alert * 1.5;
-              const profit = (Number(item.sell_price) || 0) - (Number(item.cost_price) || 0);
-
-              const categoryEmoji =
-                item.category === 'oil'
-                  ? '🛢️'
-                  : item.category === 'filter'
-                  ? '🔍'
-                  : item.category === 'battery'
-                  ? '🔋'
-                  : item.category === 'tire'
-                  ? '🛞'
-                  : '🔧';
-
-              const maxBar = Math.max(item.min_stock_alert * 3, 20);
-              const barPercent = Math.min(100, Math.round((item.stock_qty / maxBar) * 100));
-
-              return (
-                <div
-                  key={item.id}
-                  className={`p-4 rounded-2xl bg-slate-900/90 border transition-all duration-150 flex flex-col justify-between gap-3 shadow-md ${
-                    isCritical
-                      ? 'border-rose-500/40 bg-gradient-to-b from-rose-500/10 to-slate-900/90'
-                      : isNearAlert
-                      ? 'border-amber-500/30'
-                      : 'border-white/10 hover:border-white/20'
-                  } ${item.is_active === 0 ? 'opacity-50' : ''}`}
-                >
-                  <div>
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="flex items-center gap-2">
-                        <span className="text-xl p-1.5 rounded-xl bg-slate-800 border border-white/5">{categoryEmoji}</span>
-                        <div>
-                          <div className="font-extrabold text-white text-sm leading-tight line-clamp-1">{item.name}</div>
-                          <div className="text-xs text-slate-400 font-medium">{item.brand}</div>
-                        </div>
-                      </div>
-                      <span className="text-[10px] font-mono font-bold bg-slate-800 text-slate-300 px-1.5 py-0.5 rounded border border-white/5">
-                        {item.sku}
-                      </span>
-                    </div>
-
-                    <div className="flex flex-wrap items-center gap-1.5 mt-2.5">
-                      {item.viscosity && (
-                        <span className="px-2 py-0.5 rounded-md bg-amber-400/10 text-amber-300 border border-amber-400/30 text-[11px] font-mono font-bold">
-                          {item.viscosity}
-                        </span>
-                      )}
-                      {item.pack_size && (
-                        <span className="px-2 py-0.5 rounded-md bg-slate-800 text-slate-300 text-[11px] font-bold">
-                          {item.pack_size === 'bulk_liter' ? 'لتر فلت 🛢️' : item.pack_size}
-                        </span>
-                      )}
-                      {item.is_consignment === 1 && (
-                        <span className="px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 text-[10px] font-bold">
-                          🤝 أمانة
-                        </span>
-                      )}
-                    </div>
-                  </div>
-
-                  <div className="p-2.5 rounded-xl bg-slate-950/60 border border-white/5 space-y-1.5">
-                    <div className="flex items-center justify-between text-xs">
-                      <span className="text-slate-400 font-bold">الرصيد المتاح:</span>
-                      {isService ? (
-                        <span className="text-teal-400 font-bold">خدمة ورشة ♾️</span>
-                      ) : (
-                        <span className={`font-mono font-black text-sm ${isCritical ? 'text-rose-400' : isNearAlert ? 'text-amber-400' : 'text-emerald-400'}`}>
-                          {item.stock_qty} <span className="text-[11px] font-sans text-slate-400 font-normal">عبوة</span>
-                        </span>
-                      )}
-                    </div>
-
-                    {!isService && (
-                      <div className="w-full h-2 rounded-full bg-slate-800 overflow-hidden">
-                        <div
-                          className={`h-full rounded-full transition-all duration-300 ${
-                            isCritical ? 'bg-rose-500' : isNearAlert ? 'bg-amber-400' : 'bg-emerald-400'
-                          }`}
-                          style={{ width: `${Math.max(barPercent, 6)}%` }}
-                        />
-                      </div>
-                    )}
-
-                    <div className="flex items-baseline justify-between pt-1 border-t border-white/5">
-                      <span className="text-xs text-slate-400">سعر البيع:</span>
-                      <span className="font-mono font-black text-base text-amber-400">
-                        {Number(item.sell_price).toLocaleString()} <span className="text-xs font-sans text-slate-400 font-bold">ر.ي</span>
-                      </span>
-                    </div>
-
-                    {isOwnerMode && !isService && (
-                      <div className="flex items-center justify-between text-[11px] text-slate-400 font-mono">
-                        <span>التكلفة: {Number(item.cost_price).toLocaleString()}</span>
-                        <span className={profit > 0 ? 'text-emerald-400 font-bold' : 'text-slate-400'}>
-                          ربح: +{profit.toLocaleString()}
-                        </span>
-                      </div>
-                    )}
-                  </div>
-
-                  <div className="flex items-center gap-1.5 pt-1">
-                    <button
-                      type="button"
-                      onClick={() =>
-                        guardedAction(
-                          () => handleOpenEdit(item),
-                          'تعديل الصنف',
-                          'تعديل أسعار وبيانات الصنف محمي برمز المالك'
-                        )
-                      }
-                      className="flex-1 min-h-[38px] rounded-xl bg-white/5 hover:bg-white/10 text-white font-bold text-xs flex items-center justify-center gap-1 tap-bounce border border-white/10"
-                    >
-                      <Edit2 className="w-3.5 h-3.5" />
-                      <span>تعديل</span>
-                    </button>
-
-                    {!isService && item.is_active === 1 && (
-                      <button
-                        type="button"
-                        onClick={() =>
-                          guardedAction(
-                            () => handleOpenAdjust(item),
-                            'تسوية جردية',
-                            'تعديل أرصدة الجرد محمي برمز المالك'
-                          )
-                        }
-                        className="min-h-[38px] px-3 rounded-xl bg-amber-500/15 hover:bg-amber-500/25 text-amber-300 font-bold text-xs flex items-center justify-center gap-1 tap-bounce border border-amber-500/30"
-                        title="تسوية جردية"
-                      >
-                        <Scale className="w-3.5 h-3.5" />
-                        <span>جرد</span>
-                      </button>
-                    )}
-
-                    <button
-                      type="button"
-                      onClick={() => handleOpenBarcode(item)}
-                      className="min-h-[38px] px-2.5 rounded-xl bg-teal-500/10 hover:bg-teal-500/20 text-teal-400 font-bold text-xs flex items-center justify-center tap-bounce border border-teal-500/20"
-                      title="طباعة باركود"
-                    >
-                      <Tag className="w-3.5 h-3.5" />
-                    </button>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-
-          {filteredItems.length === 0 && (
-            <div className="p-12 text-center text-slate-400">
-              <Package className="w-10 h-10 mx-auto text-slate-600 mb-2" />
-              <p className="font-bold text-sm">لا توجد أصناف مطابقة لخيارات البحث أو التصفية الحالية</p>
-            </div>
-          )}
-        </div>
-      ) : (
-        /* VARIANT 1 & 3: CALM TABLE OR APPLE GLASS TABLE */
-        <div className={`rounded-3xl border flex-1 overflow-hidden flex flex-col shadow-xl ${
-          inventoryStyle === 'glass' ? 'apple-glass border-white/10' : 'bg-[#090d16] border-slate-800'
-        }`}>
+      {/* 4. Inventory Table (Switchable between 3 distinct styles of the same Table model) */}
+      <div
+        className={`rounded-3xl border flex-1 overflow-hidden flex flex-col shadow-xl transition-all duration-200 ${
+          inventoryStyle === 'glass'
+            ? 'apple-glass border-white/10 p-2'
+            : inventoryStyle === 'zebra'
+            ? 'bg-slate-950 border-slate-700'
+            : 'bg-[#090d16] border-slate-800'
+        }`}
+      >
         <div className="overflow-x-auto flex-1">
-          <table className="w-full text-right text-xs">
-            <thead className="bg-white/5 border-b border-white/10 text-slate-400 font-extrabold sticky top-0 backdrop-blur z-10">
+          <table
+            className={`w-full text-right text-xs ${
+              inventoryStyle === 'glass'
+                ? 'border-separate border-spacing-y-2'
+                : 'border-collapse'
+            }`}
+          >
+            <thead
+              className={`border-b font-extrabold sticky top-0 backdrop-blur z-10 ${
+                inventoryStyle === 'glass'
+                  ? 'bg-transparent text-slate-400 border-none'
+                  : inventoryStyle === 'zebra'
+                  ? 'bg-slate-900 border-slate-700 text-slate-200'
+                  : 'bg-slate-900/90 border-slate-800 text-slate-400'
+              }`}
+            >
               <tr>
                 <th className="p-3.5">الصنف والمواصفات</th>
                 <th className="p-3.5">الفئة والماركة</th>
@@ -1106,7 +959,15 @@ export default function InventoryView({
                 <th className="p-3.5 text-center">إجراءات</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-white/5 text-slate-200">
+            <tbody
+              className={`${
+                inventoryStyle === 'glass'
+                  ? 'space-y-2'
+                  : inventoryStyle === 'zebra'
+                  ? 'divide-y divide-slate-800/60 font-mono'
+                  : 'divide-y divide-slate-800/80 text-slate-200'
+              }`}
+            >
               {filteredItems.map((item) => {
                 const isService = item.category === 'service' || item.item_type === 'service';
                 const isCritical = !isService && item.stock_qty <= item.min_stock_alert;
@@ -1121,10 +982,22 @@ export default function InventoryView({
 
                 const dotInfo = item.category === 'tire' && item.dot_code ? calculateDotAge(item.dot_code) : null;
 
+                // Dynamic styling per selected variant
+                let trClass = '';
+                if (inventoryStyle === 'glass') {
+                  trClass = 'apple-glass rounded-2xl border border-white/10 hover:border-white/20 transition shadow-sm';
+                } else if (inventoryStyle === 'zebra') {
+                  trClass = 'even:bg-slate-900/90 odd:bg-slate-950/90 hover:bg-amber-400/10 border-b border-slate-800/80 transition text-white font-bold';
+                } else {
+                  trClass = 'hover:bg-slate-800/30 border-b border-slate-800/60 transition';
+                }
+
+                const cellPadding = inventoryStyle === 'glass' ? 'first:rounded-r-2xl last:rounded-l-2xl p-3.5' : 'p-3.5';
+
                 return (
-                  <tr key={item.id} className={`hover:bg-white/5 transition ${item.is_active === 0 ? 'opacity-50 bg-slate-900/40' : ''}`}>
+                  <tr key={item.id} className={`${trClass} ${item.is_active === 0 ? 'opacity-50 bg-slate-900/40' : ''}`}>
                     {/* Name & SKU & Specs */}
-                    <td className="p-3.5">
+                    <td className={cellPadding}>
                       <div className="font-extrabold text-white text-sm flex items-center gap-1.5">
                         {isService && <Wrench className="w-3.5 h-3.5 text-teal-400" />}
                         <span>{item.name}</span>
@@ -1399,7 +1272,6 @@ export default function InventoryView({
           <span className="font-mono">معروض: {filteredItems.length} صنف</span>
         </div>
       </div>
-      )}
 
       {/* Inbound Purchase Invoice Modal (accepts prefilled items from reorder sheet) */}
       <PurchaseInvoiceModal
