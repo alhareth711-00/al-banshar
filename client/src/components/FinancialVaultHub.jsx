@@ -42,6 +42,16 @@ export default function FinancialVaultHub({ onRefreshData, onOpenStatement }) {
   const [loading, setLoading] = useState(true);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
 
+  // 3 Live Variants Switcher (1. Tactical Cash Desk | 2. Tactile Touch Vault | 3. Executive Apple Glass)
+  const [vaultStyle, setVaultStyle] = useState(() => {
+    return localStorage.getItem('ql_vault_style') || 'tactical';
+  });
+
+  const handleSetStyle = (style) => {
+    setVaultStyle(style);
+    localStorage.setItem('ql_vault_style', style);
+  };
+
   // Summaries & Lists
   const [cashDrawer, setCashDrawer] = useState({
     cash_drawer: { current_balance: 0, total_inflow: 0, total_outflow: 0 },
@@ -261,8 +271,49 @@ export default function FinancialVaultHub({ onRefreshData, onOpenStatement }) {
           </div>
         </div>
 
-        {/* Action Buttons */}
+        {/* Action Buttons & Style Switcher */}
         <div className="flex flex-wrap items-center gap-2.5">
+          {/* Live Vault Style Switcher */}
+          <div className="flex items-center gap-1 p-1 bg-slate-900/90 rounded-2xl border border-white/10 text-xs">
+            <span className="text-slate-400 text-[11px] font-bold px-1.5">الشكل:</span>
+            <button
+              type="button"
+              onClick={() => handleSetStyle('tactical')}
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition tap-bounce ${
+                vaultStyle === 'tactical'
+                  ? 'bg-emerald-400 text-slate-950 font-black shadow-sm'
+                  : 'text-slate-300 hover:text-white hover:bg-white/5'
+              }`}
+              title="الشكل 1: كاونتر الخزينة التكتيكي عالي التباين"
+            >
+              1. خزينة تكتيكية
+            </button>
+            <button
+              type="button"
+              onClick={() => handleSetStyle('touch')}
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition tap-bounce ${
+                vaultStyle === 'touch'
+                  ? 'bg-amber-400 text-slate-950 font-black shadow-sm'
+                  : 'text-slate-300 hover:text-white hover:bg-white/5'
+              }`}
+              title="الشكل 2: بطاقات الخزائن والمحافظ اللمسية"
+            >
+              2. بطاقات لمسية
+            </button>
+            <button
+              type="button"
+              onClick={() => handleSetStyle('glass')}
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition tap-bounce ${
+                vaultStyle === 'glass'
+                  ? 'bg-cyan-500 text-slate-950 font-black shadow-sm'
+                  : 'text-slate-300 hover:text-white hover:bg-white/5'
+              }`}
+              title="الشكل 3: المركز المالي الزجاجي الفاخر"
+            >
+              3. مركز زجاجي
+            </button>
+          </div>
+
           {/* Issue Receipt Voucher */}
           <button
             onClick={() => {
@@ -498,103 +549,330 @@ export default function FinancialVaultHub({ onRefreshData, onOpenStatement }) {
         {/* ======================================================== */}
         {activeTab === 'drawer' && (
           <div className="space-y-6">
-            {/* Account Balances Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              {/* Drawer Cash 1101 */}
-              <div className="p-5 rounded-2xl bg-gradient-to-br from-emerald-950/40 via-slate-900 to-slate-900 border border-emerald-500/40 shadow-xl relative">
-                <div className="flex items-center justify-between mb-3">
-                  <div className="flex items-center gap-2">
-                    <div className="w-9 h-9 rounded-xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center border border-emerald-500/30">
-                      <Wallet className="w-5 h-5" />
+            {/* Account Balances Grid - 3 Conditional Styles */}
+            {vaultStyle === 'tactical' ? (
+              /* ============================================================
+                 STYLE 1: الخزينة التكتيكية فائقة التباين (Tactical Cash Desk)
+                 كاونتر مالي سريع وعالي الكثافة مع اختصارات فورية للعمليات
+                 ============================================================ */
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3.5">
+                {/* Tactical Drawer Cash 1101 */}
+                <div className="p-4 rounded-2xl bg-slate-900/95 border-2 border-emerald-500/50 shadow-lg flex flex-col justify-between">
+                  <div>
+                    <div className="flex items-center justify-between pb-2 mb-2 border-b border-white/10">
+                      <div className="flex items-center gap-2">
+                        <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse" />
+                        <h3 className="font-extrabold text-white text-sm">درج الصندوق النقدي</h3>
+                      </div>
+                      <span className="font-mono text-xs font-black px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                        1101
+                      </span>
                     </div>
-                    <div>
-                      <h3 className="font-bold text-white text-sm">الصندوق النقدي (الدرج)</h3>
-                      <p className="text-[11px] text-slate-400 font-mono">دليل الحسابات: 1101</p>
+
+                    <div className="my-2">
+                      <div className="text-xs text-slate-400 mb-0.5">النقدية الفعلية الحية:</div>
+                      <div className="text-3xl font-black text-white font-mono tracking-tight">
+                        {Number(cashDrawer?.cash_drawer?.current_balance || 0).toLocaleString()}{' '}
+                        <span className="text-xs text-emerald-400 font-sans font-bold">ريال</span>
+                      </div>
+                      <p className="text-[11px] text-slate-400 font-medium truncate mt-1">
+                        {tafqeet(Number(cashDrawer?.cash_drawer?.current_balance || 0))}
+                      </p>
                     </div>
                   </div>
-                  <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 text-[10px] font-semibold">
-                    النقدية المتاحة
-                  </span>
+
+                  <div className="pt-2.5 border-t border-white/10 grid grid-cols-2 gap-2 text-xs">
+                    <div className="p-1.5 rounded-lg bg-slate-950/70 border border-white/5">
+                      <span className="text-[10px] text-slate-400 block">وارد الصندوق:</span>
+                      <span className="font-mono font-bold text-emerald-400">
+                        +{Number(cashDrawer?.cash_drawer?.total_inflow || 0).toLocaleString()}
+                      </span>
+                    </div>
+                    <div className="p-1.5 rounded-lg bg-slate-950/70 border border-white/5">
+                      <span className="text-[10px] text-slate-400 block">صادر الصندوق:</span>
+                      <span className="font-mono font-bold text-rose-400">
+                        -{Number(cashDrawer?.cash_drawer?.total_outflow || 0).toLocaleString()}
+                      </span>
+                    </div>
+                  </div>
                 </div>
-                <div className="text-3xl font-black text-emerald-400 font-mono my-2">
-                  {Number(cashDrawer?.cash_drawer?.current_balance || 0).toLocaleString()}{' '}
-                  <span className="text-xs text-slate-400 font-normal">ريال</span>
-                </div>
-                <p className="text-xs text-slate-400 mb-4">
-                  {tafqeet(Number(cashDrawer?.cash_drawer?.current_balance || 0))}
-                </p>
-                <div className="grid grid-cols-2 gap-2 pt-3 border-t border-white/10 text-xs">
+
+                {/* Tactical Bank Al-Kuraimi 1102 */}
+                <div className="p-4 rounded-2xl bg-slate-900/95 border-2 border-blue-500/40 shadow-lg flex flex-col justify-between">
                   <div>
-                    <span className="text-slate-400 block text-[10px]">إجمالي الوارد التراكمي:</span>
-                    <span className="font-mono text-slate-200">
-                      {Number(cashDrawer?.cash_drawer?.total_inflow || 0).toLocaleString()}
+                    <div className="flex items-center justify-between pb-2 mb-2 border-b border-white/10">
+                      <div className="flex items-center gap-2">
+                        <Landmark className="w-4 h-4 text-blue-400" />
+                        <h3 className="font-extrabold text-white text-sm">بنك الكريمي</h3>
+                      </div>
+                      <span className="font-mono text-xs font-black px-2 py-0.5 rounded bg-blue-500/20 text-blue-300 border border-blue-500/30">
+                        1102
+                      </span>
+                    </div>
+
+                    <div className="my-2">
+                      <div className="text-xs text-slate-400 mb-0.5">رصيد التحويلات البنكية:</div>
+                      <div className="text-3xl font-black text-blue-400 font-mono tracking-tight">
+                        {Number(cashDrawer?.bank_kuraimi?.current_balance || 0).toLocaleString()}{' '}
+                        <span className="text-xs text-slate-400 font-sans font-bold">ريال</span>
+                      </div>
+                      <p className="text-[11px] text-slate-400 font-medium truncate mt-1">
+                        {tafqeet(Number(cashDrawer?.bank_kuraimi?.current_balance || 0))}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="pt-2.5 border-t border-white/10 flex items-center justify-between text-xs text-slate-400">
+                    <span>حساب بنكي نشط</span>
+                    <button
+                      type="button"
+                      onClick={() => handleOpenPayment('supplier')}
+                      className="text-blue-400 hover:text-blue-300 font-bold"
+                    >
+                      سداد مورد بنكياً ←
+                    </button>
+                  </div>
+                </div>
+
+                {/* Tactical E-Wallet Jeeb 1103 */}
+                <div className="p-4 rounded-2xl bg-slate-900/95 border-2 border-amber-500/40 shadow-lg flex flex-col justify-between">
+                  <div>
+                    <div className="flex items-center justify-between pb-2 mb-2 border-b border-white/10">
+                      <div className="flex items-center gap-2">
+                        <CreditCard className="w-4 h-4 text-amber-400" />
+                        <h3 className="font-extrabold text-white text-sm">محفظة جيب الإلكترونية</h3>
+                      </div>
+                      <span className="font-mono text-xs font-black px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                        1103
+                      </span>
+                    </div>
+
+                    <div className="my-2">
+                      <div className="text-xs text-slate-400 mb-0.5">رصيد الدفع الذكي:</div>
+                      <div className="text-3xl font-black text-amber-400 font-mono tracking-tight">
+                        {Number(cashDrawer?.e_wallet_jeeb?.current_balance || 0).toLocaleString()}{' '}
+                        <span className="text-xs text-slate-400 font-sans font-bold">ريال</span>
+                      </div>
+                      <p className="text-[11px] text-slate-400 font-medium truncate mt-1">
+                        {tafqeet(Number(cashDrawer?.e_wallet_jeeb?.current_balance || 0))}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="pt-2.5 border-t border-white/10 flex items-center justify-between text-xs text-slate-400">
+                    <span>مدفوعات QR سريعة</span>
+                    <span className="text-[11px] text-amber-400/90 font-bold">تسوية فورية</span>
+                  </div>
+                </div>
+              </div>
+            ) : vaultStyle === 'glass' ? (
+              /* ============================================================
+                 STYLE 3: المركز المالي التنفيذي الفاخر (Executive Apple Glass)
+                 تصميم زجاجي عائم مع تأثيرات بصرية وإضاءات نيون للمؤشرات
+                 ============================================================ */
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+                {/* Glass Drawer Cash 1101 */}
+                <div className="relative overflow-hidden rounded-3xl p-5 border border-white/10 bg-slate-900/60 backdrop-blur-xl shadow-2xl hover:border-emerald-500/40 transition-all">
+                  <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-emerald-500 via-teal-400 to-emerald-500" />
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="flex items-center gap-2.5">
+                      <div className="w-10 h-10 rounded-2xl bg-emerald-500/20 text-emerald-300 flex items-center justify-center border border-emerald-500/30 shadow-inner">
+                        <Wallet className="w-5 h-5" />
+                      </div>
+                      <div>
+                        <h3 className="font-extrabold text-white text-sm">الصندوق الحي (الدرج)</h3>
+                        <p className="text-[11px] text-emerald-400/80 font-mono">حساب رقم: 1101</p>
+                      </div>
+                    </div>
+                    <span className="px-2.5 py-1 rounded-full bg-emerald-500/15 text-emerald-300 text-[10px] font-bold border border-emerald-500/30">
+                      سيولة كاش
                     </span>
                   </div>
-                  <div>
-                    <span className="text-slate-400 block text-[10px]">إجمالي الصادر التراكمي:</span>
-                    <span className="font-mono text-slate-200">
-                      {Number(cashDrawer?.cash_drawer?.total_outflow || 0).toLocaleString()}
+                  <div className="text-3xl font-black text-white font-mono my-2.5">
+                    {Number(cashDrawer?.cash_drawer?.current_balance || 0).toLocaleString()}{' '}
+                    <span className="text-xs text-emerald-400 font-sans font-bold">ريال</span>
+                  </div>
+                  <p className="text-xs text-slate-400 mb-4 truncate">
+                    {tafqeet(Number(cashDrawer?.cash_drawer?.current_balance || 0))}
+                  </p>
+                  <div className="grid grid-cols-2 gap-2 pt-3 border-t border-white/10 text-xs">
+                    <div className="p-2 rounded-xl bg-white/5 border border-white/5">
+                      <span className="text-[10px] text-slate-400 block">إجمالي الوارد</span>
+                      <span className="font-mono text-emerald-300 font-bold">
+                        +{Number(cashDrawer?.cash_drawer?.total_inflow || 0).toLocaleString()}
+                      </span>
+                    </div>
+                    <div className="p-2 rounded-xl bg-white/5 border border-white/5">
+                      <span className="text-[10px] text-slate-400 block">إجمالي الصادر</span>
+                      <span className="font-mono text-rose-300 font-bold">
+                        -{Number(cashDrawer?.cash_drawer?.total_outflow || 0).toLocaleString()}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Glass Bank Al-Kuraimi 1102 */}
+                <div className="relative overflow-hidden rounded-3xl p-5 border border-white/10 bg-slate-900/60 backdrop-blur-xl shadow-2xl hover:border-blue-500/40 transition-all">
+                  <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-blue-500 via-cyan-400 to-blue-500" />
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="flex items-center gap-2.5">
+                      <div className="w-10 h-10 rounded-2xl bg-blue-500/20 text-blue-300 flex items-center justify-center border border-blue-500/30 shadow-inner">
+                        <Landmark className="w-5 h-5" />
+                      </div>
+                      <div>
+                        <h3 className="font-extrabold text-white text-sm">بنك الكريمي</h3>
+                        <p className="text-[11px] text-blue-400/80 font-mono">حساب رقم: 1102</p>
+                      </div>
+                    </div>
+                    <span className="px-2.5 py-1 rounded-full bg-blue-500/15 text-blue-300 text-[10px] font-bold border border-blue-500/30">
+                      تحويل بنكي
                     </span>
                   </div>
+                  <div className="text-3xl font-black text-cyan-300 font-mono my-2.5">
+                    {Number(cashDrawer?.bank_kuraimi?.current_balance || 0).toLocaleString()}{' '}
+                    <span className="text-xs text-slate-400 font-sans font-bold">ريال</span>
+                  </div>
+                  <p className="text-xs text-slate-400 mb-4 truncate">
+                    {tafqeet(Number(cashDrawer?.bank_kuraimi?.current_balance || 0))}
+                  </p>
+                  <div className="p-2 rounded-xl bg-white/5 border border-white/5 text-xs text-slate-300 flex justify-between items-center">
+                    <span>العمليات المحولة عبر الكريمي</span>
+                    <span className="text-[10px] text-cyan-400 font-bold font-mono">AL-KURAIMI</span>
+                  </div>
+                </div>
+
+                {/* Glass E-Wallet Jeeb 1103 */}
+                <div className="relative overflow-hidden rounded-3xl p-5 border border-white/10 bg-slate-900/60 backdrop-blur-xl shadow-2xl hover:border-purple-500/40 transition-all">
+                  <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-purple-500 via-pink-400 to-purple-500" />
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="flex items-center gap-2.5">
+                      <div className="w-10 h-10 rounded-2xl bg-purple-500/20 text-purple-300 flex items-center justify-center border border-purple-500/30 shadow-inner">
+                        <CreditCard className="w-5 h-5" />
+                      </div>
+                      <div>
+                        <h3 className="font-extrabold text-white text-sm">محفظة جيب الإلكترونية</h3>
+                        <p className="text-[11px] text-purple-400/80 font-mono">حساب رقم: 1103</p>
+                      </div>
+                    </div>
+                    <span className="px-2.5 py-1 rounded-full bg-purple-500/15 text-purple-300 text-[10px] font-bold border border-purple-500/30">
+                      محفظة ذكية
+                    </span>
+                  </div>
+                  <div className="text-3xl font-black text-purple-300 font-mono my-2.5">
+                    {Number(cashDrawer?.e_wallet_jeeb?.current_balance || 0).toLocaleString()}{' '}
+                    <span className="text-xs text-slate-400 font-sans font-bold">ريال</span>
+                  </div>
+                  <p className="text-xs text-slate-400 mb-4 truncate">
+                    {tafqeet(Number(cashDrawer?.e_wallet_jeeb?.current_balance || 0))}
+                  </p>
+                  <div className="p-2 rounded-xl bg-white/5 border border-white/5 text-xs text-slate-300 flex justify-between items-center">
+                    <span>مدفوعات QR الرقمية</span>
+                    <span className="text-[10px] text-purple-400 font-bold font-mono">JEEB PAY</span>
+                  </div>
                 </div>
               </div>
-
-              {/* Bank Al-Kuraimi 1102 */}
-              <div className="p-5 rounded-2xl bg-gradient-to-br from-blue-950/40 via-slate-900 to-slate-900 border border-blue-500/30 shadow-xl relative">
-                <div className="flex items-center justify-between mb-3">
-                  <div className="flex items-center gap-2">
-                    <div className="w-9 h-9 rounded-xl bg-blue-500/20 text-blue-400 flex items-center justify-center border border-blue-500/30">
-                      <Landmark className="w-5 h-5" />
+            ) : (
+              /* ============================================================
+                 STYLE 2: بطاقات الخزائن والمحافظ اللمسية (Tactile Touch Vault)
+                 بطاقات خزائن عريضة بمسافات لمس رحبة للورشة وشاشات الكيوسك
+                 ============================================================ */
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                {/* Drawer Cash 1101 */}
+                <div className="p-5 rounded-2xl bg-gradient-to-br from-emerald-950/40 via-slate-900 to-slate-900 border-2 border-emerald-500/40 shadow-xl relative">
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="flex items-center gap-2">
+                      <div className="w-10 h-10 rounded-xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center border border-emerald-500/30">
+                        <Wallet className="w-5 h-5" />
+                      </div>
+                      <div>
+                        <h3 className="font-extrabold text-white text-sm">الصندوق النقدي (الدرج)</h3>
+                        <p className="text-[11px] text-slate-400 font-mono">دليل الحسابات: 1101</p>
+                      </div>
+                    </div>
+                    <span className="px-2.5 py-1 rounded-full bg-emerald-500/20 text-emerald-300 text-[10px] font-bold">
+                      النقدية المتاحة
+                    </span>
+                  </div>
+                  <div className="text-3xl font-black text-emerald-400 font-mono my-2">
+                    {Number(cashDrawer?.cash_drawer?.current_balance || 0).toLocaleString()}{' '}
+                    <span className="text-xs text-slate-400 font-normal">ريال</span>
+                  </div>
+                  <p className="text-xs text-slate-400 mb-4">
+                    {tafqeet(Number(cashDrawer?.cash_drawer?.current_balance || 0))}
+                  </p>
+                  <div className="grid grid-cols-2 gap-2 pt-3 border-t border-white/10 text-xs">
+                    <div>
+                      <span className="text-slate-400 block text-[10px]">إجمالي الوارد التراكمي:</span>
+                      <span className="font-mono text-slate-200">
+                        {Number(cashDrawer?.cash_drawer?.total_inflow || 0).toLocaleString()}
+                      </span>
                     </div>
                     <div>
-                      <h3 className="font-bold text-white text-sm">حساب بنك الكريمي</h3>
-                      <p className="text-[11px] text-slate-400 font-mono">دليل الحسابات: 1102</p>
+                      <span className="text-slate-400 block text-[10px]">إجمالي الصادر التراكمي:</span>
+                      <span className="font-mono text-slate-200">
+                        {Number(cashDrawer?.cash_drawer?.total_outflow || 0).toLocaleString()}
+                      </span>
                     </div>
                   </div>
-                  <span className="px-2 py-0.5 rounded-full bg-blue-500/20 text-blue-300 text-[10px] font-semibold">
-                    تحويل بنكي
-                  </span>
                 </div>
-                <div className="text-3xl font-black text-blue-400 font-mono my-2">
-                  {Number(cashDrawer?.bank_kuraimi?.current_balance || 0).toLocaleString()}{' '}
-                  <span className="text-xs text-slate-400 font-normal">ريال</span>
-                </div>
-                <p className="text-xs text-slate-400 mb-4">
-                  {tafqeet(Number(cashDrawer?.bank_kuraimi?.current_balance || 0))}
-                </p>
-                <div className="pt-3 border-t border-white/10 text-xs text-slate-400">
-                  <span>سندات القبض والصرف المحولة عبر الكريمي</span>
-                </div>
-              </div>
 
-              {/* E-Wallet Jeeb 1103 */}
-              <div className="p-5 rounded-2xl bg-gradient-to-br from-amber-950/40 via-slate-900 to-slate-900 border border-amber-500/30 shadow-xl relative">
-                <div className="flex items-center justify-between mb-3">
-                  <div className="flex items-center gap-2">
-                    <div className="w-9 h-9 rounded-xl bg-amber-500/20 text-amber-400 flex items-center justify-center border border-amber-500/30">
-                      <CreditCard className="w-5 h-5" />
+                {/* Bank Al-Kuraimi 1102 */}
+                <div className="p-5 rounded-2xl bg-gradient-to-br from-blue-950/40 via-slate-900 to-slate-900 border-2 border-blue-500/30 shadow-xl relative">
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="flex items-center gap-2">
+                      <div className="w-10 h-10 rounded-xl bg-blue-500/20 text-blue-400 flex items-center justify-center border border-blue-500/30">
+                        <Landmark className="w-5 h-5" />
+                      </div>
+                      <div>
+                        <h3 className="font-extrabold text-white text-sm">حساب بنك الكريمي</h3>
+                        <p className="text-[11px] text-slate-400 font-mono">دليل الحسابات: 1102</p>
+                      </div>
                     </div>
-                    <div>
-                      <h3 className="font-bold text-white text-sm">محفظة جيب الإلكترونية</h3>
-                      <p className="text-[11px] text-slate-400 font-mono">دليل الحسابات: 1103</p>
-                    </div>
+                    <span className="px-2.5 py-1 rounded-full bg-blue-500/20 text-blue-300 text-[10px] font-bold">
+                      تحويل بنكي
+                    </span>
                   </div>
-                  <span className="px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 text-[10px] font-semibold">
-                    محفظة ذكية
-                  </span>
+                  <div className="text-3xl font-black text-blue-400 font-mono my-2">
+                    {Number(cashDrawer?.bank_kuraimi?.current_balance || 0).toLocaleString()}{' '}
+                    <span className="text-xs text-slate-400 font-normal">ريال</span>
+                  </div>
+                  <p className="text-xs text-slate-400 mb-4">
+                    {tafqeet(Number(cashDrawer?.bank_kuraimi?.current_balance || 0))}
+                  </p>
+                  <div className="pt-3 border-t border-white/10 text-xs text-slate-400">
+                    <span>سندات القبض والصرف المحولة عبر الكريمي</span>
+                  </div>
                 </div>
-                <div className="text-3xl font-black text-amber-400 font-mono my-2">
-                  {Number(cashDrawer?.e_wallet_jeeb?.current_balance || 0).toLocaleString()}{' '}
-                  <span className="text-xs text-slate-400 font-normal">ريال</span>
-                </div>
-                <p className="text-xs text-slate-400 mb-4">
-                  {tafqeet(Number(cashDrawer?.e_wallet_jeeb?.current_balance || 0))}
-                </p>
-                <div className="pt-3 border-t border-white/10 text-xs text-slate-400">
-                  <span>سندات القبض والدفع عبر محفظة جيب</span>
+
+                {/* E-Wallet Jeeb 1103 */}
+                <div className="p-5 rounded-2xl bg-gradient-to-br from-amber-950/40 via-slate-900 to-slate-900 border-2 border-amber-500/30 shadow-xl relative">
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="flex items-center gap-2">
+                      <div className="w-10 h-10 rounded-xl bg-amber-500/20 text-amber-400 flex items-center justify-center border border-amber-500/30">
+                        <CreditCard className="w-5 h-5" />
+                      </div>
+                      <div>
+                        <h3 className="font-extrabold text-white text-sm">محفظة جيب الإلكترونية</h3>
+                        <p className="text-[11px] text-slate-400 font-mono">دليل الحسابات: 1103</p>
+                      </div>
+                    </div>
+                    <span className="px-2.5 py-1 rounded-full bg-amber-500/20 text-amber-300 text-[10px] font-bold">
+                      محفظة ذكية
+                    </span>
+                  </div>
+                  <div className="text-3xl font-black text-amber-400 font-mono my-2">
+                    {Number(cashDrawer?.e_wallet_jeeb?.current_balance || 0).toLocaleString()}{' '}
+                    <span className="text-xs text-slate-400 font-normal">ريال</span>
+                  </div>
+                  <p className="text-xs text-slate-400 mb-4">
+                    {tafqeet(Number(cashDrawer?.e_wallet_jeeb?.current_balance || 0))}
+                  </p>
+                  <div className="pt-3 border-t border-white/10 text-xs text-slate-400">
+                    <span>سندات القبض والدفع عبر محفظة جيب</span>
+                  </div>
                 </div>
               </div>
-            </div>
+            )}
 
             {/* Pro Upgrade 3: Owner Drawings Safety Gauge & Profit Ratio */}
             {ownerAnalytics && (
