@@ -66,16 +66,6 @@ export default function InventoryView({
   const [showAdvancedToolsMenu, setShowAdvancedToolsMenu] = useState(false);
   const toolsMenuRef = useRef(null);
 
-  // 3 Live Variants Switcher (1. Calm Table | 2. Tactile Cards | 3. Apple Glass)
-  const [inventoryStyle, setInventoryStyle] = useState(() => {
-    return localStorage.getItem('ql_inventory_style') || 'calm';
-  });
-
-  const handleSetStyle = (style) => {
-    setInventoryStyle(style);
-    localStorage.setItem('ql_inventory_style', style);
-  };
-
   // Click outside to close advanced tools menu
   useEffect(() => {
     const handleOutsideClick = (e) => {
@@ -585,47 +575,6 @@ export default function InventoryView({
               </div>
             )}
           </div>
-
-          {/* 4. Live Style Switcher Pills (3 Variations of the Table Model) */}
-          <div className="flex items-center gap-1 p-1 bg-slate-900/90 rounded-2xl border border-white/10 text-xs">
-            <span className="text-slate-400 text-[11px] font-bold px-1.5">أسلوب الجدول:</span>
-            <button
-              type="button"
-              onClick={() => handleSetStyle('calm')}
-              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition tap-bounce ${
-                inventoryStyle === 'calm'
-                  ? 'bg-amber-400 text-slate-950 font-black shadow-sm'
-                  : 'text-slate-300 hover:text-white hover:bg-white/5'
-              }`}
-              title="الشكل 1: مسطح هادئ كلاسيكي بدون إجهاد للعين"
-            >
-              1. مسطح هادئ
-            </button>
-            <button
-              type="button"
-              onClick={() => handleSetStyle('zebra')}
-              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition tap-bounce ${
-                inventoryStyle === 'zebra'
-                  ? 'bg-amber-400 text-slate-950 font-black shadow-sm'
-                  : 'text-slate-300 hover:text-white hover:bg-white/5'
-              }`}
-              title="الشكل 2: مخطط متبادل فائق التباين لمنع خطأ العين"
-            >
-              2. مخطط عالي التباين
-            </button>
-            <button
-              type="button"
-              onClick={() => handleSetStyle('glass')}
-              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition tap-bounce ${
-                inventoryStyle === 'glass'
-                  ? 'bg-cyan-500 text-slate-950 font-black shadow-sm'
-                  : 'text-slate-300 hover:text-white hover:bg-white/5'
-              }`}
-              title="الشكل 3: صفوف كبسولات زجاجية طافية فخمة"
-            >
-              3. صفوف زجاجية طافية
-            </button>
-          </div>
         </div>
       </div>
 
@@ -920,33 +869,11 @@ export default function InventoryView({
         </div>
       )}
 
-      {/* 4. Inventory Table (Switchable between 3 distinct styles of the same Table model) */}
-      <div
-        className={`rounded-3xl border flex-1 overflow-hidden flex flex-col shadow-xl transition-all duration-200 ${
-          inventoryStyle === 'glass'
-            ? 'apple-glass border-white/10 p-2'
-            : inventoryStyle === 'zebra'
-            ? 'bg-slate-950 border-slate-700'
-            : 'bg-[#090d16] border-slate-800'
-        }`}
-      >
+      {/* 4. Inventory Table - Zebra High-Contrast Standard (الخيار 2 المعتمد) */}
+      <div className="rounded-3xl border border-slate-700/80 bg-slate-950 flex-1 overflow-hidden flex flex-col shadow-2xl">
         <div className="overflow-x-auto flex-1">
-          <table
-            className={`w-full text-right text-xs ${
-              inventoryStyle === 'glass'
-                ? 'border-separate border-spacing-y-2'
-                : 'border-collapse'
-            }`}
-          >
-            <thead
-              className={`border-b font-extrabold sticky top-0 backdrop-blur z-10 ${
-                inventoryStyle === 'glass'
-                  ? 'bg-transparent text-slate-400 border-none'
-                  : inventoryStyle === 'zebra'
-                  ? 'bg-slate-900 border-slate-700 text-slate-200'
-                  : 'bg-slate-900/90 border-slate-800 text-slate-400'
-              }`}
-            >
+          <table className="w-full text-right text-xs border-collapse">
+            <thead className="bg-slate-900 border-b-2 border-slate-700 text-slate-200 font-black sticky top-0 backdrop-blur z-10 text-xs">
               <tr>
                 <th className="p-3.5">الصنف والمواصفات</th>
                 <th className="p-3.5">الفئة والماركة</th>
@@ -959,15 +886,7 @@ export default function InventoryView({
                 <th className="p-3.5 text-center">إجراءات</th>
               </tr>
             </thead>
-            <tbody
-              className={`${
-                inventoryStyle === 'glass'
-                  ? 'space-y-2'
-                  : inventoryStyle === 'zebra'
-                  ? 'divide-y divide-slate-800/60 font-mono'
-                  : 'divide-y divide-slate-800/80 text-slate-200'
-              }`}
-            >
+            <tbody className="divide-y divide-slate-800/70 font-mono">
               {filteredItems.map((item) => {
                 const isService = item.category === 'service' || item.item_type === 'service';
                 const isCritical = !isService && item.stock_qty <= item.min_stock_alert;
@@ -982,22 +901,15 @@ export default function InventoryView({
 
                 const dotInfo = item.category === 'tire' && item.dot_code ? calculateDotAge(item.dot_code) : null;
 
-                // Dynamic styling per selected variant
-                let trClass = '';
-                if (inventoryStyle === 'glass') {
-                  trClass = 'apple-glass rounded-2xl border border-white/10 hover:border-white/20 transition shadow-sm';
-                } else if (inventoryStyle === 'zebra') {
-                  trClass = 'even:bg-slate-900/90 odd:bg-slate-950/90 hover:bg-amber-400/10 border-b border-slate-800/80 transition text-white font-bold';
-                } else {
-                  trClass = 'hover:bg-slate-800/30 border-b border-slate-800/60 transition';
-                }
-
-                const cellPadding = inventoryStyle === 'glass' ? 'first:rounded-r-2xl last:rounded-l-2xl p-3.5' : 'p-3.5';
-
                 return (
-                  <tr key={item.id} className={`${trClass} ${item.is_active === 0 ? 'opacity-50 bg-slate-900/40' : ''}`}>
+                  <tr
+                    key={item.id}
+                    className={`even:bg-slate-900/85 odd:bg-slate-950 hover:bg-amber-400/10 border-b border-slate-800/80 transition text-white ${
+                      item.is_active === 0 ? 'opacity-50 bg-slate-900/40' : ''
+                    }`}
+                  >
                     {/* Name & SKU & Specs */}
-                    <td className={cellPadding}>
+                    <td className="p-3.5 font-sans font-bold">
                       <div className="font-extrabold text-white text-sm flex items-center gap-1.5">
                         {isService && <Wrench className="w-3.5 h-3.5 text-teal-400" />}
                         <span>{item.name}</span>
