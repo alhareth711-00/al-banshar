@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
-import { X, Car, User, Phone, Gauge, Check, AlertCircle, Building2, Percent, ShieldCheck } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { X, Car, User, Phone, Gauge, Check, AlertCircle, Building2, Percent } from 'lucide-react';
 
-export default function NewVehicleModal({ isOpen, onClose, onVehicleCreated }) {
+export default function NewVehicleModal({ isOpen, onClose, onVehicleCreated, initialVehicle = null }) {
   const [formData, setFormData] = useState({
     plate_number: '',
     plate_type: 'خصوصي',
@@ -22,22 +22,54 @@ export default function NewVehicleModal({ isOpen, onClose, onVehicleCreated }) {
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
+  useEffect(() => {
+    if (initialVehicle) {
+      const isAutoPlate = initialVehicle.plate_number && initialVehicle.plate_number.startsWith('بدون');
+      setFormData({
+        plate_number: isAutoPlate ? '' : (initialVehicle.plate_number || ''),
+        plate_type: initialVehicle.plate_type || 'خصوصي',
+        car_make_model: initialVehicle.car_make_model || '',
+        customer_name: initialVehicle.customer_name || '',
+        phone: initialVehicle.phone || '',
+        preferred_oil_brand: initialVehicle.preferred_oil_brand || 'تويوتا',
+        preferred_viscosity: initialVehicle.preferred_viscosity || '20W-50',
+        last_odometer: initialVehicle.last_odometer ? String(initialVehicle.last_odometer) : '',
+        customer_type: initialVehicle.customer_type || 'individual',
+        corporate_name: initialVehicle.corporate_name || '',
+        discount_percent: initialVehicle.discount_percent || 0,
+        credit_limit: initialVehicle.credit_limit || 50000,
+        corporate_tax_no: initialVehicle.corporate_tax_no || '',
+        billing_cycle: initialVehicle.billing_cycle || 'instant',
+      });
+    } else {
+      setFormData({
+        plate_number: '',
+        plate_type: 'خصوصي',
+        car_make_model: '',
+        customer_name: '',
+        phone: '',
+        preferred_oil_brand: 'تويوتا',
+        preferred_viscosity: '20W-50',
+        last_odometer: '',
+        customer_type: 'individual',
+        corporate_name: '',
+        discount_percent: 0,
+        credit_limit: 50000,
+        corporate_tax_no: '',
+        billing_cycle: 'instant',
+      });
+    }
+    setError('');
+  }, [initialVehicle, isOpen]);
+
   if (!isOpen) return null;
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
 
-    if (!formData.plate_number.trim()) {
-      setError('يرجى إدخال رقم اللوحة');
-      return;
-    }
     if (!formData.customer_name.trim()) {
       setError('يرجى إدخال اسم العميل');
-      return;
-    }
-    if (!formData.car_make_model.trim()) {
-      setError('يرجى إدخال نوع وموديل السيارة');
       return;
     }
     if (!formData.phone.trim()) {
@@ -52,11 +84,16 @@ export default function NewVehicleModal({ isOpen, onClose, onVehicleCreated }) {
 
     try {
       setSubmitting(true);
-      const res = await fetch('/api/vehicles', {
-        method: 'POST',
+      const isEdit = initialVehicle && initialVehicle.id;
+      const url = isEdit ? `/api/vehicles/${initialVehicle.id}` : '/api/vehicles';
+      const method = isEdit ? 'PUT' : 'POST';
+
+      const res = await fetch(url, {
+        method,
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           ...formData,
+          car_make_model: formData.car_make_model.trim() || 'سيارة بدون تحديد',
           last_odometer: Number(formData.last_odometer) || 0,
           discount_percent: Number(formData.discount_percent) || 0,
           credit_limit: Number(formData.credit_limit) || 50000,
@@ -65,7 +102,7 @@ export default function NewVehicleModal({ isOpen, onClose, onVehicleCreated }) {
 
       const data = await res.json();
       if (!res.ok) {
-        throw new Error(data.message || 'فشل في حفظ بيانات السيارة');
+        throw new Error(data.message || 'فشل في حفظ بيانات العميل');
       }
 
       onVehicleCreated(data.data);
@@ -96,11 +133,15 @@ export default function NewVehicleModal({ isOpen, onClose, onVehicleCreated }) {
         <div className="px-6 py-4 border-b border-white/10 flex items-center justify-between bg-white/5 flex-shrink-0">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-xl bg-amber-500/20 text-amber-400 border border-amber-500/30 flex items-center justify-center">
-              <Car className="w-5 h-5 stroke-[2.2]" />
+              <User className="w-5 h-5 stroke-[2.2]" />
             </div>
             <div>
-              <h3 className="font-extrabold text-white text-base">تسجيل مركبة وعميل جديد</h3>
-              <p className="text-xs text-slate-400">إضافة سريعة مع خيارات التسعير التفضيلي وأساطيل الشركات</p>
+              <h3 className="font-extrabold text-white text-base">
+                {initialVehicle ? 'تعديل بيانات العميل' : 'إضافة عميل جديد'}
+              </h3>
+              <p className="text-xs text-slate-400">
+                تسجيل بيانات العميل (رقم اللوحة اختياري — يمكن إضافتها الآن أو لاحقاً)
+              </p>
             </div>
           </div>
           <button
@@ -120,7 +161,89 @@ export default function NewVehicleModal({ isOpen, onClose, onVehicleCreated }) {
             </div>
           )}
 
-          {/* Customer / Account Type Selector (Upgrade 3) */}
+          {/* Customer Name & Phone (Required) */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+            <div>
+              <label className="block text-slate-300 font-bold mb-1.5">
+                اسم العميل <span className="text-rose-400">*</span>
+              </label>
+              <div className="relative">
+                <input
+                  type="text"
+                  placeholder="مثال: أحمد قائد الحيمي"
+                  value={formData.customer_name}
+                  onChange={(e) => setFormData({ ...formData, customer_name: e.target.value })}
+                  className="w-full min-h-[44px] px-3.5 pr-9 rounded-xl bg-slate-900/90 border border-white/15 text-white placeholder-slate-500 focus:outline-none focus:border-amber-400 font-bold text-sm"
+                  required
+                  autoFocus
+                />
+                <User className="w-4 h-4 text-slate-500 absolute right-3 top-3.5 pointer-events-none" />
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-slate-300 font-bold mb-1.5">
+                رقم الجوال <span className="text-rose-400">*</span>
+              </label>
+              <div className="relative">
+                <input
+                  type="tel"
+                  placeholder="77XXXXXXX"
+                  value={formData.phone}
+                  onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                  className="w-full min-h-[44px] px-3.5 pr-9 rounded-xl bg-slate-900/90 border border-white/15 text-white placeholder-slate-500 focus:outline-none focus:border-amber-400 font-mono font-bold text-sm"
+                  required
+                />
+                <Phone className="w-4 h-4 text-slate-500 absolute right-3 top-3.5 pointer-events-none" />
+              </div>
+            </div>
+          </div>
+
+          {/* Plate Number (OPTIONAL) & Plate Type */}
+          <div className="p-3 rounded-2xl bg-slate-900/70 border border-white/10 space-y-1.5">
+            <div className="flex items-center justify-between">
+              <label className="block text-slate-200 font-extrabold text-xs">
+                رقم اللوحة <span className="text-amber-400 text-[11px] font-normal">(اختياري — اتركه فارغاً إذا كان العميل بدون لوحة)</span>
+              </label>
+              <span className="text-[10px] text-slate-400">يمكن إضافتها لاحقاً في أي وقت</span>
+            </div>
+            <div className="flex gap-2">
+              <input
+                type="text"
+                placeholder="مثال: 1-45892 (اختياري)"
+                value={formData.plate_number}
+                onChange={(e) => setFormData({ ...formData, plate_number: e.target.value })}
+                className="flex-1 min-h-[44px] px-3.5 rounded-xl bg-slate-950 border border-white/15 text-white placeholder-slate-500 focus:outline-none focus:border-amber-400 font-mono text-sm font-bold"
+              />
+              <select
+                value={formData.plate_type}
+                onChange={(e) => setFormData({ ...formData, plate_type: e.target.value })}
+                className="min-h-[44px] px-3 rounded-xl bg-slate-950 border border-white/15 text-slate-200 focus:outline-none focus:border-amber-400 font-bold cursor-pointer"
+              >
+                {plateTypes.map((t) => (
+                  <option key={t} value={t} className="bg-slate-900 text-white">
+                    {t}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          {/* Car Make & Model */}
+          <div>
+            <label className="block text-slate-300 font-bold mb-1.5">
+              نوع وموديل السيارة:
+            </label>
+            <input
+              type="text"
+              placeholder="مثال: تويوتا هايلوكس دبل 2022 (أو اتركها عامة)"
+              value={formData.car_make_model}
+              onChange={(e) => setFormData({ ...formData, car_make_model: e.target.value })}
+              className="w-full min-h-[44px] px-3.5 rounded-xl bg-slate-900/90 border border-white/15 text-white placeholder-slate-500 focus:outline-none focus:border-amber-400 font-bold"
+            />
+          </div>
+
+          {/* Customer / Account Type Selector */}
           <div>
             <label className="block text-slate-300 font-bold mb-1.5">نوع الحساب والتسعير:</label>
             <div className="grid grid-cols-3 sm:grid-cols-5 gap-1.5">
@@ -150,7 +273,7 @@ export default function NewVehicleModal({ isOpen, onClose, onVehicleCreated }) {
             </div>
           </div>
 
-          {/* Corporate Fleet Details (Revealed when not individual) */}
+          {/* Corporate Fleet Details */}
           {isCorporate && (
             <div className="p-3 rounded-2xl bg-indigo-950/40 border border-indigo-500/30 space-y-2.5 animate-in fade-in">
               <div className="flex items-center gap-2 text-indigo-300 font-black text-xs">
@@ -215,91 +338,10 @@ export default function NewVehicleModal({ isOpen, onClose, onVehicleCreated }) {
             </div>
           )}
 
-          {/* Plate Number & Type */}
-          <div>
-            <label className="block text-slate-300 font-bold mb-1.5">
-              رقم اللوحة ونوعها <span className="text-rose-400">*</span>
-            </label>
-            <div className="flex gap-2">
-              <input
-                type="text"
-                placeholder="مثال: 1-45892"
-                value={formData.plate_number}
-                onChange={(e) => setFormData({ ...formData, plate_number: e.target.value })}
-                className="flex-1 min-h-[44px] px-3.5 rounded-xl bg-slate-900/90 border border-white/15 text-white placeholder-slate-500 focus:outline-none focus:border-amber-400 font-mono text-sm font-bold"
-                required
-                autoFocus
-              />
-              <select
-                value={formData.plate_type}
-                onChange={(e) => setFormData({ ...formData, plate_type: e.target.value })}
-                className="min-h-[44px] px-3 rounded-xl bg-slate-900/90 border border-white/15 text-slate-200 focus:outline-none focus:border-amber-400 font-bold cursor-pointer"
-              >
-                {plateTypes.map((t) => (
-                  <option key={t} value={t} className="bg-slate-900 text-white">
-                    {t}
-                  </option>
-                ))}
-              </select>
-            </div>
-          </div>
-
-          {/* Car Make & Model */}
-          <div>
-            <label className="block text-slate-300 font-bold mb-1.5">
-              نوع وموديل السيارة <span className="text-rose-400">*</span>
-            </label>
-            <input
-              type="text"
-              placeholder="مثال: تويوتا هايلوكس دبل 2022"
-              value={formData.car_make_model}
-              onChange={(e) => setFormData({ ...formData, car_make_model: e.target.value })}
-              className="w-full min-h-[44px] px-3.5 rounded-xl bg-slate-900/90 border border-white/15 text-white placeholder-slate-500 focus:outline-none focus:border-amber-400 font-bold"
-              required
-            />
-          </div>
-
-          {/* Customer Name & Yemeni Phone */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-            <div>
-              <label className="block text-slate-300 font-bold mb-1.5">
-                اسم السائق أو المسؤول <span className="text-rose-400">*</span>
-              </label>
-              <div className="relative">
-                <input
-                  type="text"
-                  placeholder="الاسم الكامل"
-                  value={formData.customer_name}
-                  onChange={(e) => setFormData({ ...formData, customer_name: e.target.value })}
-                  className="w-full min-h-[44px] px-3.5 pr-9 rounded-xl bg-slate-900/90 border border-white/15 text-white placeholder-slate-500 focus:outline-none focus:border-amber-400 font-bold"
-                  required
-                />
-                <User className="w-4 h-4 text-slate-500 absolute right-3 top-3.5 pointer-events-none" />
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-slate-300 font-bold mb-1.5">
-                رقم الجوال <span className="text-rose-400">*</span>
-              </label>
-              <div className="relative">
-                <input
-                  type="tel"
-                  placeholder="77XXXXXXX"
-                  value={formData.phone}
-                  onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                  className="w-full min-h-[44px] px-3.5 pr-9 rounded-xl bg-slate-900/90 border border-white/15 text-white placeholder-slate-500 focus:outline-none focus:border-amber-400 font-mono font-bold"
-                  required
-                />
-                <Phone className="w-4 h-4 text-slate-500 absolute right-3 top-3.5 pointer-events-none" />
-              </div>
-            </div>
-          </div>
-
           {/* Preferred Oil & Viscosity */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
             <div>
-              <label className="block text-slate-300 font-bold mb-1">الماركة المعتادة:</label>
+              <label className="block text-slate-300 font-bold mb-1">الماركة المعتادة للزيت:</label>
               <select
                 value={formData.preferred_oil_brand}
                 onChange={(e) => setFormData({ ...formData, preferred_oil_brand: e.target.value })}
@@ -330,7 +372,7 @@ export default function NewVehicleModal({ isOpen, onClose, onVehicleCreated }) {
           {/* Current Odometer */}
           <div>
             <label className="block text-slate-300 font-bold mb-1">
-              قراءة العداد الحالية (كم):
+              قراءة العداد الحالية (كم) — اختياري:
             </label>
             <div className="relative">
               <input
@@ -359,7 +401,7 @@ export default function NewVehicleModal({ isOpen, onClose, onVehicleCreated }) {
               className="flex-1 min-h-[46px] rounded-2xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-extrabold shadow-lg shadow-amber-500/25 transition flex items-center justify-center gap-2 active:scale-95"
             >
               <Check className="w-4 h-4 stroke-[2.5]" />
-              {submitting ? 'جاري الحفظ...' : 'حفظ واختيار المركبة'}
+              {submitting ? 'جاري الحفظ...' : initialVehicle ? 'حفظ التعديلات' : 'حفظ واختيار العميل'}
             </button>
           </div>
         </form>

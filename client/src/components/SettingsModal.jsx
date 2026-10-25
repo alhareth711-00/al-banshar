@@ -17,6 +17,7 @@ import {
   CheckCircle2,
   Database,
   ShieldCheck,
+  Calendar,
 } from 'lucide-react';
 import { getShopSettings, saveShopSettings, recordBackupDownloaded } from '../utils/settings';
 
@@ -221,6 +222,33 @@ export default function SettingsModal({ isOpen, onClose, onSettingsUpdated }) {
                 <option value={26}>02:00 فجراً</option>
               </select>
             </div>
+          </div>
+
+          {/* Default Next Service Duration in Months */}
+          <div className="p-3.5 rounded-2xl bg-slate-900/80 border border-white/10 space-y-1.5">
+            <div className="flex items-center justify-between">
+              <label className="text-slate-200 font-extrabold flex items-center gap-1.5 text-xs">
+                <Calendar className="w-4 h-4 text-teal-400" />
+                <span>المدة الافتراضية لموعد غيار الزيت القادم:</span>
+              </label>
+              <span className="text-[10px] text-teal-300 font-mono bg-teal-500/20 px-2 py-0.5 rounded-full border border-teal-500/30">
+                افتراضي: 2 أشهر
+              </span>
+            </div>
+            <p className="text-[11px] text-slate-400 leading-relaxed">
+              المدة التلقائية المقترحة التي تظهر في شاشة البيع لزيارة العميل القادمة، ويمكن للكاشير تعديل تاريخ اليوم أو الشهر في أي فاتورة بحرية.
+            </p>
+            <select
+              value={formData.defaultServiceIntervalMonths !== undefined ? formData.defaultServiceIntervalMonths : 2}
+              onChange={(e) => setFormData({ ...formData, defaultServiceIntervalMonths: Number(e.target.value) })}
+              className="w-full min-h-[42px] px-3 rounded-xl bg-slate-950 border border-white/15 text-white text-xs font-bold focus:outline-none focus:border-teal-400 cursor-pointer"
+            >
+              <option value={1}>شهر واحد (30 يوماً)</option>
+              <option value={2}>شهران (60 يوماً - الموصى به لمعظم السيارات)</option>
+              <option value={3}>3 أشهر (90 يوماً)</option>
+              <option value={4}>4 أشهر (120 يوماً)</option>
+              <option value={6}>6 أشهر (180 يوماً)</option>
+            </select>
           </div>
 
           {/* Owner PIN Protection (الجزء الأول) */}

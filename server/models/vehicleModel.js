@@ -98,6 +98,16 @@ const vehicleModel = {
   },
 
   create(data) {
+    let finalPlate = (data.plate_number && data.plate_number.trim()) || '';
+    if (!finalPlate) {
+      const cleanPhone = (data.phone || '').trim().replace(/\D/g, '');
+      finalPlate = `بدون-${cleanPhone || Date.now().toString().slice(-6)}`;
+      const existing = db.prepare('SELECT id FROM customers_vehicles WHERE plate_number = ?').get(finalPlate);
+      if (existing) {
+        finalPlate = `${finalPlate}-${Date.now().toString().slice(-4)}`;
+      }
+    }
+
     const stmt = db.prepare(`
       INSERT INTO customers_vehicles (
         plate_number, plate_type, car_make_model, customer_name, phone,
@@ -115,11 +125,11 @@ const vehicleModel = {
     `);
 
     const result = stmt.run({
-      plate_number: data.plate_number.trim(),
+      plate_number: finalPlate,
       plate_type: data.plate_type || 'خصوصي',
-      car_make_model: data.car_make_model.trim(),
-      customer_name: data.customer_name.trim(),
-      phone: data.phone.trim(),
+      car_make_model: (data.car_make_model && data.car_make_model.trim()) || 'سيارة بدون تحديد',
+      customer_name: (data.customer_name && data.customer_name.trim()) || 'عميل غير مسمى',
+      phone: (data.phone && data.phone.trim()) || '',
       preferred_oil_brand: data.preferred_oil_brand || null,
       preferred_viscosity: data.preferred_viscosity || null,
       last_odometer: Number(data.last_odometer) || 0,

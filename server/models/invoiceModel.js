@@ -303,7 +303,7 @@ const invoiceModel = {
       try {
         const jv = db.prepare("SELECT id FROM journal_entries WHERE ref_type = 'invoice' AND ref_id = ?").get(id);
         if (jv) {
-          db.prepare("DELETE FROM journal_entry_lines WHERE journal_entry_id = ?").run(jv.id);
+          db.prepare("DELETE FROM journal_lines WHERE journal_entry_id = ?").run(jv.id);
           db.prepare("DELETE FROM journal_entries WHERE id = ?").run(jv.id);
         }
       } catch (jvErr) {

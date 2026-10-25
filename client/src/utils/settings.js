@@ -14,6 +14,7 @@ const DEFAULT_SETTINGS = {
   ownerPin: '1234', // Default Manager / Owner PIN for Kiosk Protection
   autoLockMinutes: 3, // Auto-lock inactivity timeout in minutes (0 = disabled)
   demoMode: false, // Training Mode (الجزء الثالث: وضع التدريب وتجربة البيع)
+  defaultServiceIntervalMonths: 2, // المدة الافتراضية لموعد غيار الزيت القادم (شهران)
 };
 
 export function getShopSettings() {
