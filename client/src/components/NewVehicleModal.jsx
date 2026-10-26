@@ -402,6 +402,8 @@ export default function NewVehicleModal({ isOpen, onClose, onVehicleCreated, ini
                   plateNumber={formData.plate_number}
                   plateDivider={formData.plate_divider}
                   plateType={formData.plate_type}
+                  numberTabIndex={8}
+                  dividerTabIndex={9}
                   onChange={({ plate_number, plate_divider, plate_type }) => {
                     setFormData(prev => ({
                       ...prev,

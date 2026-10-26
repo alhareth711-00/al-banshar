@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useRef } from 'react';
 
 // Helper to convert Western/English digits to Eastern Arabic digits (٠-٩)
 export const toEasternArabicDigits = (val) => {
@@ -14,7 +14,12 @@ export default function YemeniPlateWidget({
   onChange = null,
   editable = true,
   className = '',
+  numberTabIndex = 8,
+  dividerTabIndex = 9,
 }) {
+  const numberInputRef = useRef(null);
+  const dividerInputRef = useRef(null);
+
   // Official Yemeni Plate Types (All with black text and black line borders, no RFID chip, no screw holes)
   const plateTypes = [
     { id: 'خصوصي', label: 'خصوصي', bg: 'bg-sky-400', border: 'border-sky-600', activeHex: '#38bdf8' },
@@ -58,10 +63,10 @@ export default function YemeniPlateWidget({
   const dividerAr = toEasternArabicDigits(plateDivider) || '١';
   const dividerEn = plateDivider || '1';
   const numberAr = toEasternArabicDigits(plateNumber) || '—';
-  const numberEn = plateNumber || '—';
+  const numberEn = plateNumber || '';
 
   return (
-    <div className={`space-y-3 ${className}`}>
+    <div className={`space-y-2.5 ${className}`}>
       {/* ─── 1. TYPE SELECTOR PILLS (IF EDITABLE) ─── */}
       {editable && (
         <div className="flex items-center justify-between gap-1.5">
@@ -87,90 +92,110 @@ export default function YemeniPlateWidget({
         </div>
       )}
 
-      {/* ─── 2. AUTHENTIC YEMENI PLATE REPLICA (CLEAN: NO CHIP, NO SCREWS) ─── */}
+      {/* ─── 2. AUTHENTIC YEMENI PLATE REPLICA WITH DIRECT IN-PLATE INPUT ─── */}
       <div
-        className={`w-full rounded-xl overflow-hidden border-2 border-slate-950 shadow-xl transition-colors duration-200 select-none ${currentMeta.bg} text-slate-950`}
+        className={`w-full rounded-2xl overflow-hidden border-2 border-slate-950 shadow-2xl transition-colors duration-200 select-none ${currentMeta.bg} text-slate-950`}
         style={{
-          boxShadow: '0 6px 16px -2px rgba(0, 0, 0, 0.4), inset 0 1px 2px rgba(255, 255, 255, 0.25)',
+          boxShadow: '0 8px 20px -3px rgba(0, 0, 0, 0.45), inset 0 1px 2px rgba(255, 255, 255, 0.3)',
         }}
       >
-        {/* Top Header Strip: "اليمن ــ خصوصي" */}
-        <div className="py-1 px-4 text-center border-b-2 border-slate-950">
-          <h4 className="text-sm sm:text-base font-black tracking-wider leading-snug">
-            اليمن ــ {plateType}
-          </h4>
+        {/* Top Header Strip: اليمن أقصى اليمين | نوع اللوحة أقصى الشمال بحجم كبير يملأ المكان */}
+        <div className="py-2 px-5 flex items-center justify-between border-b-2 border-slate-950 bg-black/5">
+          {/* أقصى اليمين: اليَمَن */}
+          <span className="text-xl sm:text-2xl font-black text-slate-950 tracking-wider">
+            اليَمَن
+          </span>
+
+          {/* أقصى الشمال: نوع اللوحة (خصوصي / نقل / أجرة / مؤقت) */}
+          <span className="text-xl sm:text-2xl font-black text-slate-950 tracking-wider">
+            {plateType}
+          </span>
         </div>
 
-        {/* Bottom Section: Left (Divider) | Right (Plate Number) */}
-        <div className="grid grid-cols-12 min-h-[76px] items-stretch">
-          {/* Left Compartment: الفاصل (Arabic top, English bottom) */}
-          <div className="col-span-3 border-l-2 border-slate-950 flex flex-col items-center justify-center p-1.5">
-            <span
-              className="font-bold text-xl sm:text-2xl leading-none"
-              style={{ fontFamily: "'Amiri', 'Tajawal', serif" }}
-            >
-              {dividerAr}
+        {/* Bottom Section:
+             - اليمين (Right): رقم اللوحة الرئيسي (Wider compartment)
+             - الشمال (Left): الفاصل (Narrower compartment)
+        */}
+        <div className="grid grid-cols-12 min-h-[96px] items-stretch text-slate-950">
+          
+          {/* ─── RIGHT SIDE (يمين النموذج): رقم اللوحة الرئيسي ─── */}
+          <div
+            className={`col-span-8 sm:col-span-9 flex flex-col items-center justify-center p-2.5 border-l-2 border-slate-950 relative group ${
+              editable ? 'cursor-text hover:bg-black/5 transition' : ''
+            }`}
+            onClick={() => editable && numberInputRef.current?.focus()}
+          >
+            <span className="text-[9px] font-bold text-slate-900/60 absolute top-1 right-2.5 pointer-events-none select-none">
+              رقم اللوحة
             </span>
-            <span
-              className="font-black text-base sm:text-lg leading-none mt-1"
-              style={{ fontFamily: "'JetBrains Mono', monospace" }}
-            >
-              {dividerEn}
-            </span>
-          </div>
 
-          {/* Right Compartment: Plate Number (Centered across full width, clean & prominent) */}
-          <div className="col-span-9 flex flex-col items-center justify-center py-1.5 px-3">
-            <span
-              className="font-bold text-2xl sm:text-3xl leading-none tracking-widest"
+            {/* Eastern Arabic Numerals (Auto-rendered) */}
+            <div
+              className="text-2xl sm:text-3xl font-bold leading-none tracking-widest text-slate-950 pointer-events-none select-none"
               style={{ fontFamily: "'Amiri', 'Tajawal', serif" }}
             >
               {numberAr}
-            </span>
-            <span
-              className="font-black text-xl sm:text-2xl leading-none tracking-widest mt-1"
-              style={{ fontFamily: "'JetBrains Mono', monospace" }}
-            >
-              {numberEn}
-            </span>
+            </div>
+
+            {/* Direct Input Field Inside Plate (Keyboard & Numpad) */}
+            {editable ? (
+              <input
+                ref={numberInputRef}
+                type="text"
+                tabIndex={numberTabIndex}
+                value={plateNumber}
+                maxLength={6}
+                placeholder="رقم اللوحة"
+                onChange={handleNumberChange}
+                className="w-full bg-transparent border-0 text-center font-mono font-black text-xl sm:text-2xl text-slate-950 tracking-widest leading-none mt-1 focus:outline-none focus:ring-0 placeholder-slate-950/30"
+              />
+            ) : (
+              <div className="font-mono font-black text-xl sm:text-2xl text-slate-950 tracking-widest leading-none mt-1">
+                {numberEn || '—'}
+              </div>
+            )}
           </div>
+
+          {/* ─── LEFT SIDE (شمال النموذج): رقم الفاصل ─── */}
+          <div
+            className={`col-span-4 sm:col-span-3 flex flex-col items-center justify-center p-2.5 relative group ${
+              editable ? 'cursor-text hover:bg-black/5 transition' : ''
+            }`}
+            onClick={() => editable && dividerInputRef.current?.focus()}
+          >
+            <span className="text-[9px] font-bold text-slate-900/60 absolute top-1 right-2 pointer-events-none select-none">
+              الفاصل
+            </span>
+
+            {/* Eastern Arabic Numeral (Auto-rendered) */}
+            <div
+              className="text-xl sm:text-2xl font-bold leading-none text-slate-950 pointer-events-none select-none"
+              style={{ fontFamily: "'Amiri', 'Tajawal', serif" }}
+            >
+              {dividerAr}
+            </div>
+
+            {/* Direct Input Field Inside Plate (Keyboard & Numpad) */}
+            {editable ? (
+              <input
+                ref={dividerInputRef}
+                type="text"
+                tabIndex={dividerTabIndex}
+                value={plateDivider}
+                maxLength={2}
+                placeholder="1"
+                onChange={handleDividerChange}
+                className="w-full bg-transparent border-0 text-center font-mono font-black text-lg sm:text-xl text-slate-950 leading-none mt-1 focus:outline-none focus:ring-0 placeholder-slate-950/30"
+              />
+            ) : (
+              <div className="font-mono font-black text-lg sm:text-xl text-slate-950 leading-none mt-1">
+                {dividerEn}
+              </div>
+            )}
+          </div>
+
         </div>
       </div>
-
-      {/* ─── 3. RAPID KEYBOARD & NUMPAD INPUTS ─── */}
-      {editable && (
-        <div className="grid grid-cols-12 gap-2.5 items-center pt-0.5">
-          <div className="col-span-4">
-            <label className="block text-[10px] font-bold text-slate-400 mb-1">
-              الفاصل (1 أو 2 أو 9...)
-            </label>
-            <input
-              type="text"
-              tabIndex={8}
-              value={plateDivider}
-              maxLength={2}
-              onChange={handleDividerChange}
-              placeholder="1"
-              className="w-full h-10 bg-slate-950 border border-slate-700 text-center text-amber-400 font-mono font-black text-base rounded-xl focus:border-amber-400 focus:outline-none focus:ring-1 focus:ring-amber-400"
-            />
-          </div>
-
-          <div className="col-span-8">
-            <label className="block text-[10px] font-bold text-slate-400 mb-1">
-              رقم اللوحة (أرقام الكيبورد / Numpad)
-            </label>
-            <input
-              type="text"
-              tabIndex={9}
-              value={plateNumber}
-              maxLength={7}
-              onChange={handleNumberChange}
-              placeholder="مثال: 2008 أو 45892"
-              className="w-full h-10 bg-slate-950 border border-slate-700 text-center text-white font-mono font-black text-lg rounded-xl focus:border-amber-400 focus:outline-none focus:ring-1 focus:ring-amber-400 tracking-wider"
-            />
-          </div>
-        </div>
-      )}
     </div>
   );
 }
