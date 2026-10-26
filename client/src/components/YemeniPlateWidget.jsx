@@ -1,10 +1,14 @@
-import React, { useRef } from 'react';
+import React, { useState, useRef } from 'react';
 
-// Helper to convert Western/English digits to Eastern Arabic digits (٠-٩)
-export const toEasternArabicDigits = (val) => {
-  if (!val && val !== 0) return '';
+// Helper to convert Western/English digits to Eastern Arabic digits with customizable spacing
+export const toSpacedEasternDigits = (val, spaceCount = 1) => {
+  if (!val && val !== 0) return '—';
   const easternDigits = ['٠', '١', '٢', '٣', '٤', '٥', '٦', '٧', '٨', '٩'];
-  return String(val).replace(/[0-9]/g, (d) => easternDigits[parseInt(d, 10)]);
+  const spaces = ' '.repeat(spaceCount);
+  return String(val)
+    .replace(/[0-9]/g, (d) => easternDigits[parseInt(d, 10)])
+    .split('')
+    .join(spaces);
 };
 
 export default function YemeniPlateWidget({
@@ -19,6 +23,17 @@ export default function YemeniPlateWidget({
 }) {
   const numberInputRef = useRef(null);
   const dividerInputRef = useRef(null);
+
+  // 3 Interactive Typography & Spacing Models
+  // 1 = Balanced (0.28em), 2 = Spacious Wide (0.42em - Recommended), 3 = Chiseled Heavy (0.35em)
+  const [activeModel, setActiveModel] = useState(() => {
+    return localStorage.getItem('al_banshar_plate_model') || '2';
+  });
+
+  const handleModelSelect = (m) => {
+    setActiveModel(m);
+    localStorage.setItem('al_banshar_plate_model', m);
+  };
 
   // Official Yemeni Plate Types (All with black text and black line borders, no RFID chip, no screw holes)
   const plateTypes = [
@@ -60,24 +75,44 @@ export default function YemeniPlateWidget({
     }
   };
 
-  const dividerAr = toEasternArabicDigits(plateDivider) || '١';
+  // Model-specific typography calibrations
+  const spaceCount = activeModel === '1' ? 1 : 2;
+  const letterSpacingStyle =
+    activeModel === '1' ? '0.28em' : activeModel === '2' ? '0.42em' : '0.36em';
+
+  const arabicNumFontSize =
+    activeModel === '1'
+      ? 'text-3xl font-black'
+      : activeModel === '2'
+      ? 'text-3xl sm:text-4xl font-black'
+      : 'text-4xl sm:text-5xl font-black';
+
+  const latinNumFontSize =
+    activeModel === '1'
+      ? 'text-2xl font-black'
+      : activeModel === '2'
+      ? 'text-2xl sm:text-3xl font-black'
+      : 'text-3xl sm:text-4xl font-black';
+
+  const dividerAr = toSpacedEasternDigits(plateDivider, 1) || '١';
   const dividerEn = plateDivider || '1';
-  const numberAr = toEasternArabicDigits(plateNumber) || '—';
+  const numberAr = toSpacedEasternDigits(plateNumber, spaceCount);
   const numberEn = plateNumber || '';
 
   return (
-    <div className={`space-y-2.5 ${className}`}>
-      {/* ─── 1. TYPE SELECTOR PILLS (IF EDITABLE) ─── */}
+    <div className={`space-y-3 ${className}`}>
+      {/* ─── 1. TOP CONTROLS: TYPE SELECTOR & 3-MODEL SWITCHER ─── */}
       {editable && (
-        <div className="flex items-center justify-between gap-1.5">
-          <label className="text-[11px] font-bold text-slate-300">نوع ترخيص اللوحة:</label>
-          <div className="flex items-center gap-1.5">
+        <div className="flex flex-wrap items-center justify-between gap-2 bg-slate-950/60 p-2 rounded-xl border border-slate-800">
+          {/* Plate Types */}
+          <div className="flex items-center gap-1">
+            <span className="text-[10px] font-bold text-slate-400 ml-1">النوع:</span>
             {plateTypes.map((p) => (
               <button
                 key={p.id}
                 type="button"
                 onClick={() => handleTypeSelect(p.id)}
-                className={`px-2.5 py-1 rounded-lg text-[11px] font-black border transition select-none ${
+                className={`px-2 py-0.5 rounded-lg text-[10px] font-black border transition select-none ${
                   p.bg
                 } text-slate-950 ${
                   plateType === p.id
@@ -88,6 +123,47 @@ export default function YemeniPlateWidget({
                 {p.label}
               </button>
             ))}
+          </div>
+
+          {/* 3 Interactive Model Switcher Pills */}
+          <div className="flex items-center gap-1 bg-slate-900 p-0.5 rounded-lg border border-slate-800">
+            <span className="text-[10px] font-bold text-amber-400 px-1">النموذج:</span>
+            <button
+              type="button"
+              onClick={() => handleModelSelect('1')}
+              title="نموذج 1: موزون قياسي (0.28em)"
+              className={`px-2 py-0.5 rounded text-[10px] font-bold transition ${
+                activeModel === '1'
+                  ? 'bg-amber-500 text-slate-950 font-black shadow'
+                  : 'text-slate-400 hover:text-white'
+              }`}
+            >
+              1. موزون ⚖️
+            </button>
+            <button
+              type="button"
+              onClick={() => handleModelSelect('2')}
+              title="نموذج 2: فسيح واسع (0.42em - موصى به)"
+              className={`px-2 py-0.5 rounded text-[10px] font-bold transition ${
+                activeModel === '2'
+                  ? 'bg-amber-500 text-slate-950 font-black shadow'
+                  : 'text-slate-400 hover:text-white'
+              }`}
+            >
+              2. فسيح واسع 🌟
+            </button>
+            <button
+              type="button"
+              onClick={() => handleModelSelect('3')}
+              title="نموذج 3: تكتيكي عريض (0.36em خط كبير)"
+              className={`px-2 py-0.5 rounded text-[10px] font-bold transition ${
+                activeModel === '3'
+                  ? 'bg-amber-500 text-slate-950 font-black shadow'
+                  : 'text-slate-400 hover:text-white'
+              }`}
+            >
+              3. تكتيكي ⚡
+            </button>
           </div>
         </div>
       )}
@@ -100,7 +176,7 @@ export default function YemeniPlateWidget({
         }}
       >
         {/* Top Header Strip: اليمن أقصى اليمين | نوع اللوحة أقصى الشمال بحجم كبير يملأ المكان */}
-        <div className="py-2 px-5 flex items-center justify-between border-b-2 border-slate-950 bg-black/5">
+        <div className="py-2 px-6 flex items-center justify-between border-b-2 border-slate-950 bg-black/5">
           {/* أقصى اليمين: اليَمَن */}
           <span className="text-xl sm:text-2xl font-black text-slate-950 tracking-wider">
             اليَمَن
@@ -116,23 +192,27 @@ export default function YemeniPlateWidget({
              - اليمين (Right): رقم اللوحة الرئيسي (Wider compartment)
              - الشمال (Left): الفاصل (Narrower compartment)
         */}
-        <div className="grid grid-cols-12 min-h-[96px] items-stretch text-slate-950">
+        <div className="grid grid-cols-12 min-h-[105px] items-stretch text-slate-950">
           
           {/* ─── RIGHT SIDE (يمين النموذج): رقم اللوحة الرئيسي ─── */}
           <div
-            className={`col-span-8 sm:col-span-9 flex flex-col items-center justify-center p-2.5 border-l-2 border-slate-950 relative group ${
+            className={`col-span-8 sm:col-span-9 flex flex-col items-center justify-center p-3 border-l-2 border-slate-950 relative group ${
               editable ? 'cursor-text hover:bg-black/5 transition' : ''
             }`}
             onClick={() => editable && numberInputRef.current?.focus()}
           >
-            <span className="text-[9px] font-bold text-slate-900/60 absolute top-1 right-2.5 pointer-events-none select-none">
+            <span className="text-[9px] font-bold text-slate-900/60 absolute top-1 right-3 pointer-events-none select-none">
               رقم اللوحة
             </span>
 
-            {/* Eastern Arabic Numerals (Auto-rendered) */}
+            {/* Eastern Arabic Numerals (Auto-rendered with model spacing) */}
             <div
-              className="text-2xl sm:text-3xl font-bold leading-none tracking-widest text-slate-950 pointer-events-none select-none"
-              style={{ fontFamily: "'Amiri', 'Tajawal', serif" }}
+              className={`${arabicNumFontSize} leading-none text-slate-950 pointer-events-none select-none`}
+              style={{
+                fontFamily: "'Amiri', 'Tajawal', serif",
+                letterSpacing: letterSpacingStyle,
+                textIndent: letterSpacingStyle,
+              }}
             >
               {numberAr}
             </div>
@@ -145,12 +225,22 @@ export default function YemeniPlateWidget({
                 tabIndex={numberTabIndex}
                 value={plateNumber}
                 maxLength={6}
-                placeholder="رقم اللوحة"
+                placeholder="1100"
                 onChange={handleNumberChange}
-                className="w-full bg-transparent border-0 text-center font-mono font-black text-xl sm:text-2xl text-slate-950 tracking-widest leading-none mt-1 focus:outline-none focus:ring-0 placeholder-slate-950/30"
+                className={`w-full bg-transparent border-0 text-center font-mono ${latinNumFontSize} text-slate-950 leading-none mt-2 focus:outline-none focus:ring-0 placeholder-slate-950/25`}
+                style={{
+                  letterSpacing: letterSpacingStyle,
+                  textIndent: letterSpacingStyle,
+                }}
               />
             ) : (
-              <div className="font-mono font-black text-xl sm:text-2xl text-slate-950 tracking-widest leading-none mt-1">
+              <div
+                className={`font-mono ${latinNumFontSize} text-slate-950 leading-none mt-2`}
+                style={{
+                  letterSpacing: letterSpacingStyle,
+                  textIndent: letterSpacingStyle,
+                }}
+              >
                 {numberEn || '—'}
               </div>
             )}
@@ -167,31 +257,37 @@ export default function YemeniPlateWidget({
               الفاصل
             </span>
 
-            {/* Eastern Arabic Numeral (Auto-rendered) */}
             <div
-              className="text-xl sm:text-2xl font-bold leading-none text-slate-950 pointer-events-none select-none"
-              style={{ fontFamily: "'Amiri', 'Tajawal', serif" }}
+              className={`w-full py-1 flex flex-col items-center justify-center ${
+                activeModel === '3' ? 'rounded-xl bg-black/5 border border-black/10' : ''
+              }`}
             >
-              {dividerAr}
-            </div>
-
-            {/* Direct Input Field Inside Plate (Keyboard & Numpad) */}
-            {editable ? (
-              <input
-                ref={dividerInputRef}
-                type="text"
-                tabIndex={dividerTabIndex}
-                value={plateDivider}
-                maxLength={2}
-                placeholder="1"
-                onChange={handleDividerChange}
-                className="w-full bg-transparent border-0 text-center font-mono font-black text-lg sm:text-xl text-slate-950 leading-none mt-1 focus:outline-none focus:ring-0 placeholder-slate-950/30"
-              />
-            ) : (
-              <div className="font-mono font-black text-lg sm:text-xl text-slate-950 leading-none mt-1">
-                {dividerEn}
+              {/* Eastern Arabic Numeral (Auto-rendered) */}
+              <div
+                className="text-2xl sm:text-3xl font-black leading-none text-slate-950 pointer-events-none select-none"
+                style={{ fontFamily: "'Amiri', 'Tajawal', serif" }}
+              >
+                {dividerAr}
               </div>
-            )}
+
+              {/* Direct Input Field Inside Plate (Keyboard & Numpad) */}
+              {editable ? (
+                <input
+                  ref={dividerInputRef}
+                  type="text"
+                  tabIndex={dividerTabIndex}
+                  value={plateDivider}
+                  maxLength={2}
+                  placeholder="1"
+                  onChange={handleDividerChange}
+                  className="w-full bg-transparent border-0 text-center font-mono font-black text-xl sm:text-2xl text-slate-950 leading-none mt-1.5 focus:outline-none focus:ring-0 placeholder-slate-950/25"
+                />
+              ) : (
+                <div className="font-mono font-black text-xl sm:text-2xl text-slate-950 leading-none mt-1.5">
+                  {dividerEn}
+                </div>
+              )}
+            </div>
           </div>
 
         </div>
