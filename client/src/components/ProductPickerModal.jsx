@@ -17,8 +17,6 @@ export default function ProductPickerModal({
   const [isCreatingService, setIsCreatingService] = useState(false);
   const [serviceCreateError, setServiceCreateError] = useState('');
 
-  if (!isOpen) return null;
-
   // Preset quick services with smart breakdown for tire patches
   const defaultServices = [
     {
@@ -239,9 +237,11 @@ export default function ProductPickerModal({
     }
   };
 
+  if (!isOpen) return null;
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-5 bg-black/75 backdrop-blur-md">
-      <div className="apple-glass border border-white/20 rounded-3xl w-full max-w-xl max-h-[90vh] flex flex-col overflow-hidden shadow-2xl animate-in fade-in zoom-in-95 duration-200">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-5 bg-black/80 backdrop-blur-md">
+      <div className="bg-slate-950 border border-white/20 rounded-3xl w-full max-w-xl max-h-[90vh] flex flex-col overflow-hidden shadow-2xl text-right">
         {/* Header */}
         <div className="px-6 py-4 border-b border-white/10 flex items-center justify-between bg-white/5 flex-shrink-0">
           <div className="flex items-center gap-3">

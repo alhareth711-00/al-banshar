@@ -14,6 +14,7 @@ import BayProfitabilityModal from './components/BayProfitabilityModal';
 import FinancialVaultHub from './components/FinancialVaultHub';
 import UserGuideModal from './components/UserGuideModal';
 import OwnerPinModal from './components/OwnerPinModal';
+import ErrorBoundary from './components/ErrorBoundary';
 import { getAutoLockMinutes } from './utils/settings';
 
 export default function App() {
@@ -241,15 +242,17 @@ export default function App() {
         />
 
         {activeTab === 'pos' && (
-          <PosScreen
-            inventory={inventory}
-            workers={workers}
-            onRefreshData={handleDataRefreshed}
-            initialVehicle={posPreselectedVehicle}
-            onOpenStatement={(vehId) => handleOpenStatementGuarded('customer', vehId)}
-            isOwnerMode={isOwnerMode}
-            onRequireOwnerAuth={requireOwnerAuth}
-          />
+          <ErrorBoundary>
+            <PosScreen
+              inventory={inventory}
+              workers={workers}
+              onRefreshData={handleDataRefreshed}
+              initialVehicle={posPreselectedVehicle}
+              onOpenStatement={(vehId) => handleOpenStatementGuarded('customer', vehId)}
+              isOwnerMode={isOwnerMode}
+              onRequireOwnerAuth={requireOwnerAuth}
+            />
+          </ErrorBoundary>
         )}
 
         {activeTab === 'radar' && (
