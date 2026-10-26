@@ -105,9 +105,13 @@ CREATE TABLE IF NOT EXISTS invoices (
     paid_amount REAL NOT NULL DEFAULT 0,
     remaining_debt REAL NOT NULL DEFAULT 0,
     notes TEXT,
+    service_status TEXT DEFAULT 'completed' CHECK(service_status IN ('pending_service', 'completed')),
+    safety_inspection_data TEXT,
+    inspection_completed_at TEXT,
     created_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime'))
 );
 
+CREATE INDEX IF NOT EXISTS idx_invoices_service_status ON invoices(service_status);
 CREATE INDEX IF NOT EXISTS idx_invoices_vehicle ON invoices(vehicle_id);
 CREATE INDEX IF NOT EXISTS idx_invoices_worker ON invoices(worker_id);
 CREATE INDEX IF NOT EXISTS idx_invoices_created ON invoices(created_at);

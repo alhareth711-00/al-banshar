@@ -57,6 +57,25 @@ const invoiceController = {
       data: result,
     });
   }),
+
+  getPendingServices: asyncHandler(async (req, res) => {
+    const pending = invoiceModel.getPendingServices();
+    res.json({
+      success: true,
+      count: pending.length,
+      data: pending,
+    });
+  }),
+
+  completeService: asyncHandler(async (req, res) => {
+    const id = parseInt(req.params.id, 10);
+    const updatedInvoice = invoiceModel.completeService(id, req.body);
+    res.json({
+      success: true,
+      message: 'تم إتمام الخدمة واعتماد الفحص بنجاح',
+      data: updatedInvoice,
+    });
+  }),
 };
 
 module.exports = invoiceController;

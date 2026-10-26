@@ -140,12 +140,14 @@ const invoiceModel = {
           invoice_number, vehicle_id, worker_id, current_odometer,
           next_odometer, next_service_date, items_total, labor_total,
           scrap_battery_deduction, discount, net_total, payment_method,
-          wallet_ref_number, paid_amount, remaining_debt, notes, created_at
+          wallet_ref_number, paid_amount, remaining_debt, notes,
+          service_status, safety_inspection_data, inspection_completed_at, created_at
         ) VALUES (
           @invoice_number, @vehicle_id, @worker_id, @current_odometer,
           @next_odometer, @next_service_date, @items_total, @labor_total,
           @scrap_battery_deduction, @discount, @net_total, @payment_method,
           @wallet_ref_number, @paid_amount, @remaining_debt, @notes,
+          @service_status, @safety_inspection_data, @inspection_completed_at,
           COALESCE(@created_at, datetime('now', 'localtime'))
         )
       `);
@@ -167,6 +169,13 @@ const invoiceModel = {
         paid_amount: paidAmount,
         remaining_debt: remainingDebt,
         notes: data.notes || null,
+        service_status: data.service_status || 'completed',
+        safety_inspection_data: data.safety_inspection_data
+          ? typeof data.safety_inspection_data === 'string'
+            ? data.safety_inspection_data
+            : JSON.stringify(data.safety_inspection_data)
+          : null,
+        inspection_completed_at: data.inspection_completed_at || null,
         created_at: data.created_at || null,
       });
 
@@ -338,6 +347,72 @@ const invoiceModel = {
     });
 
     return executeTransaction();
+  },
+
+  getPendingServices() {
+    const query = `
+      SELECT 
+        inv.*,
+        cv.plate_number,
+        cv.plate_type,
+        cv.car_make_model,
+        cv.customer_name,
+        cv.phone AS customer_phone,
+        w.name AS worker_name
+      FROM invoices inv
+      JOIN customers_vehicles cv ON inv.vehicle_id = cv.id
+      LEFT JOIN workers w ON inv.worker_id = w.id
+      WHERE inv.service_status = 'pending_service'
+      ORDER BY inv.id ASC
+    `;
+    const rows = db.prepare(query).all();
+
+    for (const row of rows) {
+      row.items = db.prepare(`
+        SELECT 
+          ii.*,
+          inv.category AS product_category,
+          inv.brand AS product_brand,
+          inv.viscosity AS product_viscosity
+        FROM invoice_items ii
+        LEFT JOIN inventory inv ON ii.inventory_id = inv.id
+        WHERE ii.invoice_id = ?
+      `).all(row.id);
+
+      if (row.safety_inspection_data) {
+        try {
+          row.safety_points = JSON.parse(row.safety_inspection_data);
+        } catch {
+          row.safety_points = null;
+        }
+      } else {
+        row.safety_points = null;
+      }
+    }
+
+    return rows;
+  },
+
+  completeService(id, { worker_id, safety_points, inspection_notes }) {
+    const invoice = db.prepare('SELECT * FROM invoices WHERE id = ?').get(id);
+    if (!invoice) {
+      throw new Error(`الفاتورة بالرقم ${id} غير موجودة في النظام`);
+    }
+
+    const safetyDataStr = safety_points ? JSON.stringify(safety_points) : null;
+    const workerIdToSave = worker_id || invoice.worker_id || null;
+
+    db.prepare(`
+      UPDATE invoices
+      SET 
+        service_status = 'completed',
+        worker_id = ?,
+        safety_inspection_data = ?,
+        inspection_completed_at = datetime('now', 'localtime')
+      WHERE id = ?
+    `).run(workerIdToSave, safetyDataStr, id);
+
+    return this.getById(id);
   },
 };
 

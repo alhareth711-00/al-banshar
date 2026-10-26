@@ -84,6 +84,26 @@ function initDb() {
     console.warn('[DB] Pre-migration warning on inventory:', err.message);
   }
 
+  // Pre-schema migration: invoices service_status, safety_inspection_data, inspection_completed_at
+  try {
+    const invoiceTableCheck = db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='invoices'").get();
+    if (invoiceTableCheck) {
+      const invCols = db.prepare("PRAGMA table_info(invoices)").all().map(c => c.name);
+      if (!invCols.includes('service_status')) {
+        db.exec("ALTER TABLE invoices ADD COLUMN service_status TEXT DEFAULT 'completed'");
+      }
+      if (!invCols.includes('safety_inspection_data')) {
+        db.exec("ALTER TABLE invoices ADD COLUMN safety_inspection_data TEXT");
+      }
+      if (!invCols.includes('inspection_completed_at')) {
+        db.exec("ALTER TABLE invoices ADD COLUMN inspection_completed_at TEXT");
+      }
+      console.log('[DB] Pre-schema migration applied: upgraded invoices schema.');
+    }
+  } catch (err) {
+    console.warn('[DB] Pre-migration warning on invoices:', err.message);
+  }
+
   const schemaPath = path.join(__dirname, 'schema.sql');
   const schemaSql = fs.readFileSync(schemaPath, 'utf8');
 
@@ -338,6 +358,23 @@ function initDb() {
     }
   } catch (err) {
     console.warn('[DB] Seeding quick customer warning:', err.message);
+  }
+
+  // Migration: Invoices service_status, safety_inspection_data, inspection_completed_at
+  try {
+    const invCols = db.prepare("PRAGMA table_info(invoices)").all().map(c => c.name);
+    if (!invCols.includes('service_status')) {
+      db.exec("ALTER TABLE invoices ADD COLUMN service_status TEXT DEFAULT 'completed'");
+    }
+    if (!invCols.includes('safety_inspection_data')) {
+      db.exec("ALTER TABLE invoices ADD COLUMN safety_inspection_data TEXT");
+    }
+    if (!invCols.includes('inspection_completed_at')) {
+      db.exec("ALTER TABLE invoices ADD COLUMN inspection_completed_at TEXT");
+    }
+    console.log('[DB] Migration applied: invoices upgraded with service_status and safety_inspection_data.');
+  } catch (err) {
+    console.warn('[DB] Migration warning on invoices service fields:', err.message);
   }
 
   // Seed standard Chart of Accounts
