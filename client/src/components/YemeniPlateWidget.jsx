@@ -97,7 +97,7 @@ export default function YemeniPlateWidget({
 
       {/* ─── 2. AUTHENTIC YEMENI PLATE REPLICA (CORRECT LTR ORDER & SPACING) ─── */}
       <div
-        className={`w-full rounded-2xl overflow-hidden border-2 border-slate-950 shadow-2xl transition-colors duration-200 select-none ${currentMeta.bg} text-slate-950`}
+        className={`yemen-plate-container w-full rounded-2xl overflow-hidden border-2 border-slate-950 shadow-2xl transition-colors duration-200 select-none ${currentMeta.bg} text-slate-950`}
         style={{
           boxShadow: '0 8px 22px -3px rgba(0, 0, 0, 0.5), inset 0 1px 2px rgba(255, 255, 255, 0.3)',
         }}
@@ -132,20 +132,19 @@ export default function YemeniPlateWidget({
               رقم اللوحة
             </span>
 
-            {/* Eastern Arabic Numerals: Rendered in strict LTR flex order with gap to match English digits exactly */}
+            {/* Eastern Arabic Numerals: Rendered in strict LTR flex order with Amiri-Bold font */}
             <div
               dir="ltr"
-              className="text-3xl sm:text-4xl font-black leading-none text-slate-950 pointer-events-none select-none flex items-center justify-center gap-3 sm:gap-4.5"
-              style={{ fontFamily: "'Amiri', 'Tajawal', serif" }}
+              className="arabic-plate-number text-3xl sm:text-4xl font-black leading-none text-slate-950 pointer-events-none select-none flex items-center justify-center gap-3 sm:gap-4.5"
             >
               {numberDigitsAr.map((d, idx) => (
-                <span key={idx} className="inline-block text-center min-w-[1ch]">
+                <span key={idx} className="arabic-plate-number inline-block text-center min-w-[1ch]">
                   {d}
                 </span>
               ))}
             </div>
 
-            {/* Direct Input Field Inside Plate (Keyboard & Numpad) - Strict LTR alignment */}
+            {/* Direct Input Field Inside Plate: Oswald-Bold font */}
             {editable ? (
               <input
                 ref={numberInputRef}
@@ -156,7 +155,7 @@ export default function YemeniPlateWidget({
                 maxLength={6}
                 placeholder="1100"
                 onChange={handleNumberChange}
-                className="w-full bg-transparent border-0 text-center font-mono font-black text-2xl sm:text-3xl text-slate-950 leading-none mt-2 focus:outline-none focus:ring-0 placeholder-slate-950/25 selection:bg-slate-950/20"
+                className="english-plate-number w-full bg-transparent border-0 text-center font-black text-2xl sm:text-3xl text-slate-950 leading-none mt-2 focus:outline-none focus:ring-0 placeholder-slate-950/25 selection:bg-slate-950/20"
                 style={{
                   letterSpacing: '0.42em',
                   textIndent: '0.42em',
@@ -165,7 +164,7 @@ export default function YemeniPlateWidget({
             ) : (
               <div
                 dir="ltr"
-                className="font-mono font-black text-2xl sm:text-3xl text-slate-950 leading-none mt-2 text-center"
+                className="english-plate-number font-black text-2xl sm:text-3xl text-slate-950 leading-none mt-2 text-center"
                 style={{
                   letterSpacing: '0.42em',
                   textIndent: '0.42em',
@@ -187,20 +186,19 @@ export default function YemeniPlateWidget({
               الفاصل
             </span>
 
-            {/* Eastern Arabic Numeral for Divider: Strict LTR */}
+            {/* Eastern Arabic Numeral for Divider */}
             <div
               dir="ltr"
-              className="text-2xl sm:text-3xl font-black leading-none text-slate-950 pointer-events-none select-none flex items-center justify-center gap-2"
-              style={{ fontFamily: "'Amiri', 'Tajawal', serif" }}
+              className="arabic-plate-number text-2xl sm:text-3xl font-black leading-none text-slate-950 pointer-events-none select-none flex items-center justify-center gap-2"
             >
               {dividerDigitsAr.map((d, idx) => (
-                <span key={idx} className="inline-block text-center min-w-[1ch]">
+                <span key={idx} className="arabic-plate-number inline-block text-center min-w-[1ch]">
                   {d}
                 </span>
               ))}
             </div>
 
-            {/* Direct Input Field Inside Plate for Divider: Strict LTR */}
+            {/* Direct Input Field for Divider: Oswald-Bold font */}
             {editable ? (
               <input
                 ref={dividerInputRef}
@@ -211,12 +209,12 @@ export default function YemeniPlateWidget({
                 maxLength={2}
                 placeholder="1"
                 onChange={handleDividerChange}
-                className="w-full bg-transparent border-0 text-center font-mono font-black text-xl sm:text-2xl text-slate-950 leading-none mt-2 focus:outline-none focus:ring-0 placeholder-slate-950/25 selection:bg-slate-950/20"
+                className="english-plate-number w-full bg-transparent border-0 text-center font-black text-xl sm:text-2xl text-slate-950 leading-none mt-2 focus:outline-none focus:ring-0 placeholder-slate-950/25 selection:bg-slate-950/20"
               />
             ) : (
               <div
                 dir="ltr"
-                className="font-mono font-black text-xl sm:text-2xl text-slate-950 leading-none mt-2 text-center"
+                className="english-plate-number font-black text-xl sm:text-2xl text-slate-950 leading-none mt-2 text-center"
               >
                 {dividerEn}
               </div>

@@ -1,5 +1,37 @@
 @import "tailwindcss";
 
+/* تعريف الخطوط محلياً بدون الحاجة للإنترنت */
+@font-face {
+  font-family: 'YemenPlateArabic';
+  src: url('./assets/fonts/Amiri-Bold.ttf') format('truetype');
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'YemenPlateEnglish';
+  src: url('./assets/fonts/Oswald-Bold.ttf') format('truetype');
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+/* تطبيق التنسيق حصرياً داخل نموذج اللوحة فقط */
+.yemen-plate-container .arabic-plate-number {
+  font-family: 'YemenPlateArabic', serif !important;
+  font-weight: 700;
+  line-height: 1;
+  font-feature-settings: "locl" 1, "ss01" 1;
+}
+
+.yemen-plate-container .english-plate-number {
+  font-family: 'YemenPlateEnglish', sans-serif !important;
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: 2px;
+}
+
 @layer base {
   :root {
     --apple-font: 'Cairo', 'Segoe UI Arabic', 'Segoe UI', 'Tajawal', system-ui, -apple-system, sans-serif;
