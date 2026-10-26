@@ -302,6 +302,17 @@ export default function ClosingReport({ onOpenBayProfitability }) {
             className="min-h-[44px] px-3.5 rounded-2xl bg-slate-900 border border-white/15 text-white font-mono text-xs font-bold focus:outline-none focus:border-blue-400"
           />
 
+          {/* Shift Handover Modal Trigger */}
+          <button
+            type="button"
+            onClick={() => setShowShiftModal(true)}
+            className="min-h-[44px] px-3.5 rounded-2xl bg-purple-500/20 hover:bg-purple-500/30 text-purple-300 border border-purple-500/30 font-bold text-xs flex items-center gap-1.5 transition active:scale-95"
+            title="تسليم الوردية ومطابقة العهدة النقدية"
+          >
+            <Clock className="w-4 h-4 text-purple-400" />
+            <span className="hidden sm:inline">تسليم الوردية ⏱️</span>
+          </button>
+
           {/* Print A4 */}
           <button
             type="button"
@@ -1104,3 +1115,5 @@ export default function ClosingReport({ onOpenBayProfitability }) {
     </div>
   );
 }
+// Clean verified build
+
