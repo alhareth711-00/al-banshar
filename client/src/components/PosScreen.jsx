@@ -42,6 +42,7 @@ import QuickGridConfigModal from './QuickGridConfigModal';
 import OilSelectorModal from './OilSelectorModal';
 import ProductPickerModal from './ProductPickerModal';
 import InvoiceReceiptModal from './InvoiceReceiptModal';
+import PendingServicesModal from './PendingServicesModal';
 import VehicleHistoryDrawer from './VehicleHistoryDrawer';
 import ReceiptVoucherModal from './ReceiptVoucherModal';
 import {
@@ -144,6 +145,10 @@ export default function PosScreen({
   const [isVoidingInvoice, setIsVoidingInvoice] = useState(false);
   const [cartNoticeMessage, setCartNoticeMessage] = useState('');
   const [clearCartConfirmPending, setClearCartConfirmPending] = useState(false);
+
+  // Active Bay Services State
+  const [showPendingServicesModal, setShowPendingServicesModal] = useState(false);
+  const [pendingServicesCount, setPendingServicesCount] = useState(0);
 
   // Safety Inspection Capsule State (8 points)
   const [safetyPoints, setSafetyPoints] = useState({

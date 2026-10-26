@@ -41,6 +41,7 @@ export default function ClosingReport({ onOpenBayProfitability }) {
   const [currentShiftData, setCurrentShiftData] = useState(null);
   const [showShiftModal, setShowShiftModal] = useState(false);
   const [printLayout, setPrintLayout] = useState('a4'); // 'a4' or 'thermal80'
+  const [reportStyle, setReportStyle] = useState('tactical'); // 'tactical' (1), 'glass' (2), 'split' (3)
 
   const settings = getShopSettings();
   const enableShiftsMode = !!settings.enableShiftsMode;
@@ -273,6 +274,46 @@ export default function ClosingReport({ onOpenBayProfitability }) {
 
         {/* Date & Actions */}
         <div className="flex flex-wrap items-center gap-2">
+          {/* Live 3-Variant Style Switcher */}
+          <div className="flex items-center bg-slate-950 border border-amber-500/40 rounded-2xl p-1 gap-1 shadow-lg">
+            <span className="text-[10px] font-black text-amber-400 px-2 flex items-center gap-1">
+              <span>الشكل:</span>
+            </span>
+            <button
+              type="button"
+              onClick={() => setReportStyle('tactical')}
+              className={`px-3 py-1.5 rounded-xl font-black text-xs transition ${
+                reportStyle === 'tactical'
+                  ? 'bg-amber-500 text-slate-950 shadow-md ring-1 ring-amber-300'
+                  : 'text-slate-400 hover:text-white'
+              }`}
+            >
+              1. تكتيكي سريع
+            </button>
+            <button
+              type="button"
+              onClick={() => setReportStyle('glass')}
+              className={`px-3 py-1.5 rounded-xl font-black text-xs transition ${
+                reportStyle === 'glass'
+                  ? 'bg-blue-500 text-white shadow-md ring-1 ring-blue-300'
+                  : 'text-slate-400 hover:text-white'
+              }`}
+            >
+              2. قمرة القيادة
+            </button>
+            <button
+              type="button"
+              onClick={() => setReportStyle('split')}
+              className={`px-3 py-1.5 rounded-xl font-black text-xs transition ${
+                reportStyle === 'split'
+                  ? 'bg-purple-500 text-white shadow-md ring-1 ring-purple-300'
+                  : 'text-slate-400 hover:text-white'
+              }`}
+            >
+              3. كونسول مزدوج
+            </button>
+          </div>
+
           {/* Quick Date Pills */}
           <div className="flex items-center bg-slate-900 border border-white/15 rounded-2xl p-1 gap-1">
             <button
@@ -401,508 +442,911 @@ export default function ClosingReport({ onOpenBayProfitability }) {
           </div>
         )}
 
-        {/* DUAL WHATSAPP OWNER & SUPERVISOR DIRECT DISPATCH CARD (UPGRADE 2) */}
-        <div className="apple-glass rounded-3xl p-5 border border-emerald-500/30 bg-gradient-to-r from-emerald-500/15 via-slate-900/80 to-slate-900/90 flex flex-col lg:flex-row items-center justify-between gap-4 shadow-xl shadow-emerald-950/20">
-          <div className="flex items-center gap-3.5">
-            <div className="w-12 h-12 rounded-2xl bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 flex items-center justify-center flex-shrink-0">
-              <MessageSquare className="w-6 h-6 stroke-[2.2] fill-emerald-500/30" />
-            </div>
-            <div>
-              <div className="font-extrabold text-white text-base flex items-center gap-2">
-                <span>تقرير الإغلاق المالي لمالك المركز جاهز للإرسال الفوري</span>
-                <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 font-bold border border-emerald-500/30">
-                  بنقرة واحدة
-                </span>
+        {/* ============================================================== */}
+        {/* VARIANT 1: TACTICAL COMMAND FEED (الشريط التكتيكي السريع) */}
+        {/* ============================================================== */}
+        {reportStyle === 'tactical' && (
+          <div className="space-y-4">
+            {/* Quick Metrics Tactical Strip */}
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 font-mono">
+              <div className="p-4 rounded-2xl bg-slate-900 border-2 border-emerald-500/40 shadow-lg shadow-emerald-950/20">
+                <div className="text-[11px] font-bold text-emerald-400 font-sans flex items-center justify-between">
+                  <span>💵 رصيد الصندوق الدفتري (1101)</span>
+                  <span className="text-[9px] bg-emerald-500/20 px-1.5 py-0.5 rounded text-emerald-300">مباشر</span>
+                </div>
+                <div className="text-2xl font-black text-emerald-400 mt-1">
+                  {liveDrawerBal.toLocaleString()} <span className="text-xs font-sans text-slate-400">ر.ي</span>
+                </div>
+                <div className="text-[10px] text-slate-400 font-sans mt-1 flex items-center justify-between border-t border-white/5 pt-1">
+                  <span className="text-emerald-400">+{cash_register.total_cash_inflow.toLocaleString()} داخل</span>
+                  <span className="text-rose-400">-{cash_register.total_cash_outflow.toLocaleString()} خارج</span>
+                </div>
               </div>
-              <div className="text-xs text-slate-300 mt-0.5">
-                {supervisorWhatsAppUrl ? (
-                  <span>
-                    متاح الإرسال الفوري لرقم المالك (<b className="text-white font-mono">{settings.ownerPhone}</b>) ورقم المشرف (<b className="text-indigo-300 font-mono">{settings.supervisorPhone}</b>)
+
+              <div className="p-4 rounded-2xl bg-slate-900 border-2 border-amber-500/40 shadow-lg shadow-amber-950/20">
+                <div className="text-[11px] font-bold text-amber-400 font-sans flex items-center justify-between">
+                  <span>💰 صافي الربح اليومي التقديري</span>
+                  <span className="text-[9px] bg-amber-500/20 px-1.5 py-0.5 rounded text-amber-300 font-mono">
+                    {execPulse.net_margin_pct}%
                   </span>
-                ) : (
-                  <span>
-                    إرسال الملخص المالي والتشغيلي المباشر إلى رقم المالك ({settings.ownerPhone})
+                </div>
+                <div className={`text-2xl font-black mt-1 ${execPulse.net_profit >= 0 ? 'text-amber-400' : 'text-rose-400'}`}>
+                  {execPulse.net_profit.toLocaleString()} <span className="text-xs font-sans text-slate-400">ر.ي</span>
+                </div>
+                <div className="text-[10px] text-slate-400 font-sans mt-1 flex items-center justify-between border-t border-white/5 pt-1">
+                  <span>إجمالي: <b className="text-white font-mono">{execPulse.gross_profit.toLocaleString()}</b></span>
+                  <span>تغطية: <b className="text-blue-300 font-mono">{execPulse.expense_coverage_ratio}%</b></span>
+                </div>
+              </div>
+
+              <div className="p-4 rounded-2xl bg-slate-900 border border-white/15 shadow-lg">
+                <div className="text-[11px] font-bold text-blue-400 font-sans flex items-center justify-between">
+                  <span>🚗 السيارات المخدومة</span>
+                  <span className="text-[9px] bg-blue-500/20 px-1.5 py-0.5 rounded text-blue-300">
+                    {summary.total_invoices} فاتورة
                   </span>
+                </div>
+                <div className="text-2xl font-black text-white mt-1">
+                  {summary.total_cars_served} <span className="text-xs font-sans text-slate-400">سيارة</span>
+                </div>
+                <div className="text-[10px] text-slate-400 font-sans mt-1 flex items-center justify-between border-t border-white/5 pt-1">
+                  <span>مبيعات: <b className="text-white font-mono">{summary.total_net_sales.toLocaleString()}</b></span>
+                  {renderGrowthBadge(vsYest.cars_growth_pct, 'مقارنة بالأمس')}
+                </div>
+              </div>
+
+              <div className="p-4 rounded-2xl bg-slate-900 border border-white/15 shadow-lg">
+                <div className="text-[11px] font-bold text-purple-400 font-sans flex items-center justify-between">
+                  <span>⏱️ ساعة الذروة ومتوسط الفاتورة</span>
+                  <span className="text-[9px] bg-purple-500/20 px-1.5 py-0.5 rounded text-purple-300">
+                    {peakHour.label || '04:00 م'}
+                  </span>
+                </div>
+                <div className="text-2xl font-black text-purple-300 mt-1">
+                  {avgTicket.toLocaleString()} <span className="text-xs font-sans text-slate-400">ر.ي/سيارة</span>
+                </div>
+                <div className="text-[10px] text-slate-400 font-sans mt-1 flex items-center justify-between border-t border-white/5 pt-1">
+                  <span>كثافة: <b className="text-white font-mono">{peakHour.cars_count || 0} سيارات</b></span>
+                  <span>محافظ: <b className="text-purple-300 font-mono">{payment_methods_breakdown.e_wallets.total.toLocaleString()}</b></span>
+                </div>
+              </div>
+            </div>
+
+            {/* Tactical Fast Dispatch Strip */}
+            <div className="p-4 rounded-2xl bg-slate-900 border border-white/15 flex flex-wrap items-center justify-between gap-3 shadow-lg">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 flex items-center justify-center font-black">
+                  <MessageSquare className="w-5 h-5" />
+                </div>
+                <div>
+                  <div className="font-extrabold text-white text-sm flex items-center gap-2">
+                    <span>إرسال تقرير الإغلاق المالي الفوري لمالك المركز</span>
+                    <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 font-bold border border-emerald-500/30">
+                      تحديث بنقرة واحدة
+                    </span>
+                  </div>
+                  <div className="text-xs text-slate-400 mt-0.5">
+                    الأرقام المعتمدة: المالك ({settings.ownerPhone}) {settings.supervisorPhone ? `| المشرف (${settings.supervisorPhone})` : ''}
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-2">
+                <a
+                  href={ownerWhatsAppUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-emerald-500 to-green-600 hover:from-emerald-400 hover:to-green-500 text-slate-950 font-black text-xs flex items-center gap-1.5 shadow-lg shadow-emerald-500/20 transition active:scale-95"
+                >
+                  <Smartphone className="w-4 h-4" />
+                  <span>إرسال لواتساب المالك 📲</span>
+                </a>
+                {supervisorWhatsAppUrl && (
+                  <a
+                    href={supervisorWhatsAppUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-black text-xs flex items-center gap-1.5 shadow-lg transition active:scale-95"
+                  >
+                    <Smartphone className="w-4 h-4" />
+                    <span>المشرف 📲</span>
+                  </a>
+                )}
+                <button
+                  type="button"
+                  onClick={handleCopy}
+                  className="px-3.5 py-2.5 rounded-xl bg-white/10 hover:bg-white/20 text-white font-bold text-xs flex items-center gap-1.5 transition active:scale-95"
+                >
+                  {copied ? <Check className="w-4 h-4 text-emerald-400 stroke-[3]" /> : <Copy className="w-4 h-4" />}
+                  <span>{copied ? 'تم النسخ!' : 'نسخ النص'}</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handlePrint('thermal80')}
+                  className="px-3.5 py-2.5 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/30 font-bold text-xs flex items-center gap-1.5 transition active:scale-95"
+                >
+                  <Receipt className="w-4 h-4" />
+                  <span>طابعة 80mm</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Tactical Heatmap Strip */}
+            <div className="p-4 rounded-2xl bg-slate-900 border border-white/15 space-y-3 shadow-lg">
+              <div className="flex items-center justify-between text-xs">
+                <div className="font-extrabold text-white flex items-center gap-2">
+                  <Flame className="w-4 h-4 text-amber-400" />
+                  <span>خريطة ساعات الذروة وكثافة استقبال السيارات اليومية</span>
+                </div>
+                <div className="text-[11px] text-amber-400 font-mono font-bold">
+                  ساعة الذروة: {peakHour.label || '04:00 م'} ({peakHour.cars_count || 0} سيارات)
+                </div>
+              </div>
+
+              <div className="grid grid-cols-8 sm:grid-cols-12 md:grid-cols-17 gap-1.5 items-end h-24 pt-3 pb-1 px-1 bg-slate-950 rounded-xl border border-white/10 overflow-x-auto">
+                {filteredTimeline.map((item) => {
+                  const isPeak = item.cars_count > 0 && item.hour_str === peakHour.hour_str;
+                  const heightPct = item.cars_count > 0 ? Math.max(15, Math.round((item.cars_count / maxTimelineCars) * 100)) : 6;
+                  return (
+                    <div
+                      key={item.hour}
+                      className="flex flex-col items-center justify-end h-full group relative"
+                      title={`${item.label}: ${item.cars_count} سيارة (${Number(item.total_sales).toLocaleString()} ر.ي)`}
+                    >
+                      <div
+                        style={{ height: `${heightPct}%` }}
+                        className={`w-full rounded-t-lg transition-all ${
+                          isPeak
+                            ? 'bg-amber-400 shadow-md shadow-amber-500/30 ring-1 ring-amber-300'
+                            : item.cars_count > 0
+                            ? 'bg-blue-500/60 hover:bg-blue-400'
+                            : 'bg-slate-800/40'
+                        }`}
+                      />
+                      <div className="text-[9px] font-mono text-slate-400 mt-1 truncate w-full text-center">
+                        {String(item.hour % 12 === 0 ? 12 : item.hour % 12)}
+                        <span className="text-[7px] text-slate-500">{item.hour < 12 ? 'ص' : 'م'}</span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Tactical Technical Data Split (Oil/Filters vs Low Stock Alerts) */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
+              <div className="p-4 rounded-2xl bg-slate-900 border border-white/15 space-y-3">
+                <div className="font-extrabold text-white flex items-center justify-between border-b border-white/10 pb-2">
+                  <span className="flex items-center gap-1.5">
+                    <Droplets className="w-4 h-4 text-amber-400" />
+                    <span>حركة عبوات الزيوت والفلاتر</span>
+                  </span>
+                  <span className="text-[10px] text-slate-400 font-mono">اليوم</span>
+                </div>
+                <div className="grid grid-cols-3 gap-2 text-center font-mono">
+                  <div className="p-2.5 rounded-xl bg-slate-950 border border-white/10">
+                    <div className="text-[10px] text-slate-400 font-sans">عبوة 4 لتر</div>
+                    <div className="text-lg font-black text-amber-400 mt-0.5">{oil_sales.packs_summary['4L']}</div>
+                  </div>
+                  <div className="p-2.5 rounded-xl bg-slate-950 border border-white/10">
+                    <div className="text-[10px] text-slate-400 font-sans">عبوة 1 لتر</div>
+                    <div className="text-lg font-black text-amber-400 mt-0.5">{oil_sales.packs_summary['1L']}</div>
+                  </div>
+                  <div className="p-2.5 rounded-xl bg-slate-950 border border-white/10">
+                    <div className="text-[10px] text-slate-400 font-sans">عبوة 5 لتر</div>
+                    <div className="text-lg font-black text-amber-400 mt-0.5">{oil_sales.packs_summary['5L']}</div>
+                  </div>
+                </div>
+                <div className="p-2.5 rounded-xl bg-slate-950 border border-white/5 space-y-1 font-mono text-[11px]">
+                  <div className="flex justify-between text-slate-300">
+                    <span className="font-sans text-slate-400">فلاتر زيت مباعة:</span>
+                    <b className="text-emerald-400">{oilFiltersCount} قطعة</b>
+                  </div>
+                  <div className="flex justify-between text-slate-300">
+                    <span className="font-sans text-slate-400">فلاتر هواء ومكيف:</span>
+                    <b className="text-emerald-400">{airFiltersCount + cabinFiltersCount} قطعة</b>
+                  </div>
+                </div>
+              </div>
+
+              <div className="p-4 rounded-2xl bg-slate-900 border border-rose-500/30 space-y-3">
+                <div className="font-extrabold text-white flex items-center justify-between border-b border-rose-500/20 pb-2">
+                  <span className="flex items-center gap-1.5 text-rose-300">
+                    <AlertTriangle className="w-4 h-4 text-rose-400" />
+                    <span>نواقص المخزن الحرجة ({low_stock_alerts.length})</span>
+                  </span>
+                  <span className="text-[10px] text-rose-400 font-mono">حد الأمان</span>
+                </div>
+                <div className="space-y-2 max-h-40 overflow-y-auto pr-1">
+                  {low_stock_alerts.length === 0 ? (
+                    <div className="p-5 text-center text-slate-400 text-xs">المخزون كافي ولا توجد نواقص تشغيلية</div>
+                  ) : (
+                    low_stock_alerts.map((ls) => (
+                      <div
+                        key={ls.id}
+                        className="p-2.5 rounded-xl bg-rose-500/10 border border-rose-500/20 flex items-center justify-between text-xs"
+                      >
+                        <div>
+                          <div className="font-extrabold text-white text-xs">{ls.name}</div>
+                          <div className="text-[10px] text-slate-400 font-mono">{ls.brand} &bull; {ls.pack_size}</div>
+                        </div>
+                        <div className="text-left font-mono font-bold text-rose-400">
+                          متبقي: {ls.stock_qty} (حد الأمان {ls.min_stock_alert})
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Tactical WhatsApp Text Preview */}
+            <div className="p-4 rounded-2xl bg-slate-900 border border-white/15 space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-extrabold text-slate-300 flex items-center gap-1.5">
+                  <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+                  <span>معاينة نص التقرير الصادر للمالك:</span>
+                </span>
+                <button
+                  type="button"
+                  onClick={handleCopy}
+                  className="text-xs text-amber-400 hover:text-amber-300 font-bold flex items-center gap-1"
+                >
+                  <Copy className="w-3.5 h-3.5" />
+                  <span>{copied ? 'تم النسخ!' : 'نسخ النص'}</span>
+                </button>
+              </div>
+              <pre className="p-3 rounded-xl bg-slate-950 border border-white/10 text-[11px] font-mono text-slate-200 leading-relaxed whitespace-pre-wrap max-h-36 overflow-y-auto">
+                {ownerBriefMessage}
+              </pre>
+            </div>
+          </div>
+        )}
+
+        {/* ============================================================== */}
+        {/* VARIANT 2: EXECUTIVE GLASS COCKPIT (قمرة القيادة الفاخرة) */}
+        {/* ============================================================== */}
+        {reportStyle === 'glass' && (
+          <div className="space-y-4">
+            {/* DUAL WHATSAPP DIRECT DISPATCH CARD */}
+            <div className="apple-glass rounded-3xl p-5 border border-emerald-500/30 bg-gradient-to-r from-emerald-500/15 via-slate-900/80 to-slate-900/90 flex flex-col lg:flex-row items-center justify-between gap-4 shadow-xl shadow-emerald-950/20">
+              <div className="flex items-center gap-3.5">
+                <div className="w-12 h-12 rounded-2xl bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 flex items-center justify-center flex-shrink-0">
+                  <MessageSquare className="w-6 h-6 stroke-[2.2] fill-emerald-500/30" />
+                </div>
+                <div>
+                  <div className="font-extrabold text-white text-base flex items-center gap-2">
+                    <span>تقرير الإغلاق المالي لمالك المركز جاهز للإرسال الفوري</span>
+                    <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 font-bold border border-emerald-500/30">
+                      بنقرة واحدة
+                    </span>
+                  </div>
+                  <div className="text-xs text-slate-300 mt-0.5">
+                    {supervisorWhatsAppUrl ? (
+                      <span>
+                        متاح الإرسال الفوري لرقم المالك (<b className="text-white font-mono">{settings.ownerPhone}</b>) ورقم المشرف (<b className="text-indigo-300 font-mono">{settings.supervisorPhone}</b>)
+                      </span>
+                    ) : (
+                      <span>
+                        إرسال الملخص المالي والتشغيلي المباشر إلى رقم المالك ({settings.ownerPhone})
+                      </span>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-2.5 w-full lg:w-auto">
+                <a
+                  href={ownerWhatsAppUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex-1 lg:flex-none min-h-[48px] px-5 rounded-2xl bg-gradient-to-r from-emerald-500 to-green-600 hover:from-emerald-400 hover:to-green-500 text-slate-950 font-extrabold text-xs shadow-xl shadow-emerald-500/25 flex items-center justify-center gap-2 transition active:scale-95"
+                >
+                  <Smartphone className="w-4 h-4" />
+                  <span>إرسال لواتساب المالك 📲</span>
+                </a>
+
+                {supervisorWhatsAppUrl && (
+                  <a
+                    href={supervisorWhatsAppUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex-1 lg:flex-none min-h-[48px] px-5 rounded-2xl bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-400 hover:to-purple-500 text-white font-extrabold text-xs shadow-xl shadow-indigo-500/25 flex items-center justify-center gap-2 transition active:scale-95"
+                  >
+                    <Smartphone className="w-4 h-4" />
+                    <span>إرسال لواتساب المشرف 📲</span>
+                  </a>
                 )}
               </div>
             </div>
-          </div>
 
-          {/* Action Buttons (Dual or Single) */}
-          <div className="flex flex-wrap items-center gap-2.5 w-full lg:w-auto">
-            <a
-              href={ownerWhatsAppUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex-1 lg:flex-none min-h-[48px] px-5 rounded-2xl bg-gradient-to-r from-emerald-500 to-green-600 hover:from-emerald-400 hover:to-green-500 text-slate-950 font-extrabold text-xs shadow-xl shadow-emerald-500/25 flex items-center justify-center gap-2 transition active:scale-95"
-            >
-              <Smartphone className="w-4 h-4" />
-              <span>إرسال لواتساب المالك 📲</span>
-            </a>
+            {/* EXECUTIVE PULSE & FINANCIAL HEALTH */}
+            <div className="apple-glass rounded-3xl p-5 border border-amber-500/30 bg-gradient-to-r from-amber-500/10 via-slate-900/80 to-slate-900/90 space-y-4 shadow-xl">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-9 h-9 rounded-xl bg-amber-500/20 text-amber-400 border border-amber-500/30 flex items-center justify-center">
+                    <BarChart2 className="w-5 h-5 stroke-[2.2]" />
+                  </div>
+                  <div>
+                    <h3 className="font-black text-sm text-white flex items-center gap-2">
+                      <span>النبض المالي والتقرير التنفيذي الشامل (Executive Profitability Pulse)</span>
+                      <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 font-bold border border-amber-500/30 font-mono">
+                        اليوم {reportDate}
+                      </span>
+                    </h3>
+                    <p className="text-[11px] text-slate-400">
+                      تحليل فوري لصافي العائد والربح التشغيلي بعد خصم تكلفة البضاعة (COGS) والمصروفات اليومية
+                    </p>
+                  </div>
+                </div>
 
-            {supervisorWhatsAppUrl && (
-              <a
-                href={supervisorWhatsAppUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex-1 lg:flex-none min-h-[48px] px-5 rounded-2xl bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-400 hover:to-purple-500 text-white font-extrabold text-xs shadow-xl shadow-indigo-500/25 flex items-center justify-center gap-2 transition active:scale-95"
-              >
-                <Smartphone className="w-4 h-4" />
-                <span>إرسال لواتساب المشرف 📲</span>
-              </a>
-            )}
-          </div>
-        </div>
-
-        {/* EXECUTIVE PULSE & FINANCIAL HEALTH (الجزء الرابع: النبض المالي وصافي الأرباح التقديري ومعدل تغطية المصروفات) */}
-        <div className="apple-glass rounded-3xl p-5 border border-amber-500/30 bg-gradient-to-r from-amber-500/10 via-slate-900/80 to-slate-900/90 space-y-4 shadow-xl">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2.5">
-              <div className="w-9 h-9 rounded-xl bg-amber-500/20 text-amber-400 border border-amber-500/30 flex items-center justify-center">
-                <BarChart2 className="w-5 h-5 stroke-[2.2]" />
-              </div>
-              <div>
-                <h3 className="font-black text-sm text-white flex items-center gap-2">
-                  <span>النبض المالي والتقرير التنفيذي الشامل (Executive Profitability Pulse)</span>
-                  <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 font-bold border border-amber-500/30 font-mono">
-                    اليوم {reportDate}
+                <div className="hidden sm:flex items-center gap-2">
+                  <span className={`px-2.5 py-1 rounded-xl text-xs font-mono font-bold border flex items-center gap-1.5 ${
+                    execPulse.net_profit >= 0
+                      ? 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30'
+                      : 'bg-rose-500/15 text-rose-300 border-rose-500/30'
+                  }`}>
+                    <ShieldCheck className="w-3.5 h-3.5" />
+                    <span>{execPulse.net_profit >= 0 ? 'نشاط رابح اليوم' : 'عجز تشغيلي'}</span>
                   </span>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 text-xs">
+                <div className="p-4 rounded-2xl bg-slate-900/90 border border-white/10 space-y-2 shadow-inner">
+                  <div className="flex justify-between items-center text-slate-400">
+                    <span className="font-bold flex items-center gap-1">
+                      <DollarSign className="w-3.5 h-3.5 text-emerald-400" />
+                      <span>صافي الربح التقديري:</span>
+                    </span>
+                    <span className="text-[10px] px-1.5 py-0.2 rounded bg-emerald-500/20 text-emerald-300 font-mono font-bold">
+                      هامش {execPulse.net_margin_pct}%
+                    </span>
+                  </div>
+                  <div className={`font-mono text-xl font-black ${execPulse.net_profit >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+                    {execPulse.net_profit.toLocaleString()} <span className="text-xs font-normal">ر.ي</span>
+                  </div>
+                  <div className="text-[11px] text-slate-400 pt-1 border-t border-white/5 flex justify-between">
+                    <span>الربح الإجمالي:</span>
+                    <span className="font-mono font-bold text-slate-200">{execPulse.gross_profit.toLocaleString()} ر.ي</span>
+                  </div>
+                </div>
+
+                <div className="p-4 rounded-2xl bg-slate-900/90 border border-white/10 space-y-2 shadow-inner">
+                  <div className="flex justify-between items-center text-slate-400">
+                    <span className="font-bold flex items-center gap-1">
+                      <ShieldCheck className="w-3.5 h-3.5 text-blue-400" />
+                      <span>تغطية المصروفات:</span>
+                    </span>
+                    <span className={`text-[10px] px-1.5 py-0.2 rounded font-mono font-bold ${
+                      execPulse.expense_coverage_ratio >= 100
+                        ? 'bg-blue-500/20 text-blue-300 border border-blue-500/30'
+                        : 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
+                    }`}>
+                      {execPulse.expense_coverage_ratio >= 100 ? 'تغطية آمنة' : 'دون التغطية'}
+                    </span>
+                  </div>
+                  <div className="font-mono text-xl font-black text-blue-400">
+                    {execPulse.expense_coverage_ratio}%
+                  </div>
+                  <div className="text-[11px] text-slate-400 pt-1 border-t border-white/5 flex justify-between">
+                    <span>المصاريف المنصرفة:</span>
+                    <span className="font-mono font-bold text-rose-300">{transactions_summary.expenses_total.toLocaleString()} ر.ي</span>
+                  </div>
+                </div>
+
+                <div className="p-4 rounded-2xl bg-slate-900/90 border border-white/10 space-y-2 shadow-inner">
+                  <div className="flex justify-between items-center text-slate-400">
+                    <span className="font-bold flex items-center gap-1">
+                      <Layers className="w-3.5 h-3.5 text-amber-400" />
+                      <span>تكلفة البضاعة (COGS):</span>
+                    </span>
+                    <span className="text-[10px] text-slate-400 font-mono">سعر الشراء</span>
+                  </div>
+                  <div className="font-mono text-xl font-black text-amber-400">
+                    {execPulse.total_cogs.toLocaleString()} <span className="text-xs font-normal">ر.ي</span>
+                  </div>
+                  <div className="text-[11px] text-slate-400 pt-1 border-t border-white/5 flex justify-between">
+                    <span>إجمالي المبيعات:</span>
+                    <span className="font-mono font-bold text-white">{summary.total_net_sales.toLocaleString()} ر.ي</span>
+                  </div>
+                </div>
+
+                <div className="p-4 rounded-2xl bg-slate-900/90 border border-white/10 space-y-1.5 shadow-inner">
+                  <div className="flex justify-between items-center text-slate-400 mb-1">
+                    <span className="font-bold flex items-center gap-1">
+                      <PieChart className="w-3.5 h-3.5 text-purple-400" />
+                      <span>توزيع مبيعات النشاط:</span>
+                    </span>
+                    <span className="text-[10px] text-purple-300 font-mono font-bold">5 تصنيفات</span>
+                  </div>
+                  <div className="space-y-1 text-[11px] font-mono">
+                    <div className="flex justify-between text-slate-300">
+                      <span className="text-slate-400">🛢️ زيوت:</span>
+                      <span className="font-bold">{execPulse.category_breakdown.oil.toLocaleString()} ر.ي</span>
+                    </div>
+                    <div className="flex justify-between text-slate-300">
+                      <span className="text-slate-400">🔧 فلاتر:</span>
+                      <span className="font-bold">{execPulse.category_breakdown.filter.toLocaleString()} ر.ي</span>
+                    </div>
+                    <div className="flex justify-between text-slate-300">
+                      <span className="text-slate-400">🛞 إطارات:</span>
+                      <span className="font-bold">{execPulse.category_breakdown.tire.toLocaleString()} ر.ي</span>
+                    </div>
+                    <div className="flex justify-between text-slate-300">
+                      <span className="text-slate-400">⚡ بطاريات:</span>
+                      <span className="font-bold">{execPulse.category_breakdown.battery.toLocaleString()} ر.ي</span>
+                    </div>
+                    <div className="flex justify-between text-slate-300">
+                      <span className="text-slate-400">🛠️ خدمات ومصنعية:</span>
+                      <span className="font-bold text-purple-300">{execPulse.category_breakdown.service.toLocaleString()} ر.ي</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* PERFORMANCE COMPARISON & GROWTH RADAR */}
+            <div className="apple-glass rounded-3xl p-5 border border-white/10 space-y-3">
+              <div className="flex items-center justify-between">
+                <h3 className="font-extrabold text-sm text-white flex items-center gap-2">
+                  <Activity className="w-4 h-4 text-blue-400" />
+                  <span>مؤشرات نمو الأداء والنشاط التشغيلي مقارنة بالفترات السابقة (Growth Radar):</span>
                 </h3>
-                <p className="text-[11px] text-slate-400">
-                  تحليل فوري لصافي العائد والربح التشغيلي بعد خصم تكلفة البضاعة (COGS) والمصروفات اليومية
-                </p>
+                <span className="text-[11px] text-slate-400 font-mono">
+                  تاريخ المقارنة: {reportDate}
+                </span>
               </div>
-            </div>
 
-            <div className="hidden sm:flex items-center gap-2">
-              <span className={`px-2.5 py-1 rounded-xl text-xs font-mono font-bold border flex items-center gap-1.5 ${
-                execPulse.net_profit >= 0
-                  ? 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30'
-                  : 'bg-rose-500/15 text-rose-300 border-rose-500/30'
-              }`}>
-                <ShieldCheck className="w-3.5 h-3.5" />
-                <span>{execPulse.net_profit >= 0 ? 'نشاط رابح اليوم' : 'عجز تشغيلي'}</span>
-              </span>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 text-xs">
-            {/* Card 1: Estimated Net Profit */}
-            <div className="p-4 rounded-2xl bg-slate-900/90 border border-white/10 space-y-2 shadow-inner">
-              <div className="flex justify-between items-center text-slate-400">
-                <span className="font-bold flex items-center gap-1">
-                  <DollarSign className="w-3.5 h-3.5 text-emerald-400" />
-                  <span>صافي الربح التقديري:</span>
-                </span>
-                <span className="text-[10px] px-1.5 py-0.2 rounded bg-emerald-500/20 text-emerald-300 font-mono font-bold">
-                  هامش {execPulse.net_margin_pct}%
-                </span>
-              </div>
-              <div className={`font-mono text-xl font-black ${execPulse.net_profit >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
-                {execPulse.net_profit.toLocaleString()} <span className="text-xs font-normal">ر.ي</span>
-              </div>
-              <div className="text-[11px] text-slate-400 pt-1 border-t border-white/5 flex justify-between">
-                <span>الربح الإجمالي:</span>
-                <span className="font-mono font-bold text-slate-200">{execPulse.gross_profit.toLocaleString()} ر.ي</span>
-              </div>
-            </div>
-
-            {/* Card 2: Expense Coverage Ratio */}
-            <div className="p-4 rounded-2xl bg-slate-900/90 border border-white/10 space-y-2 shadow-inner">
-              <div className="flex justify-between items-center text-slate-400">
-                <span className="font-bold flex items-center gap-1">
-                  <ShieldCheck className="w-3.5 h-3.5 text-blue-400" />
-                  <span>تغطية المصروفات:</span>
-                </span>
-                <span className={`text-[10px] px-1.5 py-0.2 rounded font-mono font-bold ${
-                  execPulse.expense_coverage_ratio >= 100
-                    ? 'bg-blue-500/20 text-blue-300 border border-blue-500/30'
-                    : 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
-                }`}>
-                  {execPulse.expense_coverage_ratio >= 100 ? 'تغطية آمنة' : 'دون التغطية'}
-                </span>
-              </div>
-              <div className="font-mono text-xl font-black text-blue-400">
-                {execPulse.expense_coverage_ratio}%
-              </div>
-              <div className="text-[11px] text-slate-400 pt-1 border-t border-white/5 flex justify-between">
-                <span>المصاريف المنصرفة:</span>
-                <span className="font-mono font-bold text-rose-300">{transactions_summary.expenses_total.toLocaleString()} ر.ي</span>
-              </div>
-            </div>
-
-            {/* Card 3: COGS vs Sales */}
-            <div className="p-4 rounded-2xl bg-slate-900/90 border border-white/10 space-y-2 shadow-inner">
-              <div className="flex justify-between items-center text-slate-400">
-                <span className="font-bold flex items-center gap-1">
-                  <Layers className="w-3.5 h-3.5 text-amber-400" />
-                  <span>تكلفة البضاعة (COGS):</span>
-                </span>
-                <span className="text-[10px] text-slate-400 font-mono">سعر الشراء</span>
-              </div>
-              <div className="font-mono text-xl font-black text-amber-400">
-                {execPulse.total_cogs.toLocaleString()} <span className="text-xs font-normal">ر.ي</span>
-              </div>
-              <div className="text-[11px] text-slate-400 pt-1 border-t border-white/5 flex justify-between">
-                <span>إجمالي المبيعات:</span>
-                <span className="font-mono font-bold text-white">{summary.total_net_sales.toLocaleString()} ر.ي</span>
-              </div>
-            </div>
-
-            {/* Card 4: Sales Mix Breakdown */}
-            <div className="p-4 rounded-2xl bg-slate-900/90 border border-white/10 space-y-1.5 shadow-inner">
-              <div className="flex justify-between items-center text-slate-400 mb-1">
-                <span className="font-bold flex items-center gap-1">
-                  <PieChart className="w-3.5 h-3.5 text-purple-400" />
-                  <span>توزيع مبيعات النشاط:</span>
-                </span>
-                <span className="text-[10px] text-purple-300 font-mono font-bold">5 تصنيفات</span>
-              </div>
-              <div className="space-y-1 text-[11px] font-mono">
-                <div className="flex justify-between text-slate-300">
-                  <span className="text-slate-400">🛢️ زيوت:</span>
-                  <span className="font-bold">{execPulse.category_breakdown.oil.toLocaleString()} ر.ي</span>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 text-xs">
+                <div className="p-4 rounded-2xl bg-slate-900/80 border border-white/10 space-y-2">
+                  <div className="flex justify-between items-center text-slate-400">
+                    <span className="font-bold">حركة السيارات المخدومة:</span>
+                    <span className="font-black text-white text-sm font-mono">{summary.total_cars_served} سيارة</span>
+                  </div>
+                  <div className="flex items-center justify-between pt-1 border-t border-white/5">
+                    <span className="text-slate-400 text-[11px]">مقارنة بالأمس:</span>
+                    {renderGrowthBadge(vsYest.cars_growth_pct, 'نسبة نمو السيارات مقارنة بالأمس')}
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-slate-400 text-[11px]">مقارنة بالأسبوع الماضي:</span>
+                    {renderGrowthBadge(vsLastWeek.cars_growth_pct, 'نسبة نمو السيارات مقارنة بنفس اليوم الأسبوع الماضي')}
+                  </div>
                 </div>
-                <div className="flex justify-between text-slate-300">
-                  <span className="text-slate-400">🔧 فلاتر:</span>
-                  <span className="font-bold">{execPulse.category_breakdown.filter.toLocaleString()} ر.ي</span>
+
+                <div className="p-4 rounded-2xl bg-slate-900/80 border border-white/10 space-y-2">
+                  <div className="flex justify-between items-center text-slate-400">
+                    <span className="font-bold">إجمالي المبيعات الصافية:</span>
+                    <span className="font-black text-blue-400 text-sm font-mono">{summary.total_net_sales.toLocaleString()} ر.ي</span>
+                  </div>
+                  <div className="flex items-center justify-between pt-1 border-t border-white/5">
+                    <span className="text-slate-400 text-[11px]">مقارنة بالأمس:</span>
+                    {renderGrowthBadge(vsYest.sales_growth_pct, 'نسبة نمو المبيعات مقارنة بالأمس')}
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-slate-400 text-[11px]">مقارنة بالأسبوع الماضي:</span>
+                    {renderGrowthBadge(vsLastWeek.sales_growth_pct, 'نسبة نمو المبيعات مقارنة بنفس اليوم الأسبوع الماضي')}
+                  </div>
                 </div>
-                <div className="flex justify-between text-slate-300">
-                  <span className="text-slate-400">🛞 إطارات:</span>
-                  <span className="font-bold">{execPulse.category_breakdown.tire.toLocaleString()} ر.ي</span>
-                </div>
-                <div className="flex justify-between text-slate-300">
-                  <span className="text-slate-400">⚡ بطاريات:</span>
-                  <span className="font-bold">{execPulse.category_breakdown.battery.toLocaleString()} ر.ي</span>
-                </div>
-                <div className="flex justify-between text-slate-300">
-                  <span className="text-slate-400">🛠️ خدمات ومصنعية:</span>
-                  <span className="font-bold text-purple-300">{execPulse.category_breakdown.service.toLocaleString()} ر.ي</span>
+
+                <div className="p-4 rounded-2xl bg-slate-900/80 border border-white/10 space-y-2">
+                  <div className="flex justify-between items-center text-slate-400">
+                    <span className="font-bold">إيرادات الخدمات والمصنعية:</span>
+                    <span className="font-black text-purple-400 text-sm font-mono">{servRev.toLocaleString()} ر.ي</span>
+                  </div>
+                  <div className="flex items-center justify-between pt-1 border-t border-white/5">
+                    <span className="text-slate-400 text-[11px]">مقارنة بالأمس:</span>
+                    {renderGrowthBadge(vsYest.services_growth_pct, 'نسبة نمو الخدمات مقارنة بالأمس')}
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-slate-400 text-[11px]">مقارنة بالأسبوع الماضي:</span>
+                    {renderGrowthBadge(vsLastWeek.services_growth_pct, 'نسبة نمو الخدمات مقارنة بالأسبوع الماضي')}
+                  </div>
                 </div>
               </div>
             </div>
-          </div>
-        </div>
 
-        {/* UPGRADE 1: PERFORMANCE COMPARISON & GROWTH RADAR (Today vs Yesterday & Last Week) */}
-        <div className="apple-glass rounded-3xl p-5 border border-white/10 space-y-3">
-          <div className="flex items-center justify-between">
-            <h3 className="font-extrabold text-sm text-white flex items-center gap-2">
-              <Activity className="w-4 h-4 text-blue-400" />
-              <span>مؤشرات نمو الأداء والنشاط التشغيلي مقارنة بالفترات السابقة (Growth Radar):</span>
-            </h3>
-            <span className="text-[11px] text-slate-400 font-mono">
-              تاريخ المقارنة: {reportDate}
-            </span>
-          </div>
+            {/* PEAK HOURS HEATMAP & AVERAGE TICKET METRICS */}
+            <div className="apple-glass rounded-3xl p-5 border border-amber-500/30 bg-gradient-to-br from-amber-500/10 via-slate-900/90 to-slate-950 space-y-4">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <h3 className="font-extrabold text-sm text-white flex items-center gap-2">
+                  <Flame className="w-4 h-4 text-amber-400" />
+                  <span>خريطة ساعات الذروة وتحليل متوسط قيمة الفاتورة (Peak Heatmap & Ticket Size):</span>
+                </h3>
+                <span className="text-xs text-amber-300 font-bold px-2.5 py-0.5 rounded-full bg-amber-500/20 border border-amber-500/30">
+                  ساعات العمل المعتمدة: من {String(openingHour).padStart(2, '0')}:00 ص حتى {closingHour === 24 ? '12:00 منتصف الليل' : `${closingHour % 12}:00 مساءً`}
+                </span>
+              </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 text-xs">
-            {/* Box 1: Cars Growth */}
-            <div className="p-4 rounded-2xl bg-slate-900/80 border border-white/10 space-y-2">
-              <div className="flex justify-between items-center text-slate-400">
-                <span className="font-bold">حركة السيارات المخدومة:</span>
-                <span className="font-black text-white text-sm font-mono">{summary.total_cars_served} سيارة</span>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div className="p-4 rounded-2xl bg-slate-900/90 border border-white/10">
+                  <div className="text-[11px] font-bold text-slate-400">ساعة الذروة اليومية (Peak Hour):</div>
+                  <div className="text-xl font-black font-mono text-amber-400 mt-1 flex items-center gap-2">
+                    <span>{peakHour.label || '04:00 م'}</span>
+                    <span className="text-xs font-sans text-slate-300 font-normal">({peakHour.cars_count || 0} سيارات)</span>
+                  </div>
+                  <div className="text-[10px] text-slate-400 mt-0.5">
+                    مبيعات الذروة: <b className="text-white font-mono">{Number(peakHour.total_sales || 0).toLocaleString()} ر.ي</b>
+                  </div>
+                </div>
+
+                <div className="p-4 rounded-2xl bg-slate-900/90 border border-white/10">
+                  <div className="text-[11px] font-bold text-slate-400">متوسط قيمة الفاتورة للسيارة:</div>
+                  <div className="text-xl font-black font-mono text-emerald-400 mt-1">
+                    {avgTicket.toLocaleString()} <span className="text-xs font-sans text-slate-400">ر.ي / سيارة</span>
+                  </div>
+                  <div className="text-[10px] text-slate-400 mt-0.5">
+                    معدل إنفاق العميل الإجمالي في الزيارة
+                  </div>
+                </div>
+
+                <div className="p-4 rounded-2xl bg-slate-900/90 border border-white/10">
+                  <div className="text-[11px] font-bold text-slate-400">متوسط إيراد الخدمات للسيارة:</div>
+                  <div className="text-xl font-black font-mono text-purple-300 mt-1">
+                    {avgServices.toLocaleString()} <span className="text-xs font-sans text-slate-400">ر.ي / سيارة</span>
+                  </div>
+                  <div className="text-[10px] text-slate-400 mt-0.5">
+                    معدل رسوم غيار الزيت والتشحيم والرقع
+                  </div>
+                </div>
               </div>
-              <div className="flex items-center justify-between pt-1 border-t border-white/5">
-                <span className="text-slate-400 text-[11px]">مقارنة بالأمس:</span>
-                {renderGrowthBadge(vsYest.cars_growth_pct, 'نسبة نمو السيارات مقارنة بالأمس')}
+
+              <div className="space-y-2 pt-2 border-t border-white/10">
+                <div className="text-xs font-bold text-slate-300 flex items-center justify-between">
+                  <span>توزيع استقبال السيارات على مدار اليوم (Heatmap):</span>
+                  <span className="text-[11px] text-slate-400 font-mono">الارتفاع يعكس كثافة السيارات</span>
+                </div>
+
+                <div className="grid grid-cols-8 sm:grid-cols-12 md:grid-cols-17 gap-1.5 items-end h-28 pt-4 pb-1 px-1 bg-slate-950/70 rounded-2xl border border-white/10 overflow-x-auto">
+                  {filteredTimeline.map((item) => {
+                    const isPeak = item.cars_count > 0 && item.hour_str === peakHour.hour_str;
+                    const heightPct = item.cars_count > 0 ? Math.max(15, Math.round((item.cars_count / maxTimelineCars) * 100)) : 6;
+                    return (
+                      <div
+                        key={item.hour}
+                        className="flex flex-col items-center justify-end h-full group relative"
+                        title={`${item.label}: ${item.cars_count} سيارة (${Number(item.total_sales).toLocaleString()} ر.ي)`}
+                      >
+                        <div
+                          style={{ height: `${heightPct}%` }}
+                          className={`w-full rounded-t-lg transition-all ${
+                            isPeak
+                              ? 'bg-gradient-to-t from-amber-500 to-yellow-400 shadow-lg shadow-amber-500/30 ring-1 ring-amber-300'
+                              : item.cars_count > 0
+                              ? 'bg-blue-500/60 hover:bg-blue-400'
+                              : 'bg-slate-800/40'
+                          }`}
+                        />
+                        <div className="text-[9px] font-mono text-slate-400 mt-1 truncate w-full text-center">
+                          {String(item.hour % 12 === 0 ? 12 : item.hour % 12)}
+                          <span className="text-[7px] text-slate-500">{item.hour < 12 ? 'ص' : 'م'}</span>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
+            </div>
+
+            {/* Apple Health KPI Cards */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
+              <div className="apple-glass-card rounded-3xl p-5 border border-emerald-500/30 shadow-xl shadow-emerald-950/20">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-xs font-bold text-slate-400">رصيد الصندوق النقدي (1101):</span>
+                  <span className="w-8 h-8 rounded-xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center font-bold">
+                    💵
+                  </span>
+                </div>
+                <div className="text-2xl font-black font-mono text-emerald-400">
+                  {liveDrawerBal.toLocaleString()} <span className="text-xs font-sans text-slate-400">ر.ي</span>
+                </div>
+                <div className="text-[11px] text-slate-400 mt-1 flex items-center gap-2">
+                  <span className="text-emerald-400 font-bold">+{cash_register.total_cash_inflow.toLocaleString()} داخل</span>
+                  <span>&bull;</span>
+                  <span className="text-rose-400 font-bold">-{cash_register.total_cash_outflow.toLocaleString()} خارج</span>
+                </div>
+              </div>
+
+              <div className="apple-glass-card rounded-3xl p-5 border border-blue-500/30 shadow-xl shadow-blue-950/20">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-xs font-bold text-slate-400">صافي المبيعات والإيرادات:</span>
+                  <span className="w-8 h-8 rounded-xl bg-blue-500/20 text-blue-400 flex items-center justify-center font-bold">
+                    📈
+                  </span>
+                </div>
+                <div className="text-2xl font-black font-mono text-blue-400">
+                  {summary.total_net_sales.toLocaleString()} <span className="text-xs font-sans text-slate-400">ر.ي</span>
+                </div>
+                <div className="text-[11px] text-slate-300 mt-1 flex items-center justify-between">
+                  <span>بضائع: <b className="text-white">{goodsRev.toLocaleString()}</b></span>
+                  <span>خدمات: <b className="text-purple-300">{servRev.toLocaleString()}</b></span>
+                </div>
+              </div>
+
+              <div className="apple-glass-card rounded-3xl p-5 border border-purple-500/30 shadow-xl shadow-purple-950/20">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-xs font-bold text-slate-400">المحافظ الإلكترونية:</span>
+                  <span className="w-8 h-8 rounded-xl bg-purple-500/20 text-purple-400 flex items-center justify-center font-bold">
+                    📱
+                  </span>
+                </div>
+                <div className="text-2xl font-black font-mono text-purple-300">
+                  {payment_methods_breakdown.e_wallets.total.toLocaleString()} <span className="text-xs font-sans text-slate-400">ر.ي</span>
+                </div>
+                <div className="text-[11px] text-slate-400 mt-1">
+                  كريمي: {payment_methods_breakdown.e_wallets.kuraimi.toLocaleString()} ر.ي &bull; جيب: {payment_methods_breakdown.e_wallets.jeeb.toLocaleString()} ر.ي
+                </div>
+              </div>
+
+              <div className="apple-glass-card rounded-3xl p-5 border border-amber-500/30 shadow-xl shadow-amber-950/20">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-xs font-bold text-slate-400">مبيعات الآجل والتحصيلات:</span>
+                  <span className="w-8 h-8 rounded-xl bg-amber-500/20 text-amber-400 flex items-center justify-center font-bold">
+                    📝
+                  </span>
+                </div>
+                <div className="text-2xl font-black font-mono text-amber-400">
+                  {summary.total_new_debts.toLocaleString()} <span className="text-xs font-sans text-slate-400">ر.ي آجل</span>
+                </div>
+                <div className="text-[11px] text-slate-400 mt-1 flex items-center justify-between">
+                  <span>تحصيل ديون: <b className="text-emerald-400 font-mono">+{cash_register.inflow_cash_debt_collected.toLocaleString()}</b></span>
+                </div>
+              </div>
+            </div>
+
+            {/* Formatted Text Preview Block */}
+            <div className="apple-glass rounded-3xl p-5 border border-white/10 space-y-3">
               <div className="flex items-center justify-between">
-                <span className="text-slate-400 text-[11px]">مقارنة بالأسبوع الماضي:</span>
-                {renderGrowthBadge(vsLastWeek.cars_growth_pct, 'نسبة نمو السيارات مقارنة بنفس اليوم الأسبوع الماضي')}
+                <h3 className="font-extrabold text-sm text-white flex items-center gap-2">
+                  <Sparkles className="w-4 h-4 text-amber-400" />
+                  <span>معاينة نص الرسالة الصادرة لواتساب المالك 2.0:</span>
+                </h3>
+                <button
+                  type="button"
+                  onClick={handleCopy}
+                  className="text-xs text-amber-400 hover:text-amber-300 font-bold flex items-center gap-1"
+                >
+                  <Copy className="w-3.5 h-3.5" />
+                  <span>{copied ? 'تم النسخ بنجاح!' : 'نسخ النص'}</span>
+                </button>
               </div>
+
+              <pre className="p-4 rounded-2xl bg-slate-950/90 border border-white/10 text-xs font-mono text-slate-200 leading-relaxed whitespace-pre-wrap selection:bg-amber-500 selection:text-black">
+                {ownerBriefMessage}
+              </pre>
             </div>
 
-            {/* Box 2: Total Sales Growth */}
-            <div className="p-4 rounded-2xl bg-slate-900/80 border border-white/10 space-y-2">
-              <div className="flex justify-between items-center text-slate-400">
-                <span className="font-bold">إجمالي المبيعات الصافية:</span>
-                <span className="font-black text-blue-400 text-sm font-mono">{summary.total_net_sales.toLocaleString()} ر.ي</span>
-              </div>
-              <div className="flex items-center justify-between pt-1 border-t border-white/5">
-                <span className="text-slate-400 text-[11px]">مقارنة بالأمس:</span>
-                {renderGrowthBadge(vsYest.sales_growth_pct, 'نسبة نمو المبيعات مقارنة بالأمس')}
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-slate-400 text-[11px]">مقارنة بالأسبوع الماضي:</span>
-                {renderGrowthBadge(vsLastWeek.sales_growth_pct, 'نسبة نمو المبيعات مقارنة بنفس اليوم الأسبوع الماضي')}
-              </div>
-            </div>
+            {/* Breakdown Details Grid */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="apple-glass rounded-3xl p-5 border border-white/10 space-y-3">
+                <h3 className="font-extrabold text-sm text-white flex items-center gap-2">
+                  <Droplets className="w-4 h-4 text-amber-400" />
+                  <span>حركة عبوات الزيوت والفلاتر اليومية:</span>
+                </h3>
 
-            {/* Box 3: Services Revenue Growth */}
-            <div className="p-4 rounded-2xl bg-slate-900/80 border border-white/10 space-y-2">
-              <div className="flex justify-between items-center text-slate-400">
-                <span className="font-bold">إيرادات الخدمات والمصنعية:</span>
-                <span className="font-black text-purple-400 text-sm font-mono">{servRev.toLocaleString()} ر.ي</span>
-              </div>
-              <div className="flex items-center justify-between pt-1 border-t border-white/5">
-                <span className="text-slate-400 text-[11px]">مقارنة بالأمس:</span>
-                {renderGrowthBadge(vsYest.services_growth_pct, 'نسبة نمو الخدمات مقارنة بالأمس')}
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-slate-400 text-[11px]">مقارنة بالأسبوع الماضي:</span>
-                {renderGrowthBadge(vsLastWeek.services_growth_pct, 'نسبة نمو الخدمات مقارنة بالأسبوع الماضي')}
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* UPGRADE 5: PEAK HOURS HEATMAP & AVERAGE TICKET METRICS */}
-        <div className="apple-glass rounded-3xl p-5 border border-amber-500/30 bg-gradient-to-br from-amber-500/10 via-slate-900/90 to-slate-950 space-y-4">
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <h3 className="font-extrabold text-sm text-white flex items-center gap-2">
-              <Flame className="w-4 h-4 text-amber-400" />
-              <span>خريطة ساعات الذروة وتحليل متوسط قيمة الفاتورة (Peak Heatmap & Ticket Size):</span>
-            </h3>
-            <span className="text-xs text-amber-300 font-bold px-2.5 py-0.5 rounded-full bg-amber-500/20 border border-amber-500/30">
-              ساعات العمل المعتمدة: من {String(openingHour).padStart(2, '0')}:00 ص حتى {closingHour === 24 ? '12:00 منتصف الليل' : `${closingHour % 12}:00 مساءً`}
-            </span>
-          </div>
-
-          {/* Ticket Stats & Peak Badge */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-            <div className="p-4 rounded-2xl bg-slate-900/90 border border-white/10">
-              <div className="text-[11px] font-bold text-slate-400">ساعة الذروة اليومية (Peak Hour):</div>
-              <div className="text-xl font-black font-mono text-amber-400 mt-1 flex items-center gap-2">
-                <span>{peakHour.label || '04:00 م'}</span>
-                <span className="text-xs font-sans text-slate-300 font-normal">({peakHour.cars_count || 0} سيارات)</span>
-              </div>
-              <div className="text-[10px] text-slate-400 mt-0.5">
-                مبيعات الذروة: <b className="text-white font-mono">{Number(peakHour.total_sales || 0).toLocaleString()} ر.ي</b>
-              </div>
-            </div>
-
-            <div className="p-4 rounded-2xl bg-slate-900/90 border border-white/10">
-              <div className="text-[11px] font-bold text-slate-400">متوسط قيمة الفاتورة للسيارة:</div>
-              <div className="text-xl font-black font-mono text-emerald-400 mt-1">
-                {avgTicket.toLocaleString()} <span className="text-xs font-sans text-slate-400">ر.ي / سيارة</span>
-              </div>
-              <div className="text-[10px] text-slate-400 mt-0.5">
-                معدل إنفاق العميل الإجمالي في الزيارة
-              </div>
-            </div>
-
-            <div className="p-4 rounded-2xl bg-slate-900/90 border border-white/10">
-              <div className="text-[11px] font-bold text-slate-400">متوسط إيراد الخدمات للسيارة:</div>
-              <div className="text-xl font-black font-mono text-purple-300 mt-1">
-                {avgServices.toLocaleString()} <span className="text-xs font-sans text-slate-400">ر.ي / سيارة</span>
-              </div>
-              <div className="text-[10px] text-slate-400 mt-0.5">
-                معدل رسوم غيار الزيت والتشحيم والرقع
-              </div>
-            </div>
-          </div>
-
-          {/* Hourly Timeline Heatmap Bars */}
-          <div className="space-y-2 pt-2 border-t border-white/10">
-            <div className="text-xs font-bold text-slate-300 flex items-center justify-between">
-              <span>توزيع استقبال السيارات على مدار اليوم (Heatmap):</span>
-              <span className="text-[11px] text-slate-400 font-mono">الارتفاع يعكس كثافة السيارات</span>
-            </div>
-
-            <div className="grid grid-cols-8 sm:grid-cols-12 md:grid-cols-17 gap-1.5 items-end h-28 pt-4 pb-1 px-1 bg-slate-950/70 rounded-2xl border border-white/10 overflow-x-auto">
-              {filteredTimeline.map((item) => {
-                const isPeak = item.cars_count > 0 && item.hour_str === peakHour.hour_str;
-                const heightPct = item.cars_count > 0 ? Math.max(15, Math.round((item.cars_count / maxTimelineCars) * 100)) : 6;
-                return (
-                  <div
-                    key={item.hour}
-                    className="flex flex-col items-center justify-end h-full group relative"
-                    title={`${item.label}: ${item.cars_count} سيارة (${Number(item.total_sales).toLocaleString()} ر.ي)`}
-                  >
-                    {/* Tooltip on hover */}
-                    <div className="absolute -top-10 opacity-0 group-hover:opacity-100 transition pointer-events-none bg-slate-900 text-white text-[10px] font-bold py-1 px-2 rounded-lg border border-white/20 whitespace-nowrap z-20 shadow-xl">
-                      {item.cars_count} سيارة ({Number(item.total_sales).toLocaleString()} ر.ي)
-                    </div>
-
-                    <div
-                      style={{ height: `${heightPct}%` }}
-                      className={`w-full rounded-t-lg transition-all ${
-                        isPeak
-                          ? 'bg-gradient-to-t from-amber-500 to-yellow-400 shadow-lg shadow-amber-500/30 ring-1 ring-amber-300'
-                          : item.cars_count > 0
-                          ? 'bg-blue-500/60 hover:bg-blue-400'
-                          : 'bg-slate-800/40'
-                      }`}
-                    />
-                    <div className="text-[9px] font-mono text-slate-400 mt-1 truncate w-full text-center">
-                      {String(item.hour % 12 === 0 ? 12 : item.hour % 12)}
-                      <span className="text-[7px] text-slate-500">{item.hour < 12 ? 'ص' : 'م'}</span>
+                <div className="grid grid-cols-3 gap-2 text-center text-xs">
+                  <div className="p-3 rounded-2xl bg-slate-900/80 border border-white/10">
+                    <div className="text-slate-400">عبوة 4 لتر</div>
+                    <div className="text-xl font-mono font-black text-amber-400 mt-1">
+                      {oil_sales.packs_summary['4L']}
                     </div>
                   </div>
-                );
-              })}
-            </div>
-          </div>
-        </div>
-
-        {/* Visual Apple Health/Stocks Style KPI Cards */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
-          {/* Card 1: Net Cash Drawer 1101 */}
-          <div className="apple-glass-card rounded-3xl p-5 border border-emerald-500/30 shadow-xl shadow-emerald-950/20">
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-xs font-bold text-slate-400">رصيد الصندوق النقدي (1101):</span>
-              <span className="w-8 h-8 rounded-xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center font-bold">
-                💵
-              </span>
-            </div>
-            <div className="text-2xl font-black font-mono text-emerald-400">
-              {liveDrawerBal.toLocaleString()} <span className="text-xs font-sans text-slate-400">ر.ي</span>
-            </div>
-            <div className="text-[11px] text-slate-400 mt-1 flex items-center gap-2">
-              <span className="text-emerald-400 font-bold">+{cash_register.total_cash_inflow.toLocaleString()} داخل</span>
-              <span>&bull;</span>
-              <span className="text-rose-400 font-bold">-{cash_register.total_cash_outflow.toLocaleString()} خارج</span>
-            </div>
-          </div>
-
-          {/* Card 2: Revenue Split (Goods vs Services) */}
-          <div className="apple-glass-card rounded-3xl p-5 border border-blue-500/30 shadow-xl shadow-blue-950/20">
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-xs font-bold text-slate-400">صافي المبيعات والإيرادات:</span>
-              <span className="w-8 h-8 rounded-xl bg-blue-500/20 text-blue-400 flex items-center justify-center font-bold">
-                📈
-              </span>
-            </div>
-            <div className="text-2xl font-black font-mono text-blue-400">
-              {summary.total_net_sales.toLocaleString()} <span className="text-xs font-sans text-slate-400">ر.ي</span>
-            </div>
-            <div className="text-[11px] text-slate-300 mt-1 flex items-center justify-between">
-              <span>بضائع: <b className="text-white">{goodsRev.toLocaleString()}</b></span>
-              <span>خدمات: <b className="text-purple-300">{servRev.toLocaleString()}</b></span>
-            </div>
-          </div>
-
-          {/* Card 3: E-Wallets */}
-          <div className="apple-glass-card rounded-3xl p-5 border border-purple-500/30 shadow-xl shadow-purple-950/20">
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-xs font-bold text-slate-400">المحافظ الإلكترونية:</span>
-              <span className="w-8 h-8 rounded-xl bg-purple-500/20 text-purple-400 flex items-center justify-center font-bold">
-                📱
-              </span>
-            </div>
-            <div className="text-2xl font-black font-mono text-purple-300">
-              {payment_methods_breakdown.e_wallets.total.toLocaleString()} <span className="text-xs font-sans text-slate-400">ر.ي</span>
-            </div>
-            <div className="text-[11px] text-slate-400 mt-1">
-              كريمي: {payment_methods_breakdown.e_wallets.kuraimi.toLocaleString()} ر.ي &bull; جيب: {payment_methods_breakdown.e_wallets.jeeb.toLocaleString()} ر.ي
-            </div>
-          </div>
-
-          {/* Card 4: New Debts & Collections */}
-          <div className="apple-glass-card rounded-3xl p-5 border border-amber-500/30 shadow-xl shadow-amber-950/20">
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-xs font-bold text-slate-400">مبيعات الآجل والتحصيلات:</span>
-              <span className="w-8 h-8 rounded-xl bg-amber-500/20 text-amber-400 flex items-center justify-center font-bold">
-                📝
-              </span>
-            </div>
-            <div className="text-2xl font-black font-mono text-amber-400">
-              {summary.total_new_debts.toLocaleString()} <span className="text-xs font-sans text-slate-400">ر.ي آجل</span>
-            </div>
-            <div className="text-[11px] text-slate-400 mt-1 flex items-center justify-between">
-              <span>تحصيل ديون: <b className="text-emerald-400 font-mono">+{cash_register.inflow_cash_debt_collected.toLocaleString()}</b></span>
-            </div>
-          </div>
-        </div>
-
-        {/* Formatted Text Preview Block */}
-        <div className="apple-glass rounded-3xl p-5 border border-white/10 space-y-3">
-          <div className="flex items-center justify-between">
-            <h3 className="font-extrabold text-sm text-white flex items-center gap-2">
-              <Sparkles className="w-4 h-4 text-amber-400" />
-              <span>معاينة نص الرسالة الصادرة لواتساب المالك 2.0:</span>
-            </h3>
-            <button
-              type="button"
-              onClick={handleCopy}
-              className="text-xs text-amber-400 hover:text-amber-300 font-bold flex items-center gap-1"
-            >
-              <Copy className="w-3.5 h-3.5" />
-              <span>{copied ? 'تم النسخ بنجاح!' : 'نسخ النص'}</span>
-            </button>
-          </div>
-
-          <pre className="p-4 rounded-2xl bg-slate-950/90 border border-white/10 text-xs font-mono text-slate-200 leading-relaxed whitespace-pre-wrap selection:bg-amber-500 selection:text-black">
-            {ownerBriefMessage}
-          </pre>
-        </div>
-
-        {/* Breakdown Details Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {/* Oil & Filter Quantities */}
-          <div className="apple-glass rounded-3xl p-5 border border-white/10 space-y-3">
-            <h3 className="font-extrabold text-sm text-white flex items-center gap-2">
-              <Droplets className="w-4 h-4 text-amber-400" />
-              <span>حركة عبوات الزيوت والفلاتر اليومية:</span>
-            </h3>
-
-            <div className="grid grid-cols-3 gap-2 text-center text-xs">
-              <div className="p-3 rounded-2xl bg-slate-900/80 border border-white/10">
-                <div className="text-slate-400">عبوة 4 لتر</div>
-                <div className="text-xl font-mono font-black text-amber-400 mt-1">
-                  {oil_sales.packs_summary['4L']}
-                </div>
-              </div>
-              <div className="p-3 rounded-2xl bg-slate-900/80 border border-white/10">
-                <div className="text-slate-400">عبوة 1 لتر</div>
-                <div className="text-xl font-mono font-black text-amber-400 mt-1">
-                  {oil_sales.packs_summary['1L']}
-                </div>
-              </div>
-              <div className="p-3 rounded-2xl bg-slate-900/80 border border-white/10">
-                <div className="text-slate-400">عبوة 5 لتر</div>
-                <div className="text-xl font-mono font-black text-amber-400 mt-1">
-                  {oil_sales.packs_summary['5L']}
-                </div>
-              </div>
-            </div>
-
-            <div className="p-3 rounded-2xl bg-slate-900/60 border border-white/5 space-y-1 text-xs">
-              <div className="flex justify-between text-slate-300">
-                <span>فلاتر زيت مباعة:</span>
-                <span className="font-mono font-bold text-emerald-400">{oilFiltersCount} قطعة</span>
-              </div>
-              <div className="flex justify-between text-slate-300">
-                <span>فلاتر هواء مباعة:</span>
-                <span className="font-mono font-bold text-emerald-400">{airFiltersCount} قطعة</span>
-              </div>
-              <div className="flex justify-between text-slate-300">
-                <span>فلاتر مكيف مباعة:</span>
-                <span className="font-mono font-bold text-emerald-400">{cabinFiltersCount} قطعة</span>
-              </div>
-            </div>
-          </div>
-
-          {/* Low Stock Alerts */}
-          <div className="apple-glass rounded-3xl p-5 border border-white/10 space-y-3">
-            <h3 className="font-extrabold text-sm text-white flex items-center gap-2">
-              <AlertTriangle className="w-4 h-4 text-rose-400" />
-              <span>نواقص المخزن الحرجة ({low_stock_alerts.length}):</span>
-            </h3>
-
-            <div className="space-y-2 max-h-48 overflow-y-auto pr-1 text-xs">
-              {low_stock_alerts.length === 0 ? (
-                <div className="p-6 text-center text-slate-400">المخزون كافي ولا توجد نواقص</div>
-              ) : (
-                low_stock_alerts.map((ls) => (
-                  <div
-                    key={ls.id}
-                    className="p-3 rounded-2xl bg-rose-500/10 border border-rose-500/20 flex items-center justify-between"
-                  >
-                    <div>
-                      <div className="font-extrabold text-white text-xs">{ls.name}</div>
-                      <div className="text-[10px] text-slate-400 font-mono">{ls.brand} &bull; {ls.pack_size}</div>
-                    </div>
-                    <div className="text-left font-mono font-bold text-rose-400">
-                      متبقي: {ls.stock_qty} (حد الأمان {ls.min_stock_alert})
+                  <div className="p-3 rounded-2xl bg-slate-900/80 border border-white/10">
+                    <div className="text-slate-400">عبوة 1 لتر</div>
+                    <div className="text-xl font-mono font-black text-amber-400 mt-1">
+                      {oil_sales.packs_summary['1L']}
                     </div>
                   </div>
-                ))
-              )}
+                  <div className="p-3 rounded-2xl bg-slate-900/80 border border-white/10">
+                    <div className="text-slate-400">عبوة 5 لتر</div>
+                    <div className="text-xl font-mono font-black text-amber-400 mt-1">
+                      {oil_sales.packs_summary['5L']}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="p-3 rounded-2xl bg-slate-900/60 border border-white/5 space-y-1 text-xs">
+                  <div className="flex justify-between text-slate-300">
+                    <span>فلاتر زيت مباعة:</span>
+                    <span className="font-mono font-bold text-emerald-400">{oilFiltersCount} قطعة</span>
+                  </div>
+                  <div className="flex justify-between text-slate-300">
+                    <span>فلاتر هواء مباعة:</span>
+                    <span className="font-mono font-bold text-emerald-400">{airFiltersCount} قطعة</span>
+                  </div>
+                  <div className="flex justify-between text-slate-300">
+                    <span>فلاتر مكيف مباعة:</span>
+                    <span className="font-mono font-bold text-emerald-400">{cabinFiltersCount} قطعة</span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="apple-glass rounded-3xl p-5 border border-white/10 space-y-3">
+                <h3 className="font-extrabold text-sm text-white flex items-center gap-2">
+                  <AlertTriangle className="w-4 h-4 text-rose-400" />
+                  <span>نواقص المخزن الحرجة ({low_stock_alerts.length}):</span>
+                </h3>
+
+                <div className="space-y-2 max-h-48 overflow-y-auto pr-1 text-xs">
+                  {low_stock_alerts.length === 0 ? (
+                    <div className="p-6 text-center text-slate-400">المخزون كافي ولا توجد نواقص</div>
+                  ) : (
+                    low_stock_alerts.map((ls) => (
+                      <div
+                        key={ls.id}
+                        className="p-3 rounded-2xl bg-rose-500/10 border border-rose-500/20 flex items-center justify-between"
+                      >
+                        <div>
+                          <div className="font-extrabold text-white text-xs">{ls.name}</div>
+                          <div className="text-[10px] text-slate-400 font-mono">{ls.brand} &bull; {ls.pack_size}</div>
+                        </div>
+                        <div className="text-left font-mono font-bold text-rose-400">
+                          متبقي: {ls.stock_qty} (حد الأمان {ls.min_stock_alert})
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
             </div>
           </div>
-        </div>
+        )}
+
+        {/* ============================================================== */}
+        {/* VARIANT 3: DUAL-PANE SPLIT AUDIT CONSOLE (كونسول التدقيق المزدوج) */}
+        {/* ============================================================== */}
+        {reportStyle === 'split' && (
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            {/* RIGHT COLUMN: FINANCIAL & CASH AUDIT */}
+            <div className="p-5 rounded-3xl bg-slate-900/90 border border-purple-500/30 space-y-4 shadow-xl">
+              <div className="flex items-center justify-between border-b border-white/10 pb-3">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-10 h-10 rounded-2xl bg-purple-500/20 text-purple-300 flex items-center justify-center font-bold">
+                    🏛️
+                  </div>
+                  <div>
+                    <h3 className="font-black text-white text-sm">الرقابة المالية وتدقيق الصندوق (1101)</h3>
+                    <p className="text-[10px] text-slate-400">حركة النقد، المحافظ، تكلفة البضاعة وصافي الربح</p>
+                  </div>
+                </div>
+                <span className="text-[11px] font-mono font-bold text-emerald-400 bg-emerald-500/10 px-2.5 py-1 rounded-xl border border-emerald-500/30">
+                  مطابق ✓
+                </span>
+              </div>
+
+              <div className="space-y-2.5 text-xs font-mono">
+                <div className="p-3.5 bg-slate-950 rounded-2xl border border-emerald-500/30 flex justify-between items-center">
+                  <div>
+                    <div className="text-slate-400 font-sans text-xs">رصيد الصندوق النقدي الدفتري (1101):</div>
+                    <div className="text-[10px] text-slate-500 font-sans mt-0.5">
+                      +{cash_register.total_cash_inflow.toLocaleString()} داخل | -{cash_register.total_cash_outflow.toLocaleString()} خارج
+                    </div>
+                  </div>
+                  <span className="text-xl font-black text-emerald-400">{liveDrawerBal.toLocaleString()} ر.ي</span>
+                </div>
+
+                <div className="p-3.5 bg-slate-950 rounded-2xl border border-white/10 flex justify-between items-center">
+                  <div>
+                    <div className="text-slate-400 font-sans text-xs">إجمالي المحافظ الإلكترونية:</div>
+                    <div className="text-[10px] text-slate-500 font-sans mt-0.5">
+                      كريمي: {payment_methods_breakdown.e_wallets.kuraimi.toLocaleString()} | جيب: {payment_methods_breakdown.e_wallets.jeeb.toLocaleString()}
+                    </div>
+                  </div>
+                  <span className="text-lg font-black text-purple-300">{payment_methods_breakdown.e_wallets.total.toLocaleString()} ر.ي</span>
+                </div>
+
+                <div className="p-3.5 bg-slate-950 rounded-2xl border border-white/10 flex justify-between items-center">
+                  <div>
+                    <div className="text-slate-400 font-sans text-xs">تكلفة البضاعة المباعة (COGS):</div>
+                    <div className="text-[10px] text-slate-500 font-sans mt-0.5">سعر التكلفة الدفترية للمخزون</div>
+                  </div>
+                  <span className="text-lg font-black text-amber-400">{execPulse.total_cogs.toLocaleString()} ر.ي</span>
+                </div>
+
+                <div className="p-3.5 bg-slate-950 rounded-2xl border border-white/10 flex justify-between items-center">
+                  <div>
+                    <div className="text-slate-400 font-sans text-xs">المصاريف التشغيلية المنصرفة:</div>
+                    <div className="text-[10px] text-slate-500 font-sans mt-0.5">سندات صرف ومصاريف يومية</div>
+                  </div>
+                  <span className="text-lg font-black text-rose-400">-{transactions_summary.expenses_total.toLocaleString()} ر.ي</span>
+                </div>
+
+                <div className="p-4 bg-gradient-to-r from-emerald-500/20 via-slate-950 to-slate-950 rounded-2xl border border-emerald-500/40 flex justify-between items-center">
+                  <div>
+                    <div className="font-extrabold text-emerald-300 font-sans text-sm">صافي الأرباح اليومية المقدرة:</div>
+                    <div className="text-[11px] text-slate-400 font-sans mt-0.5">
+                      هامش {execPulse.net_margin_pct}% &bull; معدل التغطية {execPulse.expense_coverage_ratio}%
+                    </div>
+                  </div>
+                  <span className="text-2xl font-black text-emerald-400">{execPulse.net_profit.toLocaleString()} ر.ي</span>
+                </div>
+              </div>
+            </div>
+
+            {/* LEFT COLUMN: WORKSHOP OPERATIONS & DISPATCH */}
+            <div className="p-5 rounded-3xl bg-slate-900/90 border border-white/15 space-y-4 shadow-xl">
+              <div className="flex items-center justify-between border-b border-white/10 pb-3">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-10 h-10 rounded-2xl bg-blue-500/20 text-blue-300 flex items-center justify-center font-bold">
+                    🚗
+                  </div>
+                  <div>
+                    <h3 className="font-black text-white text-sm">حركة الورشة وساعات الذروة والمخزن</h3>
+                    <p className="text-[10px] text-slate-400">استقبال السيارات، الزيوت، ورسائل الواتساب</p>
+                  </div>
+                </div>
+                <span className="text-[11px] font-mono font-bold text-blue-400 bg-blue-500/10 px-2.5 py-1 rounded-xl border border-blue-500/30">
+                  {summary.total_cars_served} سيارة مخدومة
+                </span>
+              </div>
+
+              {/* Direct WhatsApp Dispatch Pill */}
+              <div className="p-3.5 bg-gradient-to-r from-emerald-500/15 via-slate-950 to-slate-950 rounded-2xl border border-emerald-500/30 flex items-center justify-between gap-3">
+                <div className="flex items-center gap-2.5">
+                  <MessageSquare className="w-5 h-5 text-emerald-400" />
+                  <div>
+                    <div className="font-bold text-white text-xs">إرسال التقرير لواتساب المالك</div>
+                    <div className="text-[10px] text-slate-400">الرقم المعتمد: {settings.ownerPhone}</div>
+                  </div>
+                </div>
+                <a
+                  href={ownerWhatsAppUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="px-4 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-xs transition active:scale-95"
+                >
+                  إرسال الآن 📲
+                </a>
+              </div>
+
+              {/* Peak Hour & Heatmap */}
+              <div className="p-3.5 bg-slate-950 rounded-2xl border border-white/10 space-y-2">
+                <div className="flex items-center justify-between text-xs">
+                  <span className="font-bold text-slate-300">ساعة الذروة اليومية:</span>
+                  <span className="font-mono font-bold text-amber-400">
+                    {peakHour.label || '04:00 م'} ({peakHour.cars_count || 0} سيارات)
+                  </span>
+                </div>
+                <div className="grid grid-cols-8 sm:grid-cols-12 md:grid-cols-17 gap-1 items-end h-16 pt-2 pb-1 px-1 bg-slate-900 rounded-lg">
+                  {filteredTimeline.map((item) => {
+                    const isPeak = item.cars_count > 0 && item.hour_str === peakHour.hour_str;
+                    const heightPct = item.cars_count > 0 ? Math.max(15, Math.round((item.cars_count / maxTimelineCars) * 100)) : 6;
+                    return (
+                      <div key={item.hour} className="h-full flex items-end">
+                        <div
+                          style={{ height: `${heightPct}%` }}
+                          className={`w-full rounded-t ${
+                            isPeak ? 'bg-amber-400' : item.cars_count > 0 ? 'bg-blue-500/60' : 'bg-slate-800/40'
+                          }`}
+                        />
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Oil & Filter Quantities Summary */}
+              <div className="p-3.5 bg-slate-950 rounded-2xl border border-white/10 space-y-2">
+                <div className="text-xs font-bold text-slate-300">🛢️ مبيعات عبوات الزيوت والفلاتر:</div>
+                <div className="grid grid-cols-3 gap-2 text-center font-mono text-[11px]">
+                  <div className="p-2 bg-slate-900 rounded-xl">4L: <b className="text-amber-400">{oil_sales.packs_summary['4L']}</b></div>
+                  <div className="p-2 bg-slate-900 rounded-xl">1L: <b className="text-amber-400">{oil_sales.packs_summary['1L']}</b></div>
+                  <div className="p-2 bg-slate-900 rounded-xl">5L: <b className="text-amber-400">{oil_sales.packs_summary['5L']}</b></div>
+                </div>
+              </div>
+
+              {/* Low Stock Alerts */}
+              <div className="p-3.5 bg-slate-950 rounded-2xl border border-rose-500/20 space-y-1.5">
+                <div className="flex justify-between items-center text-xs text-rose-300 font-bold">
+                  <span>⚠️ نواقص المخزن ({low_stock_alerts.length})</span>
+                </div>
+                <div className="text-[11px] text-slate-400 max-h-20 overflow-y-auto">
+                  {lowStockText}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* 3. Printable Document Structure (Visible ONLY in @media print) */}
