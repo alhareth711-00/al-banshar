@@ -108,19 +108,25 @@ const vehicleModel = {
       }
     }
 
+    const serviceInterval = Number(data.service_interval_km) || 3000;
+    const lastOdo = Number(data.last_odometer) || 0;
+    const nextOdo = Number(data.next_due_odometer) || (lastOdo > 0 ? lastOdo + serviceInterval : 0);
+
     const stmt = db.prepare(`
       INSERT INTO customers_vehicles (
         plate_number, plate_type, car_make_model, customer_name, phone,
         preferred_oil_brand, preferred_viscosity, last_odometer,
         next_due_odometer, next_due_date, balance_due, credit_limit,
         customer_type, corporate_name, price_tier, discount_percent,
-        corporate_tax_no, billing_cycle
+        corporate_tax_no, billing_cycle,
+        plate_divider, vehicle_category, customer_notes, service_interval_km
       ) VALUES (
         @plate_number, @plate_type, @car_make_model, @customer_name, @phone,
         @preferred_oil_brand, @preferred_viscosity, @last_odometer,
         @next_due_odometer, @next_due_date, @balance_due, @credit_limit,
         @customer_type, @corporate_name, @price_tier, @discount_percent,
-        @corporate_tax_no, @billing_cycle
+        @corporate_tax_no, @billing_cycle,
+        @plate_divider, @vehicle_category, @customer_notes, @service_interval_km
       )
     `);
 
@@ -132,17 +138,21 @@ const vehicleModel = {
       phone: (data.phone && data.phone.trim()) || '',
       preferred_oil_brand: data.preferred_oil_brand || null,
       preferred_viscosity: data.preferred_viscosity || null,
-      last_odometer: Number(data.last_odometer) || 0,
-      next_due_odometer: Number(data.next_due_odometer) || 0,
+      last_odometer: lastOdo,
+      next_due_odometer: nextOdo,
       next_due_date: data.next_due_date || null,
       balance_due: Number(data.balance_due) || 0,
-      credit_limit: data.credit_limit !== undefined ? Number(data.credit_limit) : 50000,
+      credit_limit: data.credit_limit !== undefined ? Number(data.credit_limit) : (data.customer_type === 'fleet' ? 50000 : (data.customer_type === 'vip' ? 10000 : 0)),
       customer_type: data.customer_type || 'individual',
       corporate_name: data.corporate_name ? data.corporate_name.trim() : null,
       price_tier: data.price_tier || 'standard',
       discount_percent: Number(data.discount_percent) || 0,
       corporate_tax_no: data.corporate_tax_no ? data.corporate_tax_no.trim() : null,
       billing_cycle: data.billing_cycle || 'instant',
+      plate_divider: data.plate_divider !== undefined && data.plate_divider !== null ? String(data.plate_divider).trim() : '1',
+      vehicle_category: (data.vehicle_category && data.vehicle_category.trim()) || 'سيارة',
+      customer_notes: data.customer_notes ? data.customer_notes.trim() : '',
+      service_interval_km: serviceInterval,
     });
 
     return this.getById(result.lastInsertRowid);
@@ -171,7 +181,11 @@ const vehicleModel = {
         price_tier = @price_tier,
         discount_percent = @discount_percent,
         corporate_tax_no = @corporate_tax_no,
-        billing_cycle = @billing_cycle
+        billing_cycle = @billing_cycle,
+        plate_divider = @plate_divider,
+        vehicle_category = @vehicle_category,
+        customer_notes = @customer_notes,
+        service_interval_km = @service_interval_km
       WHERE id = @id
     `);
 
@@ -195,6 +209,10 @@ const vehicleModel = {
       discount_percent: data.discount_percent !== undefined ? Number(data.discount_percent) : existing.discount_percent,
       corporate_tax_no: data.corporate_tax_no !== undefined ? (data.corporate_tax_no ? data.corporate_tax_no.trim() : null) : existing.corporate_tax_no,
       billing_cycle: data.billing_cycle !== undefined ? data.billing_cycle : existing.billing_cycle,
+      plate_divider: data.plate_divider !== undefined ? String(data.plate_divider).trim() : (existing.plate_divider || '1'),
+      vehicle_category: data.vehicle_category !== undefined ? data.vehicle_category : (existing.vehicle_category || 'سيارة'),
+      customer_notes: data.customer_notes !== undefined ? data.customer_notes : (existing.customer_notes || ''),
+      service_interval_km: data.service_interval_km !== undefined ? Number(data.service_interval_km) : (existing.service_interval_km || 3000),
     });
 
     return this.getById(id);

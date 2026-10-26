@@ -35,6 +35,7 @@ import {
   Edit,
   X,
   ExternalLink,
+  Printer,
 } from 'lucide-react';
 
 import NewVehicleModal from './NewVehicleModal';
@@ -149,6 +150,8 @@ export default function PosScreen({
   // Active Bay Services State
   const [showPendingServicesModal, setShowPendingServicesModal] = useState(false);
   const [pendingServicesCount, setPendingServicesCount] = useState(0);
+  const [pendingBayDialog, setPendingBayDialog] = useState(null);
+  const [focusPendingInvoiceId, setFocusPendingInvoiceId] = useState(null);
 
   // Safety Inspection Capsule State (8 points)
   const [safetyPoints, setSafetyPoints] = useState({
@@ -327,17 +330,17 @@ export default function PosScreen({
 
   // Handle vehicle/customer selection
   const handleSelectVehicle = (vehicle) => {
-    if (posMode === 'quick') {
-      setQuickCustomerOverride(vehicle);
+    setSelectedVehicle(vehicle);
+    setQuickCustomerOverride(vehicle);
+    setPosMode('oil');
+    fetchVehicleLastService(vehicle.id);
+    if (vehicle.last_odometer) {
+      setCurrentOdometer(String(vehicle.last_odometer));
     } else {
-      setSelectedVehicle(vehicle);
-      fetchVehicleLastService(vehicle.id);
-      if (vehicle.last_odometer) {
-        setCurrentOdometer(String(vehicle.last_odometer));
-      }
-      setKmInterval(3000);
-      setManualNextOdometer('');
+      setCurrentOdometer('');
     }
+    setKmInterval(3000);
+    setManualNextOdometer('');
     setSearchQuery('');
     setSearchResults([]);
   };
@@ -390,6 +393,13 @@ export default function PosScreen({
 
   // Cart Operations
   const handleAddToCart = (item) => {
+    const isOilProduct = (item.category === 'oil' || (item.description || '').includes('زيت'));
+    if (isOilProduct && posMode === 'quick') {
+      setPosMode('oil');
+      setCartNoticeMessage('تم تفعيل وضع غيار الزيت لإدخال قراءة العداد وتتبع السيارة في الحفرة 🛢️');
+      setTimeout(() => setCartNoticeMessage(''), 4500);
+    }
+
     setCartItems((prev) => {
       const existingIdx = prev.findIndex(
         (i) => i.inventory_id && i.inventory_id === item.inventory_id
@@ -655,13 +665,25 @@ export default function PosScreen({
         ? `العميل: ${customerNameNote.trim()} ${invoiceNotes ? `| ${invoiceNotes}` : ''}`
         : invoiceNotes || null;
 
+      // Auto-detect oil service that belongs in the pit bay
+      const hasOilOrLube = cartItems.some((item) => {
+        const desc = (item.description || '').toLowerCase();
+        const cat = (item.category || item.product_category || '').toLowerCase();
+        return desc.includes('زيت') || desc.includes('oil') || desc.includes('سيفون') || cat.includes('oil');
+      });
+      const hasVehicleAttached = selectedVehicle && selectedVehicle.id && selectedVehicle.id !== 'quick';
+      const hasOdo = Number(currentOdometer) > 0;
+
+      const isOilService = posMode === 'oil' || (hasVehicleAttached && (hasOilOrLube || hasOdo)) || hasOilOrLube;
+      const statusToSave = isOilService ? 'pending_service' : 'completed';
+
       const payload = {
         vehicle_id: vehicleIdToSubmit,
         worker_id: selectedWorkerId || null,
-        service_status: posMode === 'oil' ? 'pending_service' : 'completed',
-        current_odometer: posMode === 'oil' ? (Number(currentOdometer) || 0) : 0,
-        next_odometer: posMode === 'oil' ? (Number(nextOdometer) || 0) : 0,
-        next_service_date: posMode === 'oil' ? (serviceDateInput || nextServiceDate) : nextServiceDate,
+        service_status: statusToSave,
+        current_odometer: isOilService ? (Number(currentOdometer) || 0) : 0,
+        next_odometer: isOilService ? (Number(nextOdometer) || 0) : 0,
+        next_service_date: isOilService ? (serviceDateInput || nextServiceDate) : nextServiceDate,
         items_total: goodsTotal,
         labor_total: servicesTotal,
         scrap_battery_deduction: 0,
@@ -697,16 +719,24 @@ export default function PosScreen({
 
       const completedData = {
         ...data.data,
-        safetyPoints: posMode === 'oil' ? safetyPoints : null,
+        safetyPoints: isOilService ? safetyPoints : null,
         worker_name: workers.find((w) => w.id === selectedWorkerId)?.name || 'فني المركز',
       };
 
-      setCompletedInvoice(completedData);
       setLastSubmittedInvoice(completedData);
 
-      if (posMode === 'oil') {
-        setCartNoticeMessage(`تم حفظ الفاتورة بنجاح ونقل السيارة (${selectedVehicle?.plate_number && !selectedVehicle?.plate_number.startsWith('بدون') ? selectedVehicle.plate_number : selectedVehicle?.customer_name}) إلى [سيارات قيد الخدمة حالياً] ⏳`);
-        setTimeout(() => setCartNoticeMessage(''), 7000);
+      if (statusToSave === 'pending_service') {
+        const plateStr = selectedVehicle?.plate_number && !selectedVehicle?.plate_number.startsWith('بدون')
+          ? selectedVehicle.plate_number
+          : (selectedVehicle?.customer_name || 'سيارة العميل');
+        setPendingBayDialog({
+          isOpen: true,
+          invoice: completedData,
+          plateNumber: plateStr,
+          carModel: selectedVehicle?.car_make_model || '',
+        });
+      } else {
+        setCompletedInvoice(completedData);
       }
 
       // Reset form for next customer
@@ -1915,13 +1945,78 @@ export default function PosScreen({
 
       <PendingServicesModal
         isOpen={showPendingServicesModal}
-        onClose={() => setShowPendingServicesModal(false)}
+        onClose={() => {
+          setShowPendingServicesModal(false);
+          setFocusPendingInvoiceId(null);
+        }}
+        initialInvoiceId={focusPendingInvoiceId}
         workers={workers}
         onServiceCompleted={() => {
           fetchPendingServicesCount();
           if (onRefreshData) onRefreshData();
         }}
       />
+
+      {/* Pit Bay Transition Confirmation Dialog */}
+      {pendingBayDialog?.isOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md animate-in fade-in duration-200">
+          <div className="w-full max-w-md bg-slate-950 border border-blue-500/40 rounded-3xl p-6 shadow-2xl space-y-5 text-center">
+            <div className="w-16 h-16 rounded-2xl bg-gradient-to-tr from-blue-600 to-indigo-600 text-white flex items-center justify-center mx-auto shadow-lg shadow-blue-500/30 animate-pulse">
+              <Car className="w-8 h-8" />
+            </div>
+
+            <div className="space-y-1.5">
+              <h3 className="text-lg font-black text-white">السيارة دخلت الحفرة بنجاح 🚗</h3>
+              <p className="text-xs text-blue-300 font-bold">
+                تم نقل ({pendingBayDialog.plateNumber} {pendingBayDialog.carModel}) إلى قسم [سيارات قيد الخدمة حالياً]
+              </p>
+              <p className="text-[11px] text-slate-400">
+                الفاتورة رقم: <span className="font-mono text-amber-400 font-bold">{pendingBayDialog.invoice?.invoice_number}</span> &bull; الحفرة جاهزة للفحص والخدمة
+              </p>
+            </div>
+
+            <div className="space-y-2 pt-2">
+              <button
+                type="button"
+                onClick={() => {
+                  const invId = pendingBayDialog.invoice?.id;
+                  setPendingBayDialog(null);
+                  setFocusPendingInvoiceId(invId);
+                  setShowPendingServicesModal(true);
+                }}
+                className="w-full min-h-[48px] rounded-2xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-black text-sm shadow-xl shadow-blue-500/25 flex items-center justify-center gap-2 active:scale-95 transition"
+              >
+                <Wrench className="w-4 h-4" />
+                <span>متابعة فحص الحفرة والـ 8 نقاط فوراً 🛠️</span>
+              </button>
+
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    const inv = pendingBayDialog.invoice;
+                    setPendingBayDialog(null);
+                    setCompletedInvoice(inv);
+                  }}
+                  className="flex-1 min-h-[44px] rounded-xl bg-slate-900 border border-white/10 hover:bg-slate-800 text-slate-300 font-bold text-xs flex items-center justify-center gap-1.5 transition active:scale-95"
+                >
+                  <Printer className="w-3.5 h-3.5" />
+                  <span>إيصال استلام</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setPendingBayDialog(null)}
+                  className="flex-1 min-h-[44px] rounded-xl bg-white/10 hover:bg-white/15 text-white font-bold text-xs flex items-center justify-center gap-1.5 transition active:scale-95"
+                >
+                  <Check className="w-3.5 h-3.5" />
+                  <span>فاتورة جديدة ⚡</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       <VehicleHistoryDrawer
         isOpen={showHistoryDrawer}

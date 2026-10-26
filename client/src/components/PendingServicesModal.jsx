@@ -47,6 +47,7 @@ export default function PendingServicesModal({
   isOpen,
   onClose,
   workers = [],
+  initialInvoiceId = null,
   onServiceCompleted,
 }) {
   const [pendingServices, setPendingServices] = useState([]);
@@ -57,6 +58,7 @@ export default function PendingServicesModal({
   const [notes, setNotes] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [successToast, setSuccessToast] = useState('');
+  const [errorToast, setErrorToast] = useState('');
   const [now, setNow] = useState(Date.now());
 
   const settings = getShopSettings();
@@ -74,9 +76,18 @@ export default function PendingServicesModal({
       const data = await res.json();
       if (data.success) {
         setPendingServices(data.data || []);
-        if (data.data.length > 0 && (!selectedInvoice || !data.data.some((i) => i.id === selectedInvoice.id))) {
-          handleSelectInvoice(data.data[0]);
-        } else if (data.data.length === 0) {
+        if (data.data.length > 0) {
+          if (initialInvoiceId) {
+            const found = data.data.find((i) => i.id === initialInvoiceId);
+            if (found) {
+              handleSelectInvoice(found);
+              return;
+            }
+          }
+          if (!selectedInvoice || !data.data.some((i) => i.id === selectedInvoice.id)) {
+            handleSelectInvoice(data.data[0]);
+          }
+        } else {
           setSelectedInvoice(null);
         }
       }
@@ -192,7 +203,8 @@ ${safetyReportText}
       if (onServiceCompleted) onServiceCompleted();
       fetchPending();
     } catch (err) {
-      alert(err.message || 'حدث خطأ أثناء حفظ الفحص');
+      setErrorToast(err.message || 'حدث خطأ أثناء حفظ الفحص');
+      setTimeout(() => setErrorToast(''), 5000);
     } finally {
       setSubmitting(false);
     }
@@ -292,6 +304,14 @@ ${safetyReportText}
           <div className="bg-emerald-500/20 border-b border-emerald-500/30 px-4 py-2.5 text-xs font-bold text-emerald-300 flex items-center gap-2 animate-in fade-in">
             <CheckCircle className="w-4 h-4 text-emerald-400 shrink-0" />
             <span>{successToast}</span>
+          </div>
+        )}
+
+        {/* Error Alert Banner */}
+        {errorToast && (
+          <div className="bg-rose-500/20 border-b border-rose-500/30 px-4 py-2.5 text-xs font-bold text-rose-300 flex items-center gap-2 animate-in fade-in">
+            <AlertTriangle className="w-4 h-4 text-rose-400 shrink-0" />
+            <span>{errorToast}</span>
           </div>
         )}
 

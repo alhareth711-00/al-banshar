@@ -137,7 +137,19 @@ function initDb() {
     if (!colNames.includes('billing_cycle')) {
       db.exec("ALTER TABLE customers_vehicles ADD COLUMN billing_cycle TEXT NOT NULL DEFAULT 'instant'");
     }
-    console.log('[DB] Migration applied: upgraded customers_vehicles with corporate & fleet price book fields.');
+    if (!colNames.includes('plate_divider')) {
+      db.exec("ALTER TABLE customers_vehicles ADD COLUMN plate_divider TEXT DEFAULT '1'");
+    }
+    if (!colNames.includes('vehicle_category')) {
+      db.exec("ALTER TABLE customers_vehicles ADD COLUMN vehicle_category TEXT DEFAULT 'سيارة'");
+    }
+    if (!colNames.includes('customer_notes')) {
+      db.exec("ALTER TABLE customers_vehicles ADD COLUMN customer_notes TEXT DEFAULT ''");
+    }
+    if (!colNames.includes('service_interval_km')) {
+      db.exec("ALTER TABLE customers_vehicles ADD COLUMN service_interval_km INTEGER DEFAULT 3000");
+    }
+    console.log('[DB] Migration applied: upgraded customers_vehicles with corporate, divider, category, notes & interval fields.');
   } catch (err) {
     console.warn('[DB] Migration warning on customers_vehicles corporate fields:', err.message);
   }

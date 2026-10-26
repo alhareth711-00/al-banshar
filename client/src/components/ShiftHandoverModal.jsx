@@ -138,7 +138,7 @@ export default function ShiftHandoverModal({ isOpen, onClose, currentShift, onSh
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/85 backdrop-blur-md select-none">
-      <div className="apple-glass border border-white/20 rounded-3xl w-full max-w-lg overflow-hidden shadow-2xl animate-in fade-in zoom-in-95 duration-200 max-h-[92vh] flex flex-col">
+      <div className="apple-glass bg-slate-950 border border-white/20 rounded-3xl w-full max-w-lg overflow-hidden shadow-2xl animate-in fade-in zoom-in-95 duration-200 max-h-[92vh] flex flex-col">
         {/* Header Bar */}
         <div className="px-5 py-4 border-b border-white/10 flex items-center justify-between gap-3 bg-white/5 flex-shrink-0">
           <div className="flex items-center gap-3">
