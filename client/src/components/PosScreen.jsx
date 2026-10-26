@@ -212,6 +212,25 @@ export default function PosScreen({
     };
   }, []);
 
+  // Fetch pending services count in the bay
+  const fetchPendingServicesCount = async () => {
+    try {
+      const res = await fetch('/api/invoices/pending-services');
+      const data = await res.json();
+      if (data.success) {
+        setPendingServicesCount(data.count || (data.data ? data.data.length : 0));
+      }
+    } catch {
+      // background error ignore
+    }
+  };
+
+  useEffect(() => {
+    fetchPendingServicesCount();
+    const interval = setInterval(fetchPendingServicesCount, 15000);
+    return () => clearInterval(interval);
+  }, []);
+
   // Backup status fetcher
   const fetchBackupStatus = async () => {
     try {
@@ -529,17 +548,6 @@ export default function PosScreen({
       return;
     }
 
-    if (!selectedWorkerId) {
-      setTouchAlert({
-        isOpen: true,
-        title: 'تحديد الفني المسؤول',
-        message: 'يرجى اختيار الفني المسؤول عن تنفيذ الخدمة من قائمة العمال.',
-        type: 'warning',
-        cancelBtnText: 'حسناً',
-      });
-      return;
-    }
-
     // Poka-Yoke: Prevent anonymous credit sales
     if (paymentMethod === 'credit') {
       const isGeneralAccount =
@@ -649,7 +657,8 @@ export default function PosScreen({
 
       const payload = {
         vehicle_id: vehicleIdToSubmit,
-        worker_id: selectedWorkerId,
+        worker_id: selectedWorkerId || null,
+        service_status: posMode === 'oil' ? 'pending_service' : 'completed',
         current_odometer: posMode === 'oil' ? (Number(currentOdometer) || 0) : 0,
         next_odometer: posMode === 'oil' ? (Number(nextOdometer) || 0) : 0,
         next_service_date: posMode === 'oil' ? (serviceDateInput || nextServiceDate) : nextServiceDate,
@@ -684,6 +693,8 @@ export default function PosScreen({
         throw new Error(data.message || 'حدث خطأ أثناء إصدار الفاتورة');
       }
 
+      fetchPendingServicesCount();
+
       const completedData = {
         ...data.data,
         safetyPoints: posMode === 'oil' ? safetyPoints : null,
@@ -692,6 +703,11 @@ export default function PosScreen({
 
       setCompletedInvoice(completedData);
       setLastSubmittedInvoice(completedData);
+
+      if (posMode === 'oil') {
+        setCartNoticeMessage(`تم حفظ الفاتورة بنجاح ونقل السيارة (${selectedVehicle?.plate_number && !selectedVehicle?.plate_number.startsWith('بدون') ? selectedVehicle.plate_number : selectedVehicle?.customer_name}) إلى [سيارات قيد الخدمة حالياً] ⏳`);
+        setTimeout(() => setCartNoticeMessage(''), 7000);
+      }
 
       // Reset form for next customer
       handleResetPos();
@@ -917,6 +933,35 @@ export default function PosScreen({
               <span>🛢️ فاتورة غيار زيت</span>
               <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-black/20 font-bold hidden sm:inline">
                 العداد والخدمة
+              </span>
+            </button>
+
+            {/* 3. ACTIVE SERVICES IN BAY (سيارات قيد الخدمة حالياً) */}
+            <button
+              type="button"
+              onClick={() => setShowPendingServicesModal(true)}
+              className={`min-h-[48px] px-3.5 sm:px-4 rounded-xl text-xs sm:text-sm font-black transition flex items-center gap-2 active:scale-95 border ${
+                pendingServicesCount > 0
+                  ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white border-blue-400/60 shadow-lg shadow-blue-500/30 ring-1 ring-blue-400/50'
+                  : 'text-slate-300 border-white/5 hover:text-white hover:bg-white/5'
+              }`}
+              title="متابعة وإتمام فحص السيارات التي لا تزال تحت الخدمة في الحفرة وإرسال الواتساب"
+            >
+              <div className="relative">
+                <Car className="w-4 h-4 stroke-[2.5]" />
+                {pendingServicesCount > 0 && (
+                  <span className="absolute -top-1 -right-1.5 w-2 h-2 rounded-full bg-rose-400 animate-ping" />
+                )}
+              </div>
+              <span>🚗 سيارات قيد الخدمة حالياً</span>
+              <span
+                className={`text-[11px] px-2 py-0.5 rounded-md font-mono font-bold ${
+                  pendingServicesCount > 0
+                    ? 'bg-white/20 text-white'
+                    : 'bg-slate-800 text-slate-400'
+                }`}
+              >
+                {pendingServicesCount}
               </span>
             </button>
           </div>
@@ -1531,113 +1576,15 @@ export default function PosScreen({
                 </button>
               </div>
 
-              {/* Technician Assignment Strip */}
-              <div className="apple-glass rounded-3xl p-3 border border-white/10">
-                <div className="text-xs font-bold text-slate-300 mb-2 flex items-center justify-between">
-                  <span className="flex items-center gap-1.5">
-                    <UserCheck className="w-4 h-4 text-teal-400" />
-                    <span>الفني المسؤول عن تنفيذ غيار الزيت:</span>
+              {/* Pit Bay Workflow Hint Banner */}
+              <div className="p-3 rounded-2xl bg-slate-900/60 border border-teal-500/20 text-xs text-slate-300 flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2">
+                  <span className="w-2 h-2 rounded-full bg-teal-400 animate-ping shrink-0" />
+                  <span className="font-bold text-teal-300">مسار باكة الحفرة:</span>
+                  <span className="text-slate-400 text-[11px]">
+                    احفظ الفاتورة الآن لتبدأ السيارة بالخدمة، وسيتم اختيار الفني واعتماد فحص الـ 8 نقاط وإرسال الواتساب فور الانتهاء عبر أيقونة [🚗 سيارات قيد الخدمة حالياً].
                   </span>
-                  <span className="text-[11px] text-slate-400 font-mono">طاقم الورشة المعتمد</span>
                 </div>
-                <div className="grid grid-cols-3 gap-2">
-                  {workers.map((w) => {
-                    const isSelected = selectedWorkerId === w.id;
-                    return (
-                      <button
-                        key={w.id}
-                        type="button"
-                        onClick={() => setSelectedWorkerId(w.id)}
-                        className={`min-h-[44px] px-3 py-1.5 rounded-2xl border text-right transition flex items-center justify-between ${
-                          isSelected
-                            ? 'bg-teal-500/20 border-teal-400 text-white font-bold shadow-md shadow-teal-500/10'
-                            : 'bg-slate-900/60 border-white/10 text-slate-400 hover:text-slate-200'
-                        }`}
-                      >
-                        <div className="truncate">
-                          <div className="text-xs font-extrabold truncate">{w.name.split(' ')[0]}</div>
-                          <div className="text-[10px] text-slate-400 truncate">{w.role.split(' ')[1] || w.role}</div>
-                        </div>
-                        {isSelected && <Check className="w-4 h-4 text-teal-400 stroke-[3] flex-shrink-0" />}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-
-              {/* 8-Point Free Touch Safety Inspection Capsule */}
-              <div className="apple-glass rounded-2xl p-3 border border-white/10 transition-all duration-200">
-                <div className="flex items-center justify-between gap-2 flex-wrap">
-                  <div className="flex items-center gap-2">
-                    <div className="w-8 h-8 rounded-xl bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 flex items-center justify-center">
-                      <ShieldCheck className="w-4 h-4" />
-                    </div>
-                    <div>
-                      <span className="text-xs font-extrabold text-white">فحص السلامة المجاني (8 نقاط):</span>
-                      <div className="text-[11px] font-mono font-bold flex items-center gap-1.5 mt-0.5">
-                        {passedSafetyCount === 8 ? (
-                          <span className="text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20">
-                            8 / 8 نقاط مجتازة وسليمة بالكامل 🛡️
-                          </span>
-                        ) : (
-                          <span className="text-rose-400 bg-rose-500/10 px-2 py-0.5 rounded-full border border-rose-500/20 flex items-center gap-1">
-                            <span>⚠️ {passedSafetyCount}/8</span>
-                            <span className="font-sans text-[10px] text-rose-300">
-                              (ملاحظات: {failedSafetyPoints.join('، ')})
-                            </span>
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-
-                  <button
-                    type="button"
-                    onClick={() => setIsSafetyExpanded(!isSafetyExpanded)}
-                    className="min-h-[36px] px-3 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-200 border border-white/10 font-bold text-xs flex items-center gap-1.5 transition active:scale-95"
-                  >
-                    <span>{isSafetyExpanded ? 'إخفاء النقاط' : 'تخصيص الفحص'}</span>
-                    {isSafetyExpanded ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
-                  </button>
-                </div>
-
-                {isSafetyExpanded && (
-                  <div className="mt-3 pt-3 border-t border-white/10 animate-in fade-in duration-150 space-y-2">
-                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5 text-xs">
-                      {[
-                        { id: 'radiator', label: '💧 ماء الرديتر' },
-                        { id: 'brake', label: '🛑 زيت الفرامل' },
-                        { id: 'washer', label: '🚿 ماء المساحات' },
-                        { id: 'tires', label: '🛞 ضغط الإطارات' },
-                        { id: 'air_filter', label: '💨 فلتر الهواء' },
-                        { id: 'cabin_filter', label: '❄️ فلتر المكيف' },
-                        { id: 'leaks', label: '🔍 فحص التهريب' },
-                        { id: 'battery', label: '🔋 فحص البطارية' },
-                      ].map((pt) => {
-                        const isChecked = safetyPoints[pt.id];
-                        return (
-                          <button
-                            key={pt.id}
-                            type="button"
-                            onClick={() => setSafetyPoints((prev) => ({ ...prev, [pt.id]: !prev[pt.id] }))}
-                            className={`min-h-[38px] px-2 py-1 rounded-xl text-[11px] font-bold transition flex items-center justify-between border active:scale-95 ${
-                              isChecked
-                                ? 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30'
-                                : 'bg-slate-900 text-slate-500 border-white/10 line-through'
-                            }`}
-                          >
-                            <span className="truncate">{pt.label}</span>
-                            {isChecked ? (
-                              <Check className="w-3.5 h-3.5 text-emerald-400 stroke-[3] flex-shrink-0" />
-                            ) : (
-                              <span className="text-[10px] text-rose-400 font-black">✕ خلل</span>
-                            )}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-                )}
               </div>
             </div>
           )}
@@ -1964,6 +1911,16 @@ export default function PosScreen({
         onClose={() => setCompletedInvoice(null)}
         invoice={completedInvoice}
         onNewInvoice={handleResetPos}
+      />
+
+      <PendingServicesModal
+        isOpen={showPendingServicesModal}
+        onClose={() => setShowPendingServicesModal(false)}
+        workers={workers}
+        onServiceCompleted={() => {
+          fetchPendingServicesCount();
+          if (onRefreshData) onRefreshData();
+        }}
       />
 
       <VehicleHistoryDrawer
