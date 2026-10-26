@@ -3,6 +3,7 @@ import {
   X, Car, User, Phone, Gauge, Check, AlertCircle, Building2, 
   Percent, FileText, Hash, ShieldCheck, Wrench
 } from 'lucide-react';
+import YemeniPlateWidget from './YemeniPlateWidget';
 
 export default function NewVehicleModal({ isOpen, onClose, onVehicleCreated, initialVehicle = null }) {
   const [formData, setFormData] = useState({
@@ -395,64 +396,34 @@ export default function NewVehicleModal({ isOpen, onClose, onVehicleCreated, ini
                 <span className="text-[10px] text-slate-400">اللوحة والفاصل ومسافة الزيت</span>
               </div>
 
-              {/* Yemeni Plate Selector & Colors */}
-              <div className="p-3 rounded-xl bg-slate-900 border border-slate-800 space-y-2">
-                <div className="flex items-center justify-between">
-                  <label className="text-[11px] font-bold text-slate-300">نوع اللوحة (كتابة سوداء معتمدة):</label>
-                  <div className="flex items-center gap-1">
-                    {plateTypes.map(p => (
-                      <button
-                        key={p.id}
-                        type="button"
-                        onClick={() => setFormData({ ...formData, plate_type: p.id })}
-                        className={`px-2 py-0.5 rounded text-[10px] font-black border transition ${
-                          p.bg
-                        } ${p.text} ${p.border} ${
-                          formData.plate_type === p.id ? 'ring-2 ring-white shadow' : 'opacity-70 hover:opacity-100'
-                        }`}
-                      >
-                        {p.label}
-                      </button>
-                    ))}
-                  </div>
-                </div>
+              {/* Authentic Yemeni License Plate Widget (All Black Text, Dual Numerals, No Chip, No Screws) */}
+              <div className="p-3.5 rounded-xl bg-slate-900 border border-slate-800 space-y-3">
+                <YemeniPlateWidget
+                  plateNumber={formData.plate_number}
+                  plateDivider={formData.plate_divider}
+                  plateType={formData.plate_type}
+                  onChange={({ plate_number, plate_divider, plate_type }) => {
+                    setFormData(prev => ({
+                      ...prev,
+                      plate_number,
+                      plate_divider,
+                      plate_type,
+                    }));
+                  }}
+                />
 
-                {/* Divider, Plate Number, and Category */}
-                <div className="grid grid-cols-12 gap-2 items-center">
-                  <div className="col-span-3">
-                    <label className="block text-[10px] font-bold text-slate-400 mb-1">الفاصل (1 أو 2)</label>
-                    <input
-                      type="text"
-                      tabIndex={8}
-                      value={formData.plate_divider}
-                      onChange={(e) => setFormData({ ...formData, plate_divider: e.target.value })}
-                      className="w-full h-10 bg-slate-950 border border-slate-700 text-center text-amber-400 font-mono font-black text-sm rounded-lg focus:border-amber-400 focus:outline-none"
-                    />
-                  </div>
-                  <div className="col-span-5">
-                    <label className="block text-[10px] font-bold text-slate-400 mb-1">رقم اللوحة</label>
-                    <input
-                      type="text"
-                      tabIndex={9}
-                      placeholder="مثال: 45892"
-                      value={formData.plate_number}
-                      onChange={(e) => setFormData({ ...formData, plate_number: e.target.value })}
-                      className="w-full h-10 bg-slate-950 border border-slate-700 text-center text-white font-mono font-black text-base rounded-lg focus:border-amber-400 focus:outline-none"
-                    />
-                  </div>
-                  <div className="col-span-4">
-                    <label className="block text-[10px] font-bold text-slate-400 mb-1">تصنيف المركبة</label>
-                    <select
-                      tabIndex={10}
-                      value={formData.vehicle_category}
-                      onChange={(e) => setFormData({ ...formData, vehicle_category: e.target.value })}
-                      className="w-full h-10 bg-slate-950 border border-slate-700 text-white font-bold text-xs rounded-lg px-2 focus:border-amber-400 focus:outline-none cursor-pointer"
-                    >
-                      {vehicleCategories.map(cat => (
-                        <option key={cat} value={cat}>{cat}</option>
-                      ))}
-                    </select>
-                  </div>
+                <div>
+                  <label className="block text-[10px] font-bold text-slate-400 mb-1">تصنيف المركبة</label>
+                  <select
+                    tabIndex={10}
+                    value={formData.vehicle_category}
+                    onChange={(e) => setFormData({ ...formData, vehicle_category: e.target.value })}
+                    className="w-full h-10 bg-slate-950 border border-slate-700 text-white font-bold text-xs rounded-xl px-3 focus:border-amber-400 focus:outline-none cursor-pointer"
+                  >
+                    {vehicleCategories.map(cat => (
+                      <option key={cat} value={cat}>{cat}</option>
+                    ))}
+                  </select>
                 </div>
               </div>
 
