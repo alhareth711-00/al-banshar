@@ -30,6 +30,16 @@ export default function WorkersView({ workers = [], onRefreshData, onOpenCustome
   const [debtVehicles, setDebtVehicles] = useState([]);
   const [loading, setLoading] = useState(true);
 
+  // 3 Live Variants Switcher (1. Tactical Feed | 2. Tactile Touch Cards | 3. Executive Apple Glass)
+  const [workerStyle, setWorkerStyle] = useState(() => {
+    return localStorage.getItem('ql_workers_style') || 'tactical';
+  });
+
+  const handleSetStyle = (style) => {
+    setWorkerStyle(style);
+    localStorage.setItem('ql_workers_style', style);
+  };
+
   // Modals state
   const [showCategoryModal, setShowCategoryModal] = useState(false);
   const [showAdvanceModal, setShowAdvanceModal] = useState(false);
@@ -296,8 +306,49 @@ export default function WorkersView({ workers = [], onRefreshData, onOpenCustome
           </div>
         </div>
 
-        {/* Action Buttons */}
-        <div className="flex items-center gap-2">
+        {/* Action Buttons & Style Switcher */}
+        <div className="flex flex-wrap items-center gap-2">
+          {/* Live Workers Style Switcher */}
+          <div className="flex items-center gap-1 p-1 bg-slate-900/90 rounded-2xl border border-white/10 text-xs">
+            <span className="text-slate-400 text-[11px] font-bold px-1.5">الشكل:</span>
+            <button
+              type="button"
+              onClick={() => handleSetStyle('tactical')}
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition tap-bounce ${
+                workerStyle === 'tactical'
+                  ? 'bg-amber-400 text-slate-950 font-black shadow-sm'
+                  : 'text-slate-300 hover:text-white hover:bg-white/5'
+              }`}
+              title="الشكل 1: شريط تكتيكي سريع ومضغوط"
+            >
+              1. شريط تكتيكي
+            </button>
+            <button
+              type="button"
+              onClick={() => handleSetStyle('touch')}
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition tap-bounce ${
+                workerStyle === 'touch'
+                  ? 'bg-emerald-500 text-slate-950 font-black shadow-sm'
+                  : 'text-slate-300 hover:text-white hover:bg-white/5'
+              }`}
+              title="الشكل 2: بطاقات لمسية للكيوسك"
+            >
+              2. بطاقات لمسية
+            </button>
+            <button
+              type="button"
+              onClick={() => handleSetStyle('glass')}
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition tap-bounce ${
+                workerStyle === 'glass'
+                  ? 'bg-purple-500 text-white font-black shadow-sm'
+                  : 'text-slate-300 hover:text-white hover:bg-white/5'
+              }`}
+              title="الشكل 3: مركز الكوادر الزجاجي"
+            >
+              3. مركز زجاجي
+            </button>
+          </div>
+
           <button
             type="button"
             onClick={() => setShowCategoryModal(true)}
@@ -434,94 +485,285 @@ export default function WorkersView({ workers = [], onRefreshData, onOpenCustome
       {/* 4. Tab 1: Technicians and Daily Wages */}
       {activeTab === 'workers' && (
         <div className="flex-1 overflow-y-auto space-y-3 pr-1">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-3.5">
-            {workerStats.map((w) => {
-              const isFullyPaid = w.net_due_today <= 0;
+          {workerStyle === 'tactical' ? (
+            /* ============================================================
+               STYLE 1: الشريط التكتيكي السريع (Tactical Workshop Feed)
+               صفوف أفقية مدمجة وسريعة لمتابعة أداء الفنيين وصرف السلف
+               ============================================================ */
+            <div className="space-y-2.5">
+              {workerStats.map((w) => {
+                const isFullyPaid = w.net_due_today <= 0;
 
-              return (
-                <div
-                  key={w.worker_id}
-                  className="apple-glass-card rounded-3xl p-5 border border-white/10 flex flex-col justify-between gap-4"
-                >
-                  {/* Top info */}
-                  <div>
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2.5">
-                        <div className="w-10 h-10 rounded-xl bg-purple-500/20 text-purple-300 font-black text-sm flex items-center justify-center border border-purple-500/30">
-                          {w.name.charAt(0)}
-                        </div>
-                        <div>
-                          <div className="text-base font-extrabold text-white">{w.name}</div>
-                          <div className="text-xs text-purple-400 font-semibold">{w.role}</div>
-                        </div>
+                return (
+                  <div
+                    key={w.worker_id}
+                    className="p-3.5 rounded-2xl bg-slate-900/90 border border-white/10 hover:border-amber-400/40 transition-all flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-3 shadow-lg"
+                  >
+                    {/* Worker Identity */}
+                    <div className="flex items-center gap-3 min-w-[240px]">
+                      <div className="w-10 h-10 rounded-xl bg-amber-400/20 text-amber-400 font-black text-sm flex items-center justify-center border border-amber-400/30 flex-shrink-0">
+                        {w.name.charAt(0)}
                       </div>
-                      <span className="text-[11px] font-mono text-slate-400 bg-slate-900 px-2 py-0.5 rounded-lg border border-white/5">
-                        {w.phone}
-                      </span>
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <span className="font-extrabold text-sm text-white">{w.name}</span>
+                          <span className="text-[11px] px-2 py-0.5 rounded-md bg-purple-500/20 text-purple-300 border border-purple-500/30 font-bold">
+                            {w.role}
+                          </span>
+                        </div>
+                        <div className="text-xs text-slate-400 font-mono mt-0.5">{w.phone}</div>
+                      </div>
                     </div>
 
-                    {/* Stats Grid */}
-                    <div className="grid grid-cols-2 gap-2 mt-4 pt-3 border-t border-white/10 text-xs">
-                      <div className="p-2 rounded-xl bg-slate-900/60 border border-white/5">
-                        <div className="text-[10px] text-slate-400">الراتب الأساسي اليومي:</div>
-                        <div className="font-mono font-bold text-slate-200 mt-0.5">
+                    {/* Stats Badges */}
+                    <div className="flex flex-wrap items-center gap-2 flex-1 lg:justify-center text-xs">
+                      <div className="px-3 py-1 rounded-xl bg-slate-950/70 border border-white/5 flex items-center gap-1.5">
+                        <Car className="w-3.5 h-3.5 text-emerald-400" />
+                        <span className="text-slate-400">إنجاز اليوم:</span>
+                        <span className="font-mono font-black text-emerald-400">{w.cars_served_today} سيارة</span>
+                      </div>
+
+                      <div className="px-3 py-1 rounded-xl bg-slate-950/70 border border-white/5 flex items-center gap-1.5">
+                        <span className="text-slate-400">الراتب الأساسي:</span>
+                        <span className="font-mono font-bold text-slate-200">
                           {Number(w.daily_base_wage).toLocaleString()} ر.ي
-                        </div>
+                        </span>
                       </div>
 
-                      <div className="p-2 rounded-xl bg-slate-900/60 border border-white/5">
-                        <div className="text-[10px] text-slate-400">السيارات المخدومة اليوم:</div>
-                        <div className="font-mono font-extrabold text-emerald-400 mt-0.5 flex items-center gap-1">
-                          <Car className="w-3.5 h-3.5" />
-                          <span>{w.cars_served_today} سيارات</span>
-                        </div>
-                      </div>
-
-                      <div className="p-2 rounded-xl bg-slate-900/60 border border-white/5">
-                        <div className="text-[10px] text-slate-400">المسحوبات / السلف:</div>
-                        <div className="font-mono font-bold text-amber-400 mt-0.5">
+                      <div className="px-3 py-1 rounded-xl bg-slate-950/70 border border-white/5 flex items-center gap-1.5">
+                        <span className="text-slate-400">السلف:</span>
+                        <span className="font-mono font-bold text-amber-400">
                           -{Number(w.advances_taken_today).toLocaleString()} ر.ي
-                        </div>
+                        </span>
                       </div>
 
-                      <div className="p-2 rounded-xl bg-purple-500/10 border border-purple-500/20">
-                        <div className="text-[10px] text-purple-300 font-bold">الصافي المستحق له:</div>
-                        <div className="font-mono font-black text-white text-sm mt-0.5">
+                      <div className="px-3 py-1 rounded-xl bg-purple-950/50 border border-purple-500/30 flex items-center gap-1.5 shadow-sm">
+                        <span className="text-purple-300 font-bold">الصافي المستحق:</span>
+                        <span className="font-mono font-black text-white text-sm">
                           {Number(w.net_due_today).toLocaleString()} ر.ي
-                        </div>
+                        </span>
                       </div>
                     </div>
-                  </div>
 
-                  {/* Actions */}
-                  <div className="pt-2 border-t border-white/10 flex items-center gap-2">
-                    {onOpenWorkerStatement && (
+                    {/* Action Buttons */}
+                    <div className="flex items-center gap-2 pt-2 lg:pt-0 border-t lg:border-t-0 border-white/10">
+                      {onOpenWorkerStatement && (
+                        <button
+                          type="button"
+                          onClick={() => onOpenWorkerStatement(w.worker_id)}
+                          className="px-3.5 min-h-[42px] rounded-xl bg-white/5 hover:bg-white/10 text-slate-300 hover:text-white border border-white/10 font-bold text-xs flex items-center justify-center gap-1 transition active:scale-95"
+                          title="كشف حساب وسلف الفني"
+                        >
+                          <FileText className="w-3.5 h-3.5" />
+                          <span>كشف حساب</span>
+                        </button>
+                      )}
+
                       <button
                         type="button"
-                        onClick={() => onOpenWorkerStatement(w.worker_id)}
-                        className="px-3 min-h-[44px] rounded-xl bg-white/5 hover:bg-white/10 text-slate-300 border border-white/10 font-bold text-xs flex items-center justify-center gap-1 transition active:scale-95"
-                        title="كشف حساب وسلف الفني"
+                        onClick={() => {
+                          setSelectedWorkerForAdvance(w);
+                          setShowAdvanceModal(true);
+                        }}
+                        className="px-4 min-h-[42px] rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 font-black text-xs flex items-center justify-center gap-1.5 transition active:scale-95 shadow-md shadow-amber-950/20"
                       >
-                        <FileText className="w-3.5 h-3.5" />
-                        <span>كشف حساب</span>
+                        <Wallet className="w-4 h-4 stroke-[2.5]" />
+                        <span>تسجيل سلفة 💸</span>
                       </button>
-                    )}
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setSelectedWorkerForAdvance(w);
-                        setShowAdvanceModal(true);
-                      }}
-                      className="flex-1 min-h-[44px] rounded-xl bg-purple-500/20 hover:bg-purple-500/30 text-purple-300 border border-purple-500/30 font-extrabold text-xs flex items-center justify-center gap-2 transition active:scale-95"
-                    >
-                      <Wallet className="w-4 h-4" />
-                      <span>تسجيل سلفة للعامل 💸</span>
-                    </button>
+                    </div>
                   </div>
-                </div>
-              );
-            })}
-          </div>
+                );
+              })}
+            </div>
+          ) : workerStyle === 'touch' ? (
+            /* ============================================================
+               STYLE 2: البطاقات اللمسية للكيوسك (Tactile Touch Cards)
+               بطاقات عريضة بمسافات لمس رحبة ومريحة تمنع أخطاء النقر
+               ============================================================ */
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+              {workerStats.map((w) => {
+                const isFullyPaid = w.net_due_today <= 0;
+
+                return (
+                  <div
+                    key={w.worker_id}
+                    className="p-5 rounded-3xl bg-gradient-to-b from-emerald-950/30 to-slate-900 border-2 border-emerald-500/40 shadow-xl flex flex-col justify-between gap-4"
+                  >
+                    <div>
+                      {/* Top info */}
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                          <div className="w-11 h-11 rounded-2xl bg-emerald-500/20 text-emerald-300 font-black text-base flex items-center justify-center border border-emerald-500/40">
+                            {w.name.charAt(0)}
+                          </div>
+                          <div>
+                            <div className="text-base font-black text-white">{w.name}</div>
+                            <div className="text-xs text-emerald-400 font-bold">{w.role}</div>
+                          </div>
+                        </div>
+                        <span className="text-xs font-mono font-bold text-slate-300 bg-slate-950 px-2.5 py-1 rounded-xl border border-white/10">
+                          {w.phone}
+                        </span>
+                      </div>
+
+                      {/* Stats Grid */}
+                      <div className="grid grid-cols-2 gap-2 mt-4 pt-3 border-t border-white/10 text-xs">
+                        <div className="p-2.5 rounded-xl bg-slate-950/80 border border-white/5">
+                          <div className="text-[10px] text-slate-400">الراتب الأساسي:</div>
+                          <div className="font-mono font-bold text-slate-200 mt-0.5">
+                            {Number(w.daily_base_wage).toLocaleString()} ر.ي
+                          </div>
+                        </div>
+
+                        <div className="p-2.5 rounded-xl bg-slate-950/80 border border-white/5">
+                          <div className="text-[10px] text-slate-400">إنجاز اليوم:</div>
+                          <div className="font-mono font-extrabold text-emerald-400 mt-0.5 flex items-center gap-1">
+                            <Car className="w-3.5 h-3.5" />
+                            <span>{w.cars_served_today} سيارات</span>
+                          </div>
+                        </div>
+
+                        <div className="p-2.5 rounded-xl bg-slate-950/80 border border-white/5">
+                          <div className="text-[10px] text-slate-400">المسحوبات / السلف:</div>
+                          <div className="font-mono font-bold text-amber-400 mt-0.5">
+                            -{Number(w.advances_taken_today).toLocaleString()} ر.ي
+                          </div>
+                        </div>
+
+                        <div className="p-2.5 rounded-xl bg-emerald-500/15 border border-emerald-500/30">
+                          <div className="text-[10px] text-emerald-300 font-bold">الصافي المستحق:</div>
+                          <div className="font-mono font-black text-white text-base mt-0.5">
+                            {Number(w.net_due_today).toLocaleString()} ر.ي
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Touch Action Buttons */}
+                    <div className="pt-2 border-t border-white/10 flex items-center gap-2">
+                      {onOpenWorkerStatement && (
+                        <button
+                          type="button"
+                          onClick={() => onOpenWorkerStatement(w.worker_id)}
+                          className="px-4 min-h-[46px] rounded-xl bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs flex items-center justify-center gap-1.5 transition active:scale-95"
+                          title="كشف حساب وسلف الفني"
+                        >
+                          <FileText className="w-4 h-4" />
+                          <span>كشف حساب</span>
+                        </button>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSelectedWorkerForAdvance(w);
+                          setShowAdvanceModal(true);
+                        }}
+                        className="flex-1 min-h-[46px] rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-xs flex items-center justify-center gap-2 transition active:scale-95 shadow-md shadow-emerald-950/30"
+                      >
+                        <Wallet className="w-4 h-4 stroke-[2.5]" />
+                        <span>تسجيل سلفة للعامل 💸</span>
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          ) : (
+            /* ============================================================
+               STYLE 3: مركز الكوادر الزجاجي الفاخر (Executive Apple Glass)
+               تصميم زجاجي عصري مع شريط نيون بنفسجي وأناقة بصرية مطلقة
+               ============================================================ */
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
+              {workerStats.map((w) => {
+                const isFullyPaid = w.net_due_today <= 0;
+
+                return (
+                  <div
+                    key={w.worker_id}
+                    className="relative overflow-hidden rounded-3xl p-5 border border-white/10 bg-slate-900/60 backdrop-blur-xl shadow-2xl hover:border-purple-500/40 transition-all flex flex-col justify-between gap-4"
+                  >
+                    <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-purple-500 via-pink-400 to-indigo-500" />
+
+                    <div>
+                      {/* Top info */}
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2.5">
+                          <div className="w-10 h-10 rounded-2xl bg-purple-500/20 text-purple-300 font-extrabold text-sm flex items-center justify-center border border-purple-500/30 shadow-inner">
+                            {w.name.charAt(0)}
+                          </div>
+                          <div>
+                            <div className="text-base font-extrabold text-white">{w.name}</div>
+                            <div className="text-xs text-purple-400 font-semibold">{w.role}</div>
+                          </div>
+                        </div>
+                        <span className="text-[11px] font-mono text-slate-400 bg-slate-950/80 px-2.5 py-1 rounded-xl border border-white/10">
+                          {w.phone}
+                        </span>
+                      </div>
+
+                      {/* Stats Grid */}
+                      <div className="grid grid-cols-2 gap-2 mt-4 pt-3 border-t border-white/10 text-xs">
+                        <div className="p-2 rounded-xl bg-white/5 border border-white/5">
+                          <div className="text-[10px] text-slate-400">الراتب الأساسي:</div>
+                          <div className="font-mono font-bold text-slate-200 mt-0.5">
+                            {Number(w.daily_base_wage).toLocaleString()} ر.ي
+                          </div>
+                        </div>
+
+                        <div className="p-2 rounded-xl bg-white/5 border border-white/5">
+                          <div className="text-[10px] text-slate-400">إنجاز اليوم:</div>
+                          <div className="font-mono font-extrabold text-emerald-400 mt-0.5 flex items-center gap-1">
+                            <Car className="w-3.5 h-3.5" />
+                            <span>{w.cars_served_today} سيارات</span>
+                          </div>
+                        </div>
+
+                        <div className="p-2 rounded-xl bg-white/5 border border-white/5">
+                          <div className="text-[10px] text-slate-400">المسحوبات / السلف:</div>
+                          <div className="font-mono font-bold text-amber-400 mt-0.5">
+                            -{Number(w.advances_taken_today).toLocaleString()} ر.ي
+                          </div>
+                        </div>
+
+                        <div className="p-2 rounded-xl bg-purple-500/15 border border-purple-500/30">
+                          <div className="text-[10px] text-purple-300 font-bold">الصافي المستحق:</div>
+                          <div className="font-mono font-black text-white text-sm mt-0.5">
+                            {Number(w.net_due_today).toLocaleString()} ر.ي
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Actions */}
+                    <div className="pt-2 border-t border-white/10 flex items-center gap-2">
+                      {onOpenWorkerStatement && (
+                        <button
+                          type="button"
+                          onClick={() => onOpenWorkerStatement(w.worker_id)}
+                          className="px-3 min-h-[44px] rounded-xl bg-white/5 hover:bg-white/10 text-slate-300 border border-white/10 font-bold text-xs flex items-center justify-center gap-1 transition active:scale-95"
+                          title="كشف حساب وسلف الفني"
+                        >
+                          <FileText className="w-3.5 h-3.5" />
+                          <span>كشف حساب</span>
+                        </button>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSelectedWorkerForAdvance(w);
+                          setShowAdvanceModal(true);
+                        }}
+                        className="flex-1 min-h-[44px] rounded-xl bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-400 hover:to-pink-400 text-white font-extrabold text-xs flex items-center justify-center gap-2 transition active:scale-95 shadow-lg shadow-purple-500/20"
+                      >
+                        <Wallet className="w-4 h-4" />
+                        <span>تسجيل سلفة للعامل 💸</span>
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </div>
       )}
 
