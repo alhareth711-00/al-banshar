@@ -18,7 +18,7 @@ export default function PlateSearchFlyout({
   onOpenNewVehicleModal,
 }) {
   const [plateNumber, setPlateNumber] = useState('');
-  const [plateDivider, setPlateDivider] = useState('1');
+  const [plateDivider, setPlateDivider] = useState(''); // غير محدد افتراضياً (Unset / Auto)
   const [detectedType, setDetectedType] = useState(null); // null = neutral white initially
   const [searchResults, setSearchResults] = useState([]);
   const [isSearching, setIsSearching] = useState(false);
@@ -32,7 +32,7 @@ export default function PlateSearchFlyout({
   useEffect(() => {
     if (isOpen) {
       setPlateNumber('');
-      setPlateDivider('1');
+      setPlateDivider(''); // إعادة تعيين الفاصل ليكون غير محدد
       setDetectedType(null);
       setMatchedVehicle(null);
       setSearchResults([]);
@@ -59,6 +59,7 @@ export default function PlateSearchFlyout({
       setSearchResults([]);
       setMatchedVehicle(null);
       setDetectedType(null);
+      setPlateDivider('');
       setHasPlayedChime(false);
       return;
     }
@@ -73,7 +74,7 @@ export default function PlateSearchFlyout({
           // Look for exact plate number matches or close matches
           const exactMatch = data.data.find((v) => {
             const vNum = String(v.plate_number || '').replace(/\D/g, '');
-            return vNum === cleanNumber;
+            return vNum === cleanNumber || vNum.endsWith(cleanNumber);
           });
 
           const primary = exactMatch || data.data[0];
@@ -81,10 +82,22 @@ export default function PlateSearchFlyout({
           setMatchedVehicle(primary);
 
           // Smart Auto-Detection: morph plate color & type to the matched vehicle's type
-          if (primary && primary.plate_type) {
-            setDetectedType(primary.plate_type);
+          if (primary) {
+            if (primary.plate_type) {
+              setDetectedType(primary.plate_type);
+            }
+            // Auto-detect divider from DB column or parse from plate_number (e.g. "2-98765")
+            let autoDivider = '';
             if (primary.plate_divider) {
-              setPlateDivider(String(primary.plate_divider));
+              autoDivider = String(primary.plate_divider);
+            } else if (primary.plate_number && primary.plate_number.includes('-')) {
+              const parts = primary.plate_number.split('-');
+              if (parts[0] && /^\d+$/.test(parts[0].trim())) {
+                autoDivider = parts[0].trim();
+              }
+            }
+            if (autoDivider) {
+              setPlateDivider(autoDivider);
             }
             if (!hasPlayedChime) {
               playMatchChime();
@@ -163,7 +176,7 @@ export default function PlateSearchFlyout({
           en,
           ar: easternDigits[parseInt(en, 10)] || en,
         }))
-      : [{ en: '1', ar: '١' }];
+      : [{ en: '—', ar: '—' }];
 
   const numDigitsCount = numberPairs.length;
   const numGapClass = numDigitsCount >= 6 ? 'gap-1.5' : numDigitsCount >= 5 ? 'gap-2.5' : 'gap-3.5';
@@ -291,13 +304,13 @@ export default function PlateSearchFlyout({
               />
             </div>
 
-            {/* LEFT SIDE: Divider */}
+            {/* LEFT SIDE: Divider (غير محدد افتراضياً / يكتشف تلقائياً) */}
             <div
               className="w-[22%] flex flex-col items-center justify-center px-1.5 py-2.5 relative group cursor-text hover:bg-black/5 focus-within:bg-black/5"
               onClick={() => dividerInputRef.current?.focus()}
             >
               <span className="text-[9px] font-bold text-slate-900/60 absolute top-1 right-1.5 pointer-events-none select-none">
-                الفاصل
+                {cleanDivider ? 'الفاصل' : 'الفاصل (تلقائي)'}
               </span>
 
               {/* Divider Paired Digits */}
@@ -310,10 +323,14 @@ export default function PlateSearchFlyout({
                     key={idx}
                     className="flex flex-col items-center justify-center min-w-[18px] shrink-0"
                   >
-                    <span className="arabic-plate-number text-2xl sm:text-3xl font-black leading-none text-slate-950 text-center">
+                    <span className={`arabic-plate-number text-2xl sm:text-3xl font-black leading-none text-center ${
+                      cleanDivider ? 'text-slate-950' : 'text-slate-400/90'
+                    }`}>
                       {pair.ar}
                     </span>
-                    <span className="english-plate-number text-xl sm:text-2xl font-black leading-none text-slate-950 text-center mt-2">
+                    <span className={`english-plate-number text-xl sm:text-2xl font-black leading-none text-center mt-2 ${
+                      cleanDivider ? 'text-slate-950' : 'text-slate-400/90'
+                    }`}>
                       {pair.en}
                     </span>
                   </div>
@@ -326,7 +343,7 @@ export default function PlateSearchFlyout({
                 type="text"
                 value={cleanDivider}
                 maxLength={2}
-                placeholder="1"
+                placeholder="—"
                 onChange={(e) => setPlateDivider(e.target.value)}
                 className="absolute inset-0 w-full h-full opacity-0 cursor-text z-10"
                 autoComplete="off"
@@ -338,6 +355,35 @@ export default function PlateSearchFlyout({
         {/* ─── LIVE RESULT & ACTION AREA ─── */}
         {cleanNumber.length > 0 && (
           <div className="space-y-3 pt-1">
+            {/* Multi-match pills if identical or similar numbers match across different dividers/types */}
+            {searchResults.length > 1 && (
+              <div className="flex items-center gap-1.5 flex-wrap p-2 rounded-xl bg-slate-950/60 border border-white/5">
+                <span className="text-[11px] font-bold text-amber-300">تطابقات متعددة:</span>
+                {searchResults.map((v) => {
+                  const isSelected = matchedVehicle && matchedVehicle.id === v.id;
+                  const vDiv = v.plate_divider || (v.plate_number && v.plate_number.includes('-') ? v.plate_number.split('-')[0] : '');
+                  return (
+                    <button
+                      key={v.id}
+                      type="button"
+                      onClick={() => {
+                        setMatchedVehicle(v);
+                        if (v.plate_type) setDetectedType(v.plate_type);
+                        if (vDiv) setPlateDivider(String(vDiv));
+                      }}
+                      className={`px-2.5 py-1 rounded-lg text-xs font-bold border transition ${
+                        isSelected
+                          ? 'bg-amber-500 text-slate-950 border-amber-400 shadow-sm font-black'
+                          : 'bg-slate-800 text-slate-300 border-white/10 hover:border-white/30'
+                      }`}
+                    >
+                      فاصل {vDiv || '1'} ({v.plate_type || 'خصوصي'} - {v.car_make_model})
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+
             {matchedVehicle ? (
               /* MATCHED VEHICLE CARD */
               <div className="p-3.5 rounded-2xl bg-gradient-to-r from-emerald-500/15 via-slate-800 to-slate-800 border-2 border-emerald-500/40 space-y-2.5 animate-in fade-in">
@@ -396,7 +442,7 @@ export default function PlateSearchFlyout({
               <div className="p-3.5 rounded-2xl bg-amber-500/10 border border-amber-500/30 space-y-2.5 animate-in fade-in">
                 <div className="flex items-center gap-2 text-amber-300 font-bold text-xs">
                   <AlertCircle className="w-4 h-4 text-amber-400 shrink-0" />
-                  <span>اللوحة ({cleanDivider}-{cleanNumber}) غير مسجلة مسبقاً — هل تود تسجيلها كعميل جديد؟</span>
+                  <span>اللوحة ({cleanDivider ? `${cleanDivider}-` : ''}{cleanNumber}) غير مسجلة مسبقاً — هل تود تسجيلها كعميل جديد؟</span>
                 </div>
 
                 <button
