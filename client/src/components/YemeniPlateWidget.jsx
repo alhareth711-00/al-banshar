@@ -76,6 +76,38 @@ export default function YemeniPlateWidget({
         }))
       : [{ en: '1', ar: '١' }];
 
+  // Dynamic responsive gap & typography based on digit count (up to 6 digits comfortable fit)
+  const numDigitsCount = numberPairs.length;
+  
+  // Gap spacing: dynamic to ensure 6 digits never clip or crowd borders
+  const numGapClass =
+    numDigitsCount >= 6
+      ? 'gap-1 sm:gap-2'
+      : numDigitsCount >= 5
+      ? 'gap-2 sm:gap-3'
+      : 'gap-3 sm:gap-4.5';
+
+  const numColWidthClass =
+    numDigitsCount >= 6
+      ? 'min-w-[18px] sm:min-w-[22px]'
+      : numDigitsCount >= 5
+      ? 'min-w-[22px] sm:min-w-[26px]'
+      : 'min-w-[26px] sm:min-w-[32px]';
+
+  const arNumFontSizeClass =
+    numDigitsCount >= 6
+      ? 'text-2xl sm:text-3xl'
+      : numDigitsCount >= 5
+      ? 'text-3xl sm:text-4xl'
+      : 'text-3xl sm:text-4xl';
+
+  const enNumFontSizeClass =
+    numDigitsCount >= 6
+      ? 'text-xl sm:text-2xl'
+      : numDigitsCount >= 5
+      ? 'text-2xl sm:text-3xl'
+      : 'text-2xl sm:text-3xl';
+
   return (
     <div className={`space-y-2.5 ${className}`}>
       {/* ─── 1. TYPE SELECTOR PILLS (IF EDITABLE) ─── */}
@@ -103,7 +135,7 @@ export default function YemeniPlateWidget({
         </div>
       )}
 
-      {/* ─── 2. AUTHENTIC YEMENI PLATE REPLICA (PERFECT COLUMN ALIGNMENT) ─── */}
+      {/* ─── 2. AUTHENTIC YEMENI PLATE REPLICA (PERFECT COLUMN ALIGNMENT & NO CLIPPING) ─── */}
       <div
         className={`yemen-plate-container w-full rounded-2xl overflow-hidden border-2 border-slate-950 shadow-2xl transition-colors duration-200 select-none ${currentMeta.bg} text-slate-950`}
         style={{
@@ -111,7 +143,7 @@ export default function YemeniPlateWidget({
         }}
       >
         {/* Top Header Strip: اليمن أقصى اليمين | نوع اللوحة أقصى الشمال بحجم كبير يملأ المكان */}
-        <div className="py-2 px-6 flex items-center justify-between border-b-2 border-slate-950 bg-black/5">
+        <div className="py-2 px-5 flex items-center justify-between border-b-2 border-slate-950 bg-black/5">
           {/* أقصى اليمين: اليَمَن */}
           <span className="text-xl sm:text-2xl font-black text-slate-950 tracking-wider">
             اليَمَن
@@ -124,38 +156,38 @@ export default function YemeniPlateWidget({
         </div>
 
         {/* Bottom Section:
-             - اليمين (Right): رقم اللوحة الرئيسي (Wider compartment)
-             - الشمال (Left): الفاصل (Narrower compartment)
+             - اليمين (Right): رقم اللوحة الرئيسي (78% width - generous breathing space)
+             - الشمال (Left): الفاصل (22% width - neat divider compartment)
         */}
-        <div className="grid grid-cols-12 min-h-[110px] items-stretch text-slate-950">
+        <div className="flex min-h-[105px] items-stretch text-slate-950">
           
-          {/* ─── RIGHT SIDE (يمين النموذج): رقم اللوحة الرئيسي ─── */}
+          {/* ─── RIGHT SIDE (يمين النموذج): رقم اللوحة الرئيسي (78% width) ─── */}
           <div
-            className={`col-span-8 sm:col-span-9 flex flex-col items-center justify-center p-3 border-l-2 border-slate-950 relative group transition-colors ${
+            className={`w-[78%] flex flex-col items-center justify-center px-2 py-2.5 border-l-2 border-slate-950 relative group transition-colors overflow-hidden ${
               editable ? 'cursor-text hover:bg-black/5 focus-within:bg-black/5' : ''
             }`}
             onClick={() => editable && numberInputRef.current?.focus()}
           >
-            <span className="text-[9px] font-bold text-slate-900/60 absolute top-1.5 right-3 pointer-events-none select-none">
+            <span className="text-[9px] font-bold text-slate-900/60 absolute top-1 right-2.5 pointer-events-none select-none">
               رقم اللوحة
             </span>
 
             {/* Paired Columns: Each Arabic digit directly above its English counterpart */}
             <div
               dir="ltr"
-              className="flex items-center justify-center gap-3 sm:gap-5.5 pointer-events-none select-none z-0 py-1"
+              className={`flex items-center justify-center ${numGapClass} pointer-events-none select-none z-0 py-1 w-full max-w-full px-1`}
             >
               {numberPairs.map((pair, idx) => (
                 <div
                   key={idx}
-                  className="flex flex-col items-center justify-center min-w-[26px] sm:min-w-[32px]"
+                  className={`flex flex-col items-center justify-center ${numColWidthClass} shrink-0`}
                 >
                   {/* Top: Arabic Digit (Amiri-Bold) */}
-                  <span className="arabic-plate-number text-3xl sm:text-4xl font-black leading-none text-slate-950 text-center">
+                  <span className={`arabic-plate-number ${arNumFontSizeClass} font-black leading-none text-slate-950 text-center`}>
                     {pair.ar}
                   </span>
                   {/* Bottom: English Digit (Oswald-Bold) */}
-                  <span className="english-plate-number text-2xl sm:text-3xl font-black leading-none text-slate-950 text-center mt-2.5">
+                  <span className={`english-plate-number ${enNumFontSizeClass} font-black leading-none text-slate-950 text-center mt-2`}>
                     {pair.en}
                   </span>
                 </div>
@@ -179,33 +211,33 @@ export default function YemeniPlateWidget({
             )}
           </div>
 
-          {/* ─── LEFT SIDE (شمال النموذج): رقم الفاصل ─── */}
+          {/* ─── LEFT SIDE (شمال النموذج): رقم الفاصل (22% width) ─── */}
           <div
-            className={`col-span-4 sm:col-span-3 flex flex-col items-center justify-center p-3 relative group transition-colors ${
+            className={`w-[22%] flex flex-col items-center justify-center px-1.5 py-2.5 relative group transition-colors ${
               editable ? 'cursor-text hover:bg-black/5 focus-within:bg-black/5' : ''
             }`}
             onClick={() => editable && dividerInputRef.current?.focus()}
           >
-            <span className="text-[9px] font-bold text-slate-900/60 absolute top-1.5 right-2.5 pointer-events-none select-none">
+            <span className="text-[9px] font-bold text-slate-900/60 absolute top-1 right-1.5 pointer-events-none select-none">
               الفاصل
             </span>
 
             {/* Paired Columns for Divider */}
             <div
               dir="ltr"
-              className="flex items-center justify-center gap-2 sm:gap-3 pointer-events-none select-none z-0 py-1"
+              className="flex items-center justify-center gap-1.5 sm:gap-2 pointer-events-none select-none z-0 py-1"
             >
               {dividerPairs.map((pair, idx) => (
                 <div
                   key={idx}
-                  className="flex flex-col items-center justify-center min-w-[22px] sm:min-w-[26px]"
+                  className="flex flex-col items-center justify-center min-w-[18px] sm:min-w-[22px] shrink-0"
                 >
                   {/* Top: Arabic Divider Digit (Amiri-Bold) */}
                   <span className="arabic-plate-number text-2xl sm:text-3xl font-black leading-none text-slate-950 text-center">
                     {pair.ar}
                   </span>
                   {/* Bottom: English Divider Digit (Oswald-Bold) */}
-                  <span className="english-plate-number text-xl sm:text-2xl font-black leading-none text-slate-950 text-center mt-2.5">
+                  <span className="english-plate-number text-xl sm:text-2xl font-black leading-none text-slate-950 text-center mt-2">
                     {pair.en}
                   </span>
                 </div>
