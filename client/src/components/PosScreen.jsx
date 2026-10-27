@@ -46,6 +46,7 @@ import InvoiceReceiptModal from './InvoiceReceiptModal';
 import PendingServicesModal from './PendingServicesModal';
 import VehicleHistoryDrawer from './VehicleHistoryDrawer';
 import ReceiptVoucherModal from './ReceiptVoucherModal';
+import PlateSearchFlyout from './PlateSearchFlyout';
 import {
   isDemoMode,
   setDemoMode,
@@ -96,7 +97,9 @@ export default function PosScreen({
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState([]);
   const [isSearching, setIsSearching] = useState(false);
+  const [showPlateSearchFlyout, setShowPlateSearchFlyout] = useState(false);
   const searchContainerRef = useRef(null);
+  const customerSearchInputRef = useRef(null);
 
   // In Quick Mode: quickCustomerOverride can be null (meaning default general customer) or a registered customer
   const [quickCustomerOverride, setQuickCustomerOverride] = useState(null);
@@ -205,6 +208,12 @@ export default function PosScreen({
     const handleKeyDown = (e) => {
       if (e.key === 'Escape') {
         setSearchResults([]);
+      } else if (e.key === 'F2') {
+        e.preventDefault();
+        setShowPlateSearchFlyout((prev) => !prev);
+      } else if (e.key === 'F3') {
+        e.preventDefault();
+        customerSearchInputRef.current?.focus();
       }
     };
     document.addEventListener('mousedown', handleClickOutside);
@@ -996,26 +1005,72 @@ export default function PosScreen({
             </button>
           </div>
 
-          {/* Unified Search Input (Click-Outside dismissible) */}
-          <div className="relative flex-1" ref={searchContainerRef}>
+          {/* 2. DYNAMIC LIVE PLATE PILL (بحث برقم اللوحة - F2) */}
+          <button
+            type="button"
+            onClick={() => setShowPlateSearchFlyout(true)}
+            className={`min-h-[48px] px-3.5 sm:px-4 rounded-2xl border transition flex items-center gap-2 active:scale-95 flex-shrink-0 select-none shadow-md ${
+              selectedVehicle && selectedVehicle.plate_number && !selectedVehicle.plate_number.startsWith('بدون')
+                ? 'bg-gradient-to-r from-sky-500/20 via-blue-500/20 to-sky-500/20 border-sky-400/60 text-white ring-2 ring-sky-400/30'
+                : 'bg-slate-900/90 hover:bg-slate-800 text-slate-200 border-white/15 hover:border-amber-400/60'
+            }`}
+            title="فتح لوحة البحث برقم اللوحة المباشر (F2)"
+          >
+            {selectedVehicle && selectedVehicle.plate_number && !selectedVehicle.plate_number.startsWith('بدون') ? (
+              <div className="flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse shrink-0" />
+                <span className="text-[11px] font-black text-sky-300">لوحة السيارة:</span>
+                <span className="font-mono font-black text-xs sm:text-sm text-white px-2 py-0.5 rounded-lg bg-black/50 border border-white/10">
+                  {selectedVehicle.plate_number}
+                </span>
+                <span className="text-[10px] text-amber-300 font-mono hidden sm:inline">(F2)</span>
+              </div>
+            ) : (
+              <div className="flex items-center gap-2">
+                <div className="w-6 h-6 rounded-lg bg-amber-500/20 text-amber-400 flex items-center justify-center font-bold text-xs border border-amber-500/30">
+                  🚗
+                </div>
+                <span className="font-extrabold text-xs sm:text-sm">بحث برقم اللوحة</span>
+                <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-black/40 text-amber-300 font-mono font-bold border border-white/10">
+                  F2
+                </span>
+              </div>
+            )}
+          </button>
+
+          {/* 3. CUSTOMER NAME & PHONE SEARCH INPUT (سحب للشمال ومقصر هندسياً) */}
+          <div className="relative flex-1 max-w-xs sm:max-w-sm lg:max-w-md" ref={searchContainerRef}>
             <div className="relative">
               <input
+                ref={customerSearchInputRef}
                 type="text"
-                placeholder={
-                  posMode === 'quick'
-                    ? 'ابحث باسم العميل أو رقم هاتفه أو رقم اللوحة لربط الفاتورة بحسابه (اختياري)...'
-                    : 'ابحث برقم اللوحة (مثلاً: 1-45892) أو اسم العميل أو الهاتف لاختيار السيارة...'
-                }
+                placeholder="ابحث بالاسم أو رقم الهاتف... (F3)"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full min-h-[48px] pr-11 pl-4 rounded-2xl bg-slate-900 border border-white/15 text-white placeholder-slate-400 font-bold text-xs sm:text-sm focus:outline-none focus:border-amber-400 shadow-inner"
+                className="w-full min-h-[48px] pr-10 pl-9 rounded-2xl bg-slate-900 border border-white/15 text-white placeholder-slate-400 font-bold text-xs sm:text-sm focus:outline-none focus:border-amber-400 shadow-inner"
               />
-              <Search className="w-5 h-5 text-slate-400 absolute right-3.5 top-3.5 pointer-events-none" />
+              <Search className="w-4 h-4 text-slate-400 absolute right-3.5 top-4 pointer-events-none" />
+              
+              {/* Instant Clear Button ✕ */}
+              {searchQuery && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSearchQuery('');
+                    setSearchResults([]);
+                    customerSearchInputRef.current?.focus();
+                  }}
+                  className="absolute left-3 top-3.5 w-5 h-5 rounded-full bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white flex items-center justify-center text-xs transition"
+                  title="مسح البحث"
+                >
+                  ✕
+                </button>
+              )}
             </div>
 
-            {/* Autocomplete Dropdown */}
+            {/* Autocomplete Dropdown (100% Solid & Opaque — No Background Clashing) */}
             {searchResults.length > 0 && (
-              <div className="absolute left-0 right-0 top-full mt-1.5 apple-glass-dropdown rounded-2xl border border-white/20 overflow-hidden shadow-2xl z-50 max-h-72 overflow-y-auto custom-scrollbar">
+              <div className="absolute left-0 right-0 top-full mt-2 bg-slate-900 border-2 border-slate-700 rounded-2xl overflow-hidden shadow-2xl z-[999] max-h-80 overflow-y-auto custom-scrollbar">
                 {searchResults.map((v) => {
                   const isNoPlate = !v.plate_number || v.plate_number.startsWith('بدون');
                   return (
@@ -1023,30 +1078,43 @@ export default function PosScreen({
                       key={v.id}
                       type="button"
                       onClick={() => handleSelectVehicle(v)}
-                      className="w-full p-3 text-right hover:bg-white/10 border-b border-white/5 flex items-center justify-between transition group"
+                      className="w-full p-3 text-right hover:bg-slate-800/80 border-b border-white/5 flex items-center justify-between transition group"
                     >
                       <div>
-                        <div className="font-extrabold text-sm text-white flex items-center gap-2">
-                          <span className="group-hover:text-amber-300 transition">
+                        <div className="font-extrabold text-sm text-white flex items-center gap-2 flex-wrap">
+                          <span className="text-white font-bold group-hover:text-amber-300 transition">
+                            {v.customer_name}
+                          </span>
+                          <span className="font-mono text-xs text-slate-400 bg-black/40 px-2 py-0.5 rounded-md border border-white/5">
+                            {v.phone}
+                          </span>
+                          {/* Multi-vehicle badge */}
+                          {v.customer_vehicles_count > 1 && (
+                            <span className="text-[10px] px-2 py-0.5 rounded-full bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 font-bold">
+                              🚗 لديه {v.customer_vehicles_count} سيارات
+                            </span>
+                          )}
+                        </div>
+                        <div className="text-xs text-slate-300 mt-1 flex items-center gap-2">
+                          <span className="text-amber-400 font-mono font-bold">
                             {isNoPlate ? '🚗 (بدون لوحة)' : v.plate_number}
                           </span>
                           {!isNoPlate && (
-                            <span className="text-xs text-amber-400 font-normal">({v.plate_type})</span>
+                            <span className="text-[11px] text-slate-400">({v.plate_type})</span>
                           )}
-                          <span className="text-xs text-slate-300 font-normal">| {v.car_make_model}</span>
-                        </div>
-                        <div className="text-xs text-slate-400 mt-0.5">
-                          العميل: <span className="text-white font-bold">{v.customer_name}</span> &bull;{' '}
-                          <span className="font-mono">{v.phone}</span>
+                          <span className="text-slate-400">&bull;</span>
+                          <span className="text-slate-300 text-xs">{v.car_make_model}</span>
                         </div>
                       </div>
-                      <div className="text-left font-mono text-xs">
+                      <div className="text-left font-mono text-xs shrink-0 mr-2">
                         {v.balance_due > 0 ? (
-                          <span className="text-rose-400 font-bold bg-rose-500/10 px-2 py-0.5 rounded-full border border-rose-500/20">
+                          <span className="text-rose-400 font-bold bg-rose-500/15 px-2.5 py-1 rounded-full border border-rose-500/30 block">
                             دين: {Number(v.balance_due).toLocaleString()} ر.ي
                           </span>
                         ) : (
-                          <span className="text-emerald-400">خالي من الديون</span>
+                          <span className="text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20">
+                            خالي من الديون
+                          </span>
                         )}
                       </div>
                     </button>
@@ -1063,7 +1131,7 @@ export default function PosScreen({
               setEditingVehicle(null);
               setShowNewVehicleModal(true);
             }}
-            className="min-h-[48px] px-4 rounded-2xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-black text-xs sm:text-sm shadow-lg shadow-amber-500/20 flex items-center justify-center gap-2 transition active:scale-95 flex-shrink-0"
+            className="min-h-[48px] px-3.5 sm:px-4 rounded-2xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-black text-xs sm:text-sm shadow-lg shadow-amber-500/20 flex items-center justify-center gap-2 transition active:scale-95 flex-shrink-0"
           >
             <Plus className="w-4 h-4 stroke-[3]" />
             <span>+ إضافة عميل جديد 👤</span>
@@ -1606,16 +1674,6 @@ export default function PosScreen({
                 </button>
               </div>
 
-              {/* Pit Bay Workflow Hint Banner */}
-              <div className="p-3 rounded-2xl bg-slate-900/60 border border-teal-500/20 text-xs text-slate-300 flex items-center justify-between gap-2">
-                <div className="flex items-center gap-2">
-                  <span className="w-2 h-2 rounded-full bg-teal-400 animate-ping shrink-0" />
-                  <span className="font-bold text-teal-300">مسار باكة الحفرة:</span>
-                  <span className="text-slate-400 text-[11px]">
-                    احفظ الفاتورة الآن لتبدأ السيارة بالخدمة، وسيتم اختيار الفني واعتماد فحص الـ 8 نقاط وإرسال الواتساب فور الانتهاء عبر أيقونة [🚗 سيارات قيد الخدمة حالياً].
-                  </span>
-                </div>
-              </div>
             </div>
           )}
         </div>
@@ -2109,6 +2167,23 @@ export default function PosScreen({
           </div>
         </div>
       )}
+
+      {/* 8. ADAPTIVE YEMENI PLATE SEARCH FLYOUT */}
+      <PlateSearchFlyout
+        isOpen={showPlateSearchFlyout}
+        onClose={() => setShowPlateSearchFlyout(false)}
+        onSelectVehicle={(vehicle) => {
+          handleSelectVehicle(vehicle);
+        }}
+        onOpenNewVehicleModal={(prefilledPlate) => {
+          setEditingVehicle({
+            plate_number: prefilledPlate.plate_number,
+            plate_divider: prefilledPlate.plate_divider,
+            plate_type: prefilledPlate.plate_type,
+          });
+          setShowNewVehicleModal(true);
+        }}
+      />
 
       {/* In-App Touch Confirm Dialog */}
       {touchConfirm.isOpen && (

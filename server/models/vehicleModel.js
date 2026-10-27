@@ -5,6 +5,7 @@ const vehicleModel = {
     if (!q || !q.trim()) {
       return db.prepare(`
         SELECT cv.*, 
+          (SELECT COUNT(*) FROM customers_vehicles WHERE phone = cv.phone) AS customer_vehicles_count,
           (SELECT MAX(created_at) FROM invoices WHERE vehicle_id = cv.id) AS last_visit_date,
           (SELECT COUNT(*) FROM invoices WHERE vehicle_id = cv.id) AS total_visits
         FROM customers_vehicles cv
@@ -16,6 +17,7 @@ const vehicleModel = {
     const searchTerm = `%${q.trim()}%`;
     return db.prepare(`
       SELECT cv.*, 
+        (SELECT COUNT(*) FROM customers_vehicles WHERE phone = cv.phone) AS customer_vehicles_count,
         (SELECT MAX(created_at) FROM invoices WHERE vehicle_id = cv.id) AS last_visit_date,
         (SELECT COUNT(*) FROM invoices WHERE vehicle_id = cv.id) AS total_visits
       FROM customers_vehicles cv
