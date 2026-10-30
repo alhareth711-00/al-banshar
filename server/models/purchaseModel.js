@@ -3,6 +3,25 @@ const { formatDate } = require('../utils/helpers');
 const { roundMoney, safeNum, calcWAC } = require('../utils/mathPrecision');
 const { postPurchase } = require('../utils/accountingEngine');
 
+function logAudit(action, entity_type, entity_id, old_data, new_data, performed_by = 'system') {
+  try {
+    db.prepare(`
+      INSERT INTO financial_audit_logs (
+        action, entity_type, entity_id, old_data, new_data, performed_by, created_at
+      ) VALUES (?, ?, ?, ?, ?, ?, datetime('now', 'localtime'))
+    `).run(
+      action,
+      entity_type,
+      entity_id || null,
+      old_data ? (typeof old_data === 'string' ? old_data : JSON.stringify(old_data)) : null,
+      new_data ? (typeof new_data === 'string' ? new_data : JSON.stringify(new_data)) : null,
+      performed_by
+    );
+  } catch (e) {
+    console.warn('[AuditLog] Failed to log:', e.message);
+  }
+}
+
 function generatePurchaseNumber() {
   const today = formatDate().replace(/-/g, '');
   const prefix = `PUR-${today}-`;
@@ -102,15 +121,15 @@ const purchaseModel = {
     return db.prepare(`
       SELECT 
         p.*,
-        s.name AS supplier_name,
+        COALESCE(s.name, p.supplier_name) AS supplier_name,
         s.phone AS supplier_phone,
         s.company_name AS supplier_company,
-        julianday(p.due_date) - julianday('now') AS days_until_due
+        CAST(julianday(date(p.due_date)) - julianday(date('now', 'localtime')) AS INTEGER) AS days_until_due
       FROM purchases p
-      JOIN suppliers s ON p.supplier_id = s.id
+      LEFT JOIN suppliers s ON p.supplier_id = s.id
       WHERE p.remaining_debt > 0
       ORDER BY 
-        CASE WHEN p.due_date IS NOT NULL AND date(p.due_date) <= date('now') THEN 1 ELSE 2 END,
+        CASE WHEN p.due_date IS NOT NULL AND date(p.due_date) < date('now', 'localtime') THEN 1 ELSE 2 END,
         p.due_date ASC,
         p.id DESC
     `).all();
@@ -152,9 +171,9 @@ const purchaseModel = {
       }
 
       const shippingCost = roundMoney(Math.max(0, safeNum(data.shipping_cost, 0)));
-      const shippingPayer = data.shipping_payer || 'cash_drawer'; // 'cash_drawer' | 'supplier_account'
+      const shippingPayer = 'cash_drawer'; // Always paid cash directly from cash drawer, never charged to supplier
 
-      // Distribute landed shipping cost across items proportionally
+      // Distribute landed shipping cost across items proportionally to capitalize into inventory WAC
       for (const item of items) {
         const ratio = calculatedTotal > 0 ? (item._subtotal / calculatedTotal) : (1 / items.length);
         item.allocated_shipping = roundMoney(shippingCost * ratio);
@@ -170,11 +189,8 @@ const purchaseModel = {
         paidAmount = (paymentMethod === 'credit') ? 0 : totalAmount;
       }
 
-      // If shipping is charged to supplier account, it increases remaining debt
-      let remainingDebt = Math.max(0, totalAmount - paidAmount);
-      if (shippingCost > 0 && shippingPayer === 'supplier_account') {
-        remainingDebt = roundMoney(remainingDebt + shippingCost);
-      }
+      // Supplier debt is strictly for goods (shipping is paid separately from cash drawer to transporter)
+      const remainingDebt = Math.max(0, totalAmount - paidAmount);
 
       const paidFromDrawer = (paymentMethod === 'cash' && data.paid_from_cash_drawer !== false) ? 1 : 0;
       const purchaseNumber = data.purchase_number || generatePurchaseNumber();
@@ -320,20 +336,29 @@ const purchaseModel = {
     });
 
     const newId = execute();
-    return this.getById(newId);
+    const result = this.getById(newId);
+    logAudit('CREATE_PURCHASE', 'purchase', newId, null, {
+      purchase_number: result?.purchase_number,
+      supplier_name: result?.supplier_name,
+      total_amount: result?.total_amount,
+      paid_amount: result?.paid_amount,
+      remaining_debt: result?.remaining_debt,
+      items_count: result?.items?.length,
+    });
+    return result;
   },
 
   getDueCalendar() {
     const payables = db.prepare(`
       SELECT 
         p.*,
-        s.name AS supplier_name,
+        COALESCE(s.name, p.supplier_name) AS supplier_name,
         s.phone AS supplier_phone,
         s.company_name AS supplier_company,
         s.credit_days,
-        CAST(julianday(p.due_date) - julianday('now') AS INTEGER) AS days_until_due
+        CAST(julianday(date(p.due_date)) - julianday(date('now', 'localtime')) AS INTEGER) AS days_until_due
       FROM purchases p
-      JOIN suppliers s ON p.supplier_id = s.id
+      LEFT JOIN suppliers s ON p.supplier_id = s.id
       WHERE p.remaining_debt > 0 AND p.due_date IS NOT NULL
       ORDER BY p.due_date ASC
     `).all();

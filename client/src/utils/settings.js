@@ -15,7 +15,13 @@ const DEFAULT_SETTINGS = {
   autoLockMinutes: 3, // Auto-lock inactivity timeout in minutes (0 = disabled)
   demoMode: false, // Training Mode (الجزء الثالث: وضع التدريب وتجربة البيع)
   defaultServiceIntervalMonths: 2, // المدة الافتراضية لموعد غيار الزيت القادم (شهران)
+  preventNegativeStock: true, // منع البيع بالسالب في الكاشير عند نفاد رصيد المخزن
 };
+
+export function shouldPreventNegativeStock() {
+  const settings = getShopSettings();
+  return settings.preventNegativeStock !== false;
+}
 
 export function getShopSettings() {
   try {

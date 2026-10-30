@@ -380,7 +380,7 @@ export default function WorkersView({ workers = [], onRefreshData, onOpenCustome
           <button
             type="button"
             onClick={() => setActiveTab('workers')}
-            className={`min-h-[44px] px-4 rounded-xl text-xs font-black transition-all flex items-center gap-2.5 ${
+            className={`min-h-[44px] px-4 rounded-xl text-xs sm:text-sm font-black transition-all flex items-center gap-2.5 ${
               activeTab === 'workers'
                 ? 'bg-amber-400 text-slate-950 shadow-md shadow-amber-950/30'
                 : 'text-slate-400 hover:text-white hover:bg-white/5'
@@ -402,7 +402,7 @@ export default function WorkersView({ workers = [], onRefreshData, onOpenCustome
           <button
             type="button"
             onClick={() => setActiveTab('expenses')}
-            className={`min-h-[44px] px-4 rounded-xl text-xs font-black transition-all flex items-center gap-2.5 ${
+            className={`min-h-[44px] px-4 rounded-xl text-xs sm:text-sm font-black transition-all flex items-center gap-2.5 ${
               activeTab === 'expenses'
                 ? 'bg-rose-500 text-white shadow-md shadow-rose-950/30'
                 : 'text-slate-400 hover:text-white hover:bg-white/5'
@@ -418,50 +418,6 @@ export default function WorkersView({ workers = [], onRefreshData, onOpenCustome
               }`}
             >
               {todayExpensesList.length}
-            </span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setActiveTab('debts')}
-            className={`min-h-[44px] px-4 rounded-xl text-xs font-black transition-all flex items-center gap-2.5 ${
-              activeTab === 'debts'
-                ? 'bg-emerald-500 text-slate-950 shadow-md shadow-emerald-950/30'
-                : 'text-slate-400 hover:text-white hover:bg-white/5'
-            }`}
-          >
-            <Receipt className="w-4 h-4 stroke-[2.3]" />
-            <span>3. دفتر الديون وسندات القبض</span>
-            <span
-              className={`font-mono text-[11px] px-2 py-0.5 rounded-lg ${
-                activeTab === 'debts'
-                  ? 'bg-slate-950 text-emerald-400 font-bold'
-                  : 'bg-slate-800 text-slate-300'
-              }`}
-            >
-              {debtVehicles.length}
-            </span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setActiveTab('transactions')}
-            className={`min-h-[44px] px-4 rounded-xl text-xs font-black transition-all flex items-center gap-2.5 ${
-              activeTab === 'transactions'
-                ? 'bg-blue-600 text-white shadow-md shadow-blue-950/30'
-                : 'text-slate-400 hover:text-white hover:bg-white/5'
-            }`}
-          >
-            <FileText className="w-4 h-4 stroke-[2.3]" />
-            <span>سجل المعاملات والعمليات</span>
-            <span
-              className={`font-mono text-[11px] px-2 py-0.5 rounded-lg ${
-                activeTab === 'transactions'
-                  ? 'bg-blue-950 text-blue-200 font-bold border border-blue-400/30'
-                  : 'bg-slate-800 text-slate-300'
-              }`}
-            >
-              {transactions.length}
             </span>
           </button>
         </div>

@@ -77,6 +77,11 @@ const inventoryModel = {
     return db.prepare('SELECT * FROM inventory WHERE id = ?').get(id);
   },
 
+  getByName(name) {
+    if (!name) return null;
+    return db.prepare('SELECT * FROM inventory WHERE LOWER(TRIM(name)) = LOWER(TRIM(?))').get(name.trim());
+  },
+
   getBySku(sku) {
     if (!sku) return null;
     return db.prepare('SELECT * FROM inventory WHERE sku = ?').get(sku.trim());
@@ -415,10 +420,12 @@ const inventoryModel = {
         category,
         item_type,
         COUNT(*) AS items_count,
-        COALESCE(SUM(CASE WHEN item_type = 'product' THEN stock_qty ELSE 0 END), 0) AS total_units,
-        COALESCE(SUM(CASE WHEN item_type = 'product' THEN stock_qty * cost_price ELSE 0 END), 0) AS total_cost_value,
-        COALESCE(SUM(CASE WHEN item_type = 'product' THEN stock_qty * sell_price ELSE 0 END), 0) AS total_sell_value,
-        SUM(CASE WHEN item_type = 'product' AND stock_qty <= min_stock_alert THEN 1 ELSE 0 END) AS low_stock_count
+        COALESCE(SUM(CASE WHEN item_type = 'product' AND stock_qty > 0 AND (is_consignment = 0 OR is_consignment IS NULL) THEN stock_qty ELSE 0 END), 0) AS total_units,
+        COALESCE(SUM(CASE WHEN item_type = 'product' AND stock_qty > 0 AND (is_consignment = 0 OR is_consignment IS NULL) THEN stock_qty * cost_price ELSE 0 END), 0) AS total_cost_value,
+        COALESCE(SUM(CASE WHEN item_type = 'product' AND stock_qty > 0 AND (is_consignment = 0 OR is_consignment IS NULL) THEN stock_qty * sell_price ELSE 0 END), 0) AS total_sell_value,
+        COALESCE(SUM(CASE WHEN item_type = 'product' AND stock_qty > 0 AND is_consignment = 1 THEN stock_qty * cost_price ELSE 0 END), 0) AS consignment_cost_value,
+        SUM(CASE WHEN item_type = 'product' AND stock_qty <= min_stock_alert THEN 1 ELSE 0 END) AS low_stock_count,
+        SUM(CASE WHEN item_type = 'product' AND stock_qty < 0 THEN 1 ELSE 0 END) AS negative_stock_count
       FROM inventory
       WHERE is_active = 1
       GROUP BY category, item_type
@@ -427,34 +434,41 @@ const inventoryModel = {
 
     let grandCost = 0;
     let grandSell = 0;
+    let grandConsignmentCost = 0;
     let totalProducts = 0;
     let totalServices = 0;
     let lowStockTotal = 0;
+    let negativeStockTotal = 0;
 
     for (const c of categories) {
       c.total_cost_value = roundMoney(c.total_cost_value);
       c.total_sell_value = roundMoney(c.total_sell_value);
+      c.consignment_cost_value = roundMoney(c.consignment_cost_value || 0);
       c.expected_profit = roundMoney(c.total_sell_value - c.total_cost_value);
       c.margin_percent = c.total_cost_value > 0 ? Math.round((c.expected_profit / c.total_cost_value) * 100) : 0;
 
       if (c.item_type === 'product') {
         grandCost = roundMoney(grandCost + c.total_cost_value);
         grandSell = roundMoney(grandSell + c.total_sell_value);
+        grandConsignmentCost = roundMoney(grandConsignmentCost + c.consignment_cost_value);
         totalProducts += c.items_count;
         lowStockTotal += c.low_stock_count;
+        negativeStockTotal += (c.negative_stock_count || 0);
       } else {
         totalServices += c.items_count;
       }
     }
 
     return {
-      grand_cost_value: grandCost,
-      grand_sell_value: grandSell,
-      grand_expected_profit: roundMoney(grandSell - grandCost),
+      grand_cost_value: Math.round(grandCost),
+      grand_sell_value: Math.round(grandSell),
+      grand_expected_profit: Math.round(grandSell - grandCost),
+      grand_consignment_cost: Math.round(grandConsignmentCost),
       overall_margin_percent: grandCost > 0 ? Math.round(((grandSell - grandCost) / grandCost) * 100) : 0,
       total_products: totalProducts,
       total_services: totalServices,
       total_low_stock_alerts: lowStockTotal,
+      total_negative_stock_alerts: negativeStockTotal,
       categories,
     };
   },

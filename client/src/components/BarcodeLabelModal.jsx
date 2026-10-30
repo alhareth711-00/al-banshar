@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { X, Printer, Barcode, Tag, MapPin, Copy, Layers, Check } from 'lucide-react';
 
 /**
@@ -60,6 +60,15 @@ function generateCode128Svg(text) {
 export default function BarcodeLabelModal({ isOpen, onClose, item }) {
   const [copies, setCopies] = useState(1);
   const [labelSize, setLabelSize] = useState('50x25'); // '50x25' (thermal standard), '40x30' (shelf), 'sheet' (A4 sheet)
+
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, onClose]);
 
   if (!isOpen || !item) return null;
 

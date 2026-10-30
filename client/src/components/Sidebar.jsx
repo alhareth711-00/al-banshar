@@ -1,4 +1,5 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
+import { getShopSettings } from '../utils/settings';
 import {
   Wrench,
   Radio,
@@ -23,6 +24,13 @@ export default function Sidebar({
   onOpenUserGuide,
   isOwnerMode = false,
 }) {
+  const [shopSettings, setShopSettings] = useState(getShopSettings());
+
+  useEffect(() => {
+    const handleUpdate = () => setShopSettings(getShopSettings());
+    window.addEventListener('quick_lube_settings_updated', handleUpdate);
+    return () => window.removeEventListener('quick_lube_settings_updated', handleUpdate);
+  }, []);
   const navItems = [
     {
       id: 'pos',
@@ -88,16 +96,47 @@ export default function Sidebar({
     <aside className="w-20 lg:w-64 flex-shrink-0 bg-slate-950/95 border-l border-slate-800/80 flex flex-col justify-between p-3 lg:p-4 z-40 select-none">
       <div>
         {/* Brand Header - Calm Industrial Standard (الخيار 1 المعتمد) */}
-        <div className="flex items-center gap-3 px-3 py-2.5 mb-4 rounded-xl bg-slate-900/90 border border-slate-800">
+        <div className="flex items-center gap-3 px-3 py-2.5 mb-4 rounded-xl bg-slate-900/90 border border-amber-500/30 shadow-md">
           <div className="w-9 h-9 rounded-lg bg-amber-400 text-slate-950 flex items-center justify-center font-black shadow-sm flex-shrink-0">
             <Wrench className="w-5 h-5 stroke-[2.3]" />
           </div>
           <div className="hidden lg:block overflow-hidden">
             <div className="flex items-center gap-2">
-              <h1 className="text-sm font-bold text-white tracking-wide truncate">سريع وبنشر</h1>
-              <span className="text-[11px] font-mono font-bold px-1.5 py-0.5 rounded bg-slate-800 text-amber-400 border border-slate-700">PRO</span>
+              <h1 className="text-sm font-black text-amber-300 tracking-wide truncate" title={shopSettings.shopName}>
+                {shopSettings.shopName || 'مركز خدمة الإطارات والزيوت'}
+              </h1>
             </div>
-            <p className="text-xs text-slate-400 font-medium truncate mt-0.5">مركز غيار الزيوت والبناشر</p>
+            <div data-impeccable-variants="85cbd970" data-impeccable-variant-count="3" style={{ display: "contents" }}>
+              {/* impeccable-variants-start 85cbd970 */}
+              {/* Original */}
+              <div data-impeccable-variant="original">
+                <p className="text-xs text-slate-400 font-bold truncate mt-0.5">نظام أدارة وزيادة المبيعات</p>
+              </div>
+              {/* Variants: insert below this line */}
+              {/* Variant 1: شارة تكتيكية مضيئة مع مؤشر تشغيل حي (موصى به) */}
+              <div data-impeccable-variant="1">
+                <div className="inline-flex items-center gap-1.5 px-2 py-0.5 mt-1 rounded-md bg-amber-500/10 border border-amber-500/20">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse shrink-0" />
+                  <span className="text-[11px] text-amber-300 font-extrabold truncate">نظام إدارة وزيادة المبيعات</span>
+                </div>
+              </div>
+
+              {/* Variant 2: نمط ناصع عالي التباين مع أيقونة طاقة مدمجة */}
+              <div data-impeccable-variant="2" style={{ display: "none" }}>
+                <p className="text-xs text-slate-300 font-bold truncate mt-0.5 flex items-center gap-1.5">
+                  <span className="text-amber-400 font-bold text-xs">⚡</span>
+                  <span>نظام إدارة وزيادة المبيعات</span>
+                </p>
+              </div>
+
+              {/* Variant 3: نمط كلاسيكي هادئ ومقروء بوضوح */}
+              <div data-impeccable-variant="3" style={{ display: "none" }}>
+                <p className="text-[11.5px] text-slate-300 font-black tracking-wide truncate mt-0.5">
+                  نظام إدارة وزيادة المبيعات
+                </p>
+              </div>
+              {/* impeccable-variants-end 85cbd970 */}
+            </div>
           </div>
         </div>
 

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import {
   X,
   Package,
@@ -106,6 +106,31 @@ export default function AddInventoryModal({ isOpen, onClose, onCreated, itemToEd
   const [showAdvancedSection, setShowAdvancedSection] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState('');
+  const nameInputRef = useRef(null);
+
+  // Close on Escape & Autofocus on open
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const timer = setTimeout(() => {
+      if (nameInputRef.current) {
+        nameInputRef.current.focus();
+        nameInputRef.current.select();
+      }
+    }, 120);
+
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape') {
+        onClose();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+
+    return () => {
+      clearTimeout(timer);
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [isOpen, onClose]);
 
   // Populate form if in edit mode
   useEffect(() => {
@@ -266,9 +291,11 @@ export default function AddInventoryModal({ isOpen, onClose, onCreated, itemToEd
         consignment_supplier_name: formData.is_consignment ? formData.consignment_supplier_name.trim() : null,
         stock_qty: isService
           ? 9999
+          : (formData.initial_stock_qty !== '' && !isNaN(Number(formData.initial_stock_qty)))
+          ? Number(formData.initial_stock_qty)
           : isEditMode
           ? itemToEdit.stock_qty
-          : Number(formData.initial_stock_qty) || 0,
+          : 0,
       };
 
       const url = isEditMode ? `/api/inventory/${itemToEdit.id}` : '/api/inventory';
@@ -370,6 +397,7 @@ export default function AddInventoryModal({ isOpen, onClose, onCreated, itemToEd
           <div>
             <label className="block text-slate-300 font-bold mb-1.5">اسم الصنف أو الخدمة المباشر:</label>
             <input
+              ref={nameInputRef}
               type="text"
               placeholder={isService ? 'مثال: غيار زيت محرك وتشييك' : 'مثال: زيت تويوتا ذهبي 20W-50 علبة 1 لتر'}
               value={formData.name}
@@ -378,6 +406,138 @@ export default function AddInventoryModal({ isOpen, onClose, onCreated, itemToEd
               required
             />
           </div>
+
+          {/* Dynamic Category Specific Specifications (مباشرة بحسب التصنيف) */}
+          {formData.category === 'oil' && (
+            <div className="p-3.5 rounded-2xl bg-amber-500/10 border border-amber-500/30 space-y-2.5 animate-in fade-in">
+              <div className="text-amber-300 font-extrabold text-xs flex items-center gap-1.5">
+                <span>🛢️ مواصفات ولزوجة وسعة الزيت:</span>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                <div>
+                  <label className="block text-slate-300 mb-1 text-[11px] font-bold">درجة اللزوجة:</label>
+                  <select
+                    value={formData.viscosity}
+                    onChange={(e) => setFormData({ ...formData, viscosity: e.target.value })}
+                    className="w-full min-h-[40px] px-2.5 rounded-xl bg-slate-950 border border-white/15 text-white font-mono text-xs font-bold"
+                  >
+                    <option value="20W-50">20W-50</option>
+                    <option value="10W-40">10W-40</option>
+                    <option value="5W-30">5W-30</option>
+                    <option value="5W-40">5W-40</option>
+                    <option value="0W-20">0W-20</option>
+                    <option value="15W-40">15W-40</option>
+                    <option value="80W-90">80W-90 (تروس/دفرنش)</option>
+                    <option value="ATF-WS">ATF-WS (قير)</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-slate-300 mb-1 text-[11px] font-bold">نوع تركيبة الزيت:</label>
+                  <select
+                    value={formData.oil_type}
+                    onChange={(e) => setFormData({ ...formData, oil_type: e.target.value })}
+                    className="w-full min-h-[40px] px-2.5 rounded-xl bg-slate-950 border border-white/15 text-white text-xs font-bold"
+                  >
+                    <option value="معدني تقليدي">معدني تقليدي</option>
+                    <option value="نصف تخليقي">نصف تخليقي</option>
+                    <option value="تخليقي بالكامل">تخليقي بالكامل</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-slate-300 mb-1 text-[11px] font-bold">سعة العبوة:</label>
+                  <select
+                    value={formData.pack_size}
+                    onChange={(e) => setFormData({ ...formData, pack_size: e.target.value })}
+                    className="w-full min-h-[40px] px-2.5 rounded-xl bg-slate-950 border border-white/15 text-white font-mono text-xs font-bold"
+                  >
+                    <option value="1L">1 لتر (علبة)</option>
+                    <option value="4L">4 لتر (دبة)</option>
+                    <option value="5L">5 لتر</option>
+                    <option value="bulk_liter">لتر فلت برميل</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {formData.category === 'tire' && (
+            <div className="p-3.5 rounded-2xl bg-teal-500/10 border border-teal-500/30 space-y-2.5 animate-in fade-in">
+              <div className="text-teal-300 font-extrabold text-xs flex items-center justify-between">
+                <span>🛞 مقاس الإطار وتاريخ الصنع (DOT):</span>
+                {dotAnalysis && (
+                  <span
+                    className={`px-2 py-0.5 rounded-lg text-[10px] font-mono font-bold border ${
+                      dotAnalysis.color === 'emerald'
+                        ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40'
+                        : dotAnalysis.color === 'teal'
+                        ? 'bg-teal-500/20 text-teal-300 border-teal-500/40'
+                        : dotAnalysis.color === 'amber'
+                        ? 'bg-amber-500/20 text-amber-300 border-amber-500/40'
+                        : 'bg-rose-500/20 text-rose-300 border-rose-500/40'
+                    }`}
+                  >
+                    {dotAnalysis.label} (صنع سنة {dotAnalysis.year})
+                  </span>
+                )}
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                <div>
+                  <label className="block text-slate-300 mb-1 text-[11px] font-bold">مقاس الإطار:</label>
+                  <input
+                    type="text"
+                    placeholder="مثال: 205/65R15 أو 195/65R15"
+                    value={formData.tire_battery_spec}
+                    onChange={(e) => setFormData({ ...formData, tire_battery_spec: e.target.value })}
+                    className="w-full min-h-[40px] px-3 rounded-xl bg-slate-950 border border-white/15 text-white font-mono text-xs font-bold focus:outline-none focus:border-teal-400"
+                  />
+                </div>
+                <div>
+                  <label className="block text-slate-300 mb-1 text-[11px] font-bold">رمز DOT (4 أرقام: أسبوع وسنة الصنع مثل 2423):</label>
+                  <input
+                    type="text"
+                    maxLength={4}
+                    placeholder="مثال: 2423"
+                    value={formData.dot_code}
+                    onChange={(e) => setFormData({ ...formData, dot_code: e.target.value })}
+                    className="w-full min-h-[40px] px-3 rounded-xl bg-slate-950 border border-white/15 text-teal-300 font-mono text-xs font-extrabold focus:outline-none focus:border-teal-400"
+                  />
+                </div>
+              </div>
+            </div>
+          )}
+
+          {formData.category === 'battery' && (
+            <div className="p-3.5 rounded-2xl bg-cyan-500/10 border border-cyan-500/30 space-y-2.5 animate-in fade-in">
+              <div className="text-cyan-300 font-extrabold text-xs">
+                <span>🔋 سعة البطارية (أمبير) والضمان:</span>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                <div>
+                  <label className="block text-slate-300 mb-1 text-[11px] font-bold">سعة البطارية (Ah):</label>
+                  <input
+                    type="text"
+                    placeholder="مثال: 55Ah، 70Ah، 100Ah"
+                    value={formData.battery_capacity_ah}
+                    onChange={(e) => setFormData({ ...formData, battery_capacity_ah: e.target.value })}
+                    className="w-full min-h-[40px] px-3 rounded-xl bg-slate-950 border border-white/15 text-white font-mono text-xs font-bold focus:outline-none focus:border-cyan-400"
+                  />
+                </div>
+                <div>
+                  <label className="block text-slate-300 mb-1 text-[11px] font-bold">فترة الضمان (أشهر):</label>
+                  <input
+                    type="number"
+                    min="0"
+                    placeholder="مثال: 12 شهر"
+                    value={formData.warranty_months}
+                    onChange={(e) => setFormData({ ...formData, warranty_months: e.target.value })}
+                    className="w-full min-h-[40px] px-3 rounded-xl bg-slate-950 border border-white/15 text-cyan-300 font-mono text-xs font-bold focus:outline-none focus:border-cyan-400"
+                  />
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* 3. Direct Essential Fields: Pricing & Markup Calculator */}
           <div className="p-4 rounded-2xl bg-slate-900/90 border border-white/10 space-y-3">
@@ -636,115 +796,17 @@ export default function AddInventoryModal({ isOpen, onClose, onCreated, itemToEd
                   </div>
                 </div>
 
-                {/* Category Specs: Oil */}
-                {formData.category === 'oil' && (
-                  <div className="p-3 rounded-xl bg-slate-900 border border-amber-500/20 space-y-2.5">
-                    <div className="text-amber-400 font-bold text-[11px]">مواصفات ولزوجة الزيت:</div>
-                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                      <div>
-                        <label className="block text-slate-400 mb-1 text-[11px]">درجة اللزوجة:</label>
-                        <select
-                          value={formData.viscosity}
-                          onChange={(e) => setFormData({ ...formData, viscosity: e.target.value })}
-                          className="w-full min-h-[38px] px-2 rounded-lg bg-slate-950 border border-white/15 text-white font-mono text-xs"
-                        >
-                          <option value="20W-50">20W-50</option>
-                          <option value="10W-40">10W-40</option>
-                          <option value="5W-30">5W-30</option>
-                          <option value="5W-40">5W-40</option>
-                          <option value="0W-20">0W-20</option>
-                          <option value="15W-40">15W-40</option>
-                          <option value="80W-90">80W-90 (تروس/دفرنش)</option>
-                          <option value="ATF-WS">ATF-WS (قير)</option>
-                        </select>
-                      </div>
-
-                      <div>
-                        <label className="block text-slate-400 mb-1 text-[11px]">نوع الزيت:</label>
-                        <select
-                          value={formData.oil_type}
-                          onChange={(e) => setFormData({ ...formData, oil_type: e.target.value })}
-                          className="w-full min-h-[38px] px-2 rounded-lg bg-slate-950 border border-white/15 text-white text-xs"
-                        >
-                          <option value="معدني تقليدي">معدني تقليدي</option>
-                          <option value="نصف تخليقي">نصف تخليقي</option>
-                          <option value="تخليقي بالكامل">تخليقي بالكامل</option>
-                        </select>
-                      </div>
-
-                      <div>
-                        <label className="block text-slate-400 mb-1 text-[11px]">سعة العبوة:</label>
-                        <select
-                          value={formData.pack_size}
-                          onChange={(e) => setFormData({ ...formData, pack_size: e.target.value })}
-                          className="w-full min-h-[38px] px-2 rounded-lg bg-slate-950 border border-white/15 text-white font-mono text-xs"
-                        >
-                          <option value="1L">1 لتر (علبة)</option>
-                          <option value="4L">4 لتر (دبة)</option>
-                          <option value="5L">5 لتر</option>
-                          <option value="bulk_liter">لتر فلت برميل</option>
-                        </select>
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {/* Category Specs: Tire */}
-                {formData.category === 'tire' && (
-                  <div className="p-3 rounded-xl bg-slate-900 border border-emerald-500/20 space-y-2.5">
-                    <div className="text-emerald-400 font-bold text-[11px]">مواصفات الإطار وتاريخ الصنع (DOT):</div>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                      <div>
-                        <label className="block text-slate-400 mb-1 text-[11px]">مقاس الإطار:</label>
-                        <input
-                          type="text"
-                          placeholder="مثال: 205/65R15"
-                          value={formData.tire_battery_spec}
-                          onChange={(e) => setFormData({ ...formData, tire_battery_spec: e.target.value })}
-                          className="w-full min-h-[38px] px-2.5 rounded-lg bg-slate-950 border border-white/15 text-white font-mono text-xs"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-slate-400 mb-1 text-[11px]">رمز DOT (أسبوع وسنة الصنع مثل 2423):</label>
-                        <input
-                          type="text"
-                          maxLength={4}
-                          placeholder="مثال: 2423"
-                          value={formData.dot_code}
-                          onChange={(e) => setFormData({ ...formData, dot_code: e.target.value })}
-                          className="w-full min-h-[38px] px-2.5 rounded-lg bg-slate-950 border border-white/15 text-white font-mono text-xs font-bold"
-                        />
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {/* Category Specs: Battery */}
-                {formData.category === 'battery' && (
-                  <div className="p-3 rounded-xl bg-slate-900 border border-teal-500/20 space-y-2.5">
-                    <div className="text-teal-400 font-bold text-[11px]">سعة البطارية والضمان:</div>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                      <div>
-                        <label className="block text-slate-400 mb-1 text-[11px]">سعة البطارية (Ah):</label>
-                        <input
-                          type="text"
-                          placeholder="مثال: 60Ah أو 70Ah"
-                          value={formData.battery_capacity_ah}
-                          onChange={(e) => setFormData({ ...formData, battery_capacity_ah: e.target.value })}
-                          className="w-full min-h-[38px] px-2.5 rounded-lg bg-slate-950 border border-white/15 text-white font-mono text-xs"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-slate-400 mb-1 text-[11px]">فترة الضمان (أشهر):</label>
-                        <input
-                          type="number"
-                          placeholder="12"
-                          value={formData.warranty_months}
-                          onChange={(e) => setFormData({ ...formData, warranty_months: e.target.value })}
-                          className="w-full min-h-[38px] px-2.5 rounded-lg bg-slate-950 border border-white/15 text-white font-mono text-xs"
-                        />
-                      </div>
-                    </div>
+                {/* Carton pack qty for products */}
+                {!isService && (
+                  <div>
+                    <label className="block text-slate-300 font-bold mb-1">عدد العلب / اللترات في الكرتون أو الشدة (للتوريد):</label>
+                    <input
+                      type="number"
+                      min="1"
+                      value={formData.carton_pack_qty}
+                      onChange={(e) => setFormData({ ...formData, carton_pack_qty: e.target.value })}
+                      className="w-full min-h-[40px] px-3.5 rounded-xl bg-slate-900 border border-white/15 text-white font-mono text-xs"
+                    />
                   </div>
                 )}
 

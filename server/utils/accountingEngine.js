@@ -427,7 +427,7 @@ function postPurchase(db, { purchase, items }) {
   }
 
   // 1. Debit Inventory Asset Accounts
-  const totalLandedCost = roundMoney(totalAmount + (shippingPayer === 'cash_drawer' ? shippingCost : 0));
+  const totalLandedCost = roundMoney(totalAmount + shippingCost);
   let itemsSum = 0;
   for (const amount of Object.values(categoryDebits)) {
     itemsSum = roundMoney(itemsSum + amount);
@@ -459,13 +459,13 @@ function postPurchase(db, { purchase, items }) {
     });
   }
 
-  // 3. Credit Cash Drawer if shipping cost paid cash from drawer
-  if (shippingCost > 0 && shippingPayer === 'cash_drawer') {
+  // 3. Credit Cash Drawer: shipping cost paid cash directly from cash drawer
+  if (shippingCost > 0) {
     lines.push({
       account_code: '1101', // Cash drawer
       debit: 0,
       credit: shippingCost,
-      description: `سداد أجور شحن ونقل بضاعة كاش للفاتورة (${purchase.purchase_number})`,
+      description: `سداد أجور شحن ونقل بضاعة كاش من الدرج للفاتورة (${purchase.purchase_number})`,
     });
   }
 

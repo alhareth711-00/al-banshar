@@ -73,13 +73,26 @@ const inventoryController = {
   }),
 
   create: asyncHandler(async (req, res) => {
-    const { sku, name, category, brand } = req.body;
+    const { sku, name, category, brand, cost_price, sell_price } = req.body;
 
     if (!name || !name.trim()) {
       throw new AppError('اسم الصنف مطلوب', 400);
     }
     if (!category) {
       throw new AppError('فئة الصنف مطلوبة', 400);
+    }
+
+    // Check duplicate name
+    const existingName = inventoryModel.getByName(name.trim());
+    if (existingName && existingName.is_active === 1) {
+      throw new AppError(`يوجد صنف مسجل بنفس الاسم مسبقاً: "${existingName.name}" (كود: ${existingName.sku}) لمنع الازدواجية`, 400);
+    }
+
+    if (cost_price !== undefined && cost_price !== null && Number(cost_price) < 0) {
+      throw new AppError('سعر التكلفة لا يمكن أن يكون قيمة سالبة', 400);
+    }
+    if (sell_price !== undefined && sell_price !== null && Number(sell_price) < 0) {
+      throw new AppError('سعر البيع لا يمكن أن يكون قيمة سالبة', 400);
     }
 
     if (sku && sku.trim()) {
@@ -111,10 +124,33 @@ const inventoryController = {
       throw new AppError('الصنف المطلوب تحديثه غير موجود', 404);
     }
 
-    if (req.body.barcode && req.body.barcode.trim()) {
-      const barcodeItem = inventoryModel.getByBarcode(req.body.barcode.trim());
+    const { name, sku, barcode, cost_price, sell_price } = req.body;
+
+    if (name && name.trim()) {
+      const existingName = inventoryModel.getByName(name.trim());
+      if (existingName && existingName.id !== id && existingName.is_active === 1) {
+        throw new AppError(`يوجد صنف آخر مسجل مسبقاً بنفس الاسم: "${existingName.name}" (كود: ${existingName.sku})`, 400);
+      }
+    }
+
+    if (sku && sku.trim()) {
+      const existingSku = inventoryModel.getBySku(sku.trim());
+      if (existingSku && existingSku.id !== id) {
+        throw new AppError(`كود الصنف (SKU) "${sku}" مسجل بالفعل لصنف آخر: ${existingSku.name}`, 400);
+      }
+    }
+
+    if (cost_price !== undefined && cost_price !== null && Number(cost_price) < 0) {
+      throw new AppError('سعر التكلفة لا يمكن أن يكون قيمة سالبة', 400);
+    }
+    if (sell_price !== undefined && sell_price !== null && Number(sell_price) < 0) {
+      throw new AppError('سعر البيع لا يمكن أن يكون قيمة سالبة', 400);
+    }
+
+    if (barcode && barcode.trim()) {
+      const barcodeItem = inventoryModel.getByBarcode(barcode.trim());
       if (barcodeItem && barcodeItem.id !== id) {
-        throw new AppError(`الباركود "${req.body.barcode}" مستخدم بالفعل مع صنف آخر: ${barcodeItem.name}`, 400);
+        throw new AppError(`الباركود "${barcode}" مستخدم بالفعل مع صنف آخر: ${barcodeItem.name}`, 400);
       }
     }
 

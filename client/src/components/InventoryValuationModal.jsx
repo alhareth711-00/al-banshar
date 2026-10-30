@@ -9,7 +9,12 @@ export default function InventoryValuationModal({ isOpen, onClose, inventory = [
     if (isOpen) {
       fetchValuation();
     }
-  }, [isOpen]);
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, onClose]);
 
   const fetchValuation = async () => {
     try {

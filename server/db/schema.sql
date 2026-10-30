@@ -157,6 +157,7 @@ CREATE TABLE IF NOT EXISTS suppliers (
     commercial_reg TEXT,
     credit_days INTEGER NOT NULL DEFAULT 30,
     balance_due REAL NOT NULL DEFAULT 0,
+    is_active INTEGER NOT NULL DEFAULT 1 CHECK(is_active IN (0, 1)),
     notes TEXT,
     created_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime'))
 );

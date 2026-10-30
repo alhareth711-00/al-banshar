@@ -183,7 +183,7 @@ function initDb() {
       db.exec("ALTER TABLE purchases ADD COLUMN is_returned INTEGER NOT NULL DEFAULT 0");
     }
 
-    // 2. Upgrade suppliers table with commercial_reg, agency_brand, credit_days
+    // 2. Upgrade suppliers table with commercial_reg, agency_brand, credit_days, is_active
     const suppCols = db.prepare("PRAGMA table_info(suppliers)").all().map(c => c.name);
     if (!suppCols.includes('commercial_reg')) {
       db.exec("ALTER TABLE suppliers ADD COLUMN commercial_reg TEXT");
@@ -193,6 +193,9 @@ function initDb() {
     }
     if (!suppCols.includes('credit_days')) {
       db.exec("ALTER TABLE suppliers ADD COLUMN credit_days INTEGER NOT NULL DEFAULT 30");
+    }
+    if (!suppCols.includes('is_active')) {
+      db.exec("ALTER TABLE suppliers ADD COLUMN is_active INTEGER NOT NULL DEFAULT 1");
     }
 
     // 3. Create purchase_returns and purchase_return_items tables

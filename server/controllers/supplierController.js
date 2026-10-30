@@ -3,7 +3,7 @@ const { asyncHandler, AppError } = require('../utils/errorHandler');
 
 const supplierController = {
   getAll: asyncHandler(async (req, res) => {
-    const suppliers = supplierModel.getAll();
+    const suppliers = supplierModel.getAll(req.query);
     res.json({
       success: true,
       count: suppliers.length,
@@ -50,17 +50,39 @@ const supplierController = {
     });
   }),
 
+  toggleActive: asyncHandler(async (req, res) => {
+    const id = parseInt(req.params.id, 10);
+    const updated = supplierModel.toggleActive(id);
+    if (!updated) {
+      throw new AppError('المورد غير موجود لتعديل حالته', 404);
+    }
+    res.json({
+      success: true,
+      message: updated.is_active === 1 ? 'تم تفعيل المورد بنجاح' : 'تم تعطيل المورد بنجاح',
+      data: updated,
+    });
+  }),
+
+  delete: asyncHandler(async (req, res) => {
+    const id = parseInt(req.params.id, 10);
+    const result = supplierModel.delete(id);
+    res.json({
+      success: true,
+      message: result.message,
+    });
+  }),
+
   payDebt: asyncHandler(async (req, res) => {
     const id = parseInt(req.params.id, 10);
-    const { amount, payment_method, notes } = req.body;
+    const { amount, payment_method, notes, purchase_id } = req.body;
     if (!amount || Number(amount) <= 0) {
       throw new AppError('المبلغ يجب أن يكون أكبر من الصفر', 400);
     }
 
-    const updated = supplierModel.paySupplierDebt(id, { amount, payment_method, notes });
+    const updated = supplierModel.paySupplierDebt(id, { amount, payment_method, notes, purchase_id });
     res.json({
       success: true,
-      message: 'تم تسجيل سند سداد دفعة المورد وخصمها من الصندوق بنجاح',
+      message: 'تم تسجيل سند سداد دفعة المورد وتحديث الحسابات والمخزن بنجاح',
       data: updated,
     });
   }),

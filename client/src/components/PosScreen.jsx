@@ -53,6 +53,7 @@ import {
   recordBackupDownloaded,
   getQuickGridItemIds,
   getShopSettings,
+  shouldPreventNegativeStock,
 } from '../utils/settings';
 
 const getInitialNextServiceDate = () => {
@@ -402,6 +403,25 @@ export default function PosScreen({
 
   // Cart Operations
   const handleAddToCart = (item) => {
+    // 1. Negative stock check if item is a product and setting is active
+    if (item.inventory_id && item.item_type !== 'service' && shouldPreventNegativeStock()) {
+      const invMatch = inventory.find((i) => i.id === item.inventory_id);
+      if (invMatch) {
+        const inCart = (cartItems.find((i) => i.inventory_id === item.inventory_id)?.qty || 0);
+        const requestedTotal = inCart + (item.qty || 1);
+        if (invMatch.stock_qty <= 0) {
+          setCartNoticeMessage(`⚠️ نفدت الكمية من المخزن! الصنف "${invMatch.name}" رصيده (${invMatch.stock_qty}). تم منع البيع بالسالب.`);
+          setTimeout(() => setCartNoticeMessage(''), 5000);
+          return;
+        }
+        if (requestedTotal > invMatch.stock_qty) {
+          setCartNoticeMessage(`⚠️ الكمية المطلوبة تتجاوز الرصيد المتاح بالمخزن (${invMatch.stock_qty} عبوة)!`);
+          setTimeout(() => setCartNoticeMessage(''), 5000);
+          return;
+        }
+      }
+    }
+
     const isOilProduct = (item.category === 'oil' || (item.description || '').includes('زيت'));
     if (isOilProduct && posMode === 'quick') {
       setPosMode('oil');
@@ -436,11 +456,20 @@ export default function PosScreen({
   const handleUpdateItemQty = (index, delta) => {
     setCartItems((prev) => {
       const updated = [...prev];
-      const newQty = Math.max(1, updated[index].qty + delta);
+      const targetItem = updated[index];
+      if (delta > 0 && targetItem.inventory_id && targetItem.item_type !== 'service' && shouldPreventNegativeStock()) {
+        const invMatch = inventory.find((i) => i.id === targetItem.inventory_id);
+        if (invMatch && targetItem.qty + delta > invMatch.stock_qty) {
+          setCartNoticeMessage(`⚠️ الرصيد المتاح من "${invMatch.name}" هو (${invMatch.stock_qty}) فقط! تم منع البيع بالسالب.`);
+          setTimeout(() => setCartNoticeMessage(''), 4000);
+          return prev;
+        }
+      }
+      const newQty = Math.max(1, targetItem.qty + delta);
       updated[index] = {
-        ...updated[index],
+        ...targetItem,
         qty: newQty,
-        subtotal: newQty * updated[index].unit_price,
+        subtotal: newQty * targetItem.unit_price,
       };
       return updated;
     });
@@ -946,13 +975,13 @@ export default function PosScreen({
             <button
               type="button"
               onClick={() => setPosMode('quick')}
-              className={`min-h-[48px] px-4 rounded-xl text-xs sm:text-sm font-black transition flex items-center gap-2 active:scale-95 ${
+              className={`min-h-[42px] px-4 rounded-xl text-xs sm:text-sm font-black transition flex items-center gap-2 active:scale-95 ${
                 posMode === 'quick'
                   ? 'bg-gradient-to-r from-amber-500 to-amber-600 text-slate-950 shadow-md shadow-amber-500/25 ring-1 ring-amber-400/50'
                   : 'text-slate-300 hover:text-white hover:bg-white/5'
               }`}
             >
-              <Zap className="w-4 h-4 stroke-[2.5]" />
+              <Zap className="w-3.5 h-3.5 stroke-[2.2]" />
               <span>⚡ فاتورة سريعة</span>
               <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-black/20 font-bold hidden sm:inline">
                 رقع ومبيعات مباشرة
@@ -962,13 +991,13 @@ export default function PosScreen({
             <button
               type="button"
               onClick={() => setPosMode('oil')}
-              className={`min-h-[48px] px-4 rounded-xl text-xs sm:text-sm font-black transition flex items-center gap-2 active:scale-95 ${
+              className={`min-h-[42px] px-4 rounded-xl text-xs sm:text-sm font-black transition flex items-center gap-2 active:scale-95 ${
                 posMode === 'oil'
                   ? 'bg-gradient-to-r from-teal-500 to-teal-600 text-slate-950 shadow-md shadow-teal-500/25 ring-1 ring-teal-400/50'
                   : 'text-slate-300 hover:text-white hover:bg-white/5'
               }`}
             >
-              <Droplets className="w-4 h-4 stroke-[2.5]" />
+              <Droplets className="w-3.5 h-3.5 stroke-[2.2]" />
               <span>🛢️ فاتورة غيار زيت</span>
               <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-black/20 font-bold hidden sm:inline">
                 العداد والخدمة
@@ -979,7 +1008,7 @@ export default function PosScreen({
             <button
               type="button"
               onClick={() => setShowPendingServicesModal(true)}
-              className={`min-h-[48px] px-3.5 sm:px-4 rounded-xl text-xs sm:text-sm font-black transition flex items-center gap-2 active:scale-95 border ${
+              className={`min-h-[42px] px-3.5 sm:px-4 rounded-xl text-xs sm:text-sm font-black transition flex items-center gap-2 active:scale-95 border ${
                 pendingServicesCount > 0
                   ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white border-blue-400/60 shadow-lg shadow-blue-500/30 ring-1 ring-blue-400/50'
                   : 'text-slate-300 border-white/5 hover:text-white hover:bg-white/5'
@@ -987,7 +1016,7 @@ export default function PosScreen({
               title="متابعة وإتمام فحص السيارات التي لا تزال تحت الخدمة في الحفرة وإرسال الواتساب"
             >
               <div className="relative">
-                <Car className="w-4 h-4 stroke-[2.5]" />
+                <Car className="w-3.5 h-3.5 stroke-[2.2]" />
                 {pendingServicesCount > 0 && (
                   <span className="absolute -top-1 -right-1.5 w-2 h-2 rounded-full bg-rose-400 animate-ping" />
                 )}
@@ -1009,7 +1038,7 @@ export default function PosScreen({
           <button
             type="button"
             onClick={() => setShowPlateSearchFlyout(true)}
-            className={`min-h-[48px] px-3.5 sm:px-4 rounded-2xl border transition flex items-center gap-2 active:scale-95 flex-shrink-0 select-none shadow-md ${
+            className={`min-h-[42px] px-3.5 sm:px-4 rounded-2xl border transition flex items-center gap-2 active:scale-95 flex-shrink-0 select-none shadow-md ${
               selectedVehicle && selectedVehicle.plate_number && !selectedVehicle.plate_number.startsWith('بدون')
                 ? 'bg-gradient-to-r from-sky-500/20 via-blue-500/20 to-sky-500/20 border-sky-400/60 text-white ring-2 ring-sky-400/30'
                 : 'bg-slate-900/90 hover:bg-slate-800 text-slate-200 border-white/15 hover:border-amber-400/60'
@@ -1027,7 +1056,7 @@ export default function PosScreen({
               </div>
             ) : (
               <div className="flex items-center gap-2">
-                <div className="w-6 h-6 rounded-lg bg-amber-500/20 text-amber-400 flex items-center justify-center font-bold text-xs border border-amber-500/30">
+                <div className="w-5 h-5 rounded-md bg-amber-500/20 text-[11px] text-amber-400 flex items-center justify-center font-bold text-xs border border-amber-500/30">
                   🚗
                 </div>
                 <span className="font-extrabold text-xs sm:text-sm">بحث برقم اللوحة</span>
@@ -1042,15 +1071,15 @@ export default function PosScreen({
           <div className="relative flex-1 max-w-xs sm:max-w-sm lg:max-w-md" ref={searchContainerRef}>
             <div className="relative">
               <input
-                ref={customerSearchInputRef}
                 type="text"
+                ref={customerSearchInputRef}
                 placeholder="ابحث بالاسم أو رقم الهاتف... (F3)"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full min-h-[48px] pr-10 pl-9 rounded-2xl bg-slate-900 border border-white/15 text-white placeholder-slate-400 font-bold text-xs sm:text-sm focus:outline-none focus:border-amber-400 shadow-inner"
+                className="w-full min-h-[42px] pr-10 pl-9 rounded-2xl bg-slate-900 border border-white/15 text-white placeholder-slate-400 font-bold text-xs sm:text-sm focus:outline-none focus:border-amber-400 shadow-inner"
               />
               <Search className="w-4 h-4 text-slate-400 absolute right-3.5 top-4 pointer-events-none" />
-              
+
               {/* Instant Clear Button ✕ */}
               {searchQuery && (
                 <button
@@ -1131,7 +1160,7 @@ export default function PosScreen({
               setEditingVehicle(null);
               setShowNewVehicleModal(true);
             }}
-            className="min-h-[48px] px-3.5 sm:px-4 rounded-2xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-black text-xs sm:text-sm shadow-lg shadow-amber-500/20 flex items-center justify-center gap-2 transition active:scale-95 flex-shrink-0"
+            className="min-h-[42px] px-3.5 sm:px-4 rounded-2xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-black text-xs sm:text-sm shadow-lg shadow-amber-500/20 flex items-center justify-center gap-2 transition active:scale-95 flex-shrink-0"
           >
             <Plus className="w-4 h-4 stroke-[3]" />
             <span>+ إضافة عميل جديد 👤</span>
@@ -1193,45 +1222,52 @@ export default function PosScreen({
         {/* MODE 2 (OIL): Selected Vehicle Card with PREVIOUS ODOMETER & Approved Oil */}
         {posMode === 'oil' && selectedVehicle && (
           <div className="pt-2 border-t border-teal-500/20 animate-in fade-in space-y-2">
-            <div className="p-3 rounded-2xl bg-gradient-to-r from-teal-500/10 via-slate-900 to-slate-900 border border-teal-500/30 flex flex-wrap items-center justify-between gap-3">
-              <div className="flex items-center gap-3">
-                <div className="w-11 h-11 rounded-2xl bg-teal-500/20 text-teal-400 border border-teal-500/30 flex items-center justify-center font-mono font-extrabold shadow-sm">
+            <div className="p-3.5 rounded-2xl bg-slate-900/95 border-2 border-teal-500/40 flex flex-wrap items-center justify-between gap-3 shadow-lg">
+              <div className="flex items-center gap-3.5">
+                <div className="w-12 h-12 rounded-2xl bg-teal-500/20 text-teal-300 border border-teal-500/40 flex items-center justify-center font-mono font-extrabold shadow-sm shrink-0">
                   <Car className="w-6 h-6" />
                 </div>
                 <div>
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <span className="font-black text-base text-white">
+                  {/* Top Row: Customer Name FIRST in top right, then phone, then plate & model */}
+                  <div className="flex items-center gap-2.5 flex-wrap">
+                    {/* Customer Name placed FIRST at the top right */}
+                    <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl bg-teal-500/25 border border-teal-400/50 text-teal-200 font-black text-lg shadow-sm">
+                      <span className="text-xs text-teal-400 font-bold">العميل:</span>
+                      <span>{selectedVehicle.customer_name}</span>
+                    </span>
+                    <span className="font-mono text-xs font-black text-white bg-slate-800 px-2 py-1 rounded-lg border border-white/10">
+                      {selectedVehicle.phone}
+                    </span>
+
+                    {/* Plate & Car Model */}
+                    <span className="font-black text-xl text-amber-300 font-mono tracking-wider bg-slate-950 px-3 py-0.5 rounded-xl border border-amber-400/40 shadow-inner">
                       {selectedVehicle.plate_number && !selectedVehicle.plate_number.startsWith('بدون')
                         ? selectedVehicle.plate_number
-                        : '🚗 (بدون لوحة)'}
+                        : '🚗 بدون لوحة'}
                     </span>
-                    <span className="text-xs px-2 py-0.5 rounded-full bg-slate-800 text-slate-300 border border-white/10 font-bold">
+                    <span className="text-xs px-2.5 py-1 rounded-xl bg-slate-800 text-white border border-white/15 font-black">
                       {selectedVehicle.car_make_model}
-                    </span>
-                    <span className="text-xs text-slate-300 font-bold">
-                      العميل: <strong className="text-white">{selectedVehicle.customer_name}</strong> &bull;{' '}
-                      <span className="font-mono">{selectedVehicle.phone}</span>
                     </span>
                   </div>
 
-                  <div className="flex items-center gap-3 text-xs mt-1 flex-wrap">
-                    <span className="text-amber-300 font-bold flex items-center gap-1">
-                      <span>🛢️ الزيت المعتمد:</span>
-                      <strong>
+                  {/* Bottom Row: Oil & Odometer */}
+                  <div className="flex items-center gap-3 text-xs mt-2 flex-wrap">
+                    <span className="px-2.5 py-1 rounded-xl bg-amber-500/15 text-amber-300 border border-amber-500/30 font-bold text-xs flex items-center gap-1.5">
+                      <span>🛢️ الزيت:</span>
+                      <strong className="text-white font-black text-sm">
                         {selectedVehicle.preferred_oil_brand || 'تويوتا'} ({selectedVehicle.preferred_viscosity || '20W-50'})
                       </strong>
                     </span>
 
-                    {/* Prominent Previous Odometer Tag */}
-                    <span className="px-2.5 py-0.5 rounded-lg bg-teal-500/20 text-teal-300 border border-teal-500/40 font-mono font-black text-xs flex items-center gap-1">
-                      <Gauge className="w-3.5 h-3.5" />
+                    <span className="px-3 py-1 rounded-xl bg-teal-500/20 text-teal-300 border border-teal-500/40 font-mono font-black text-xs flex items-center gap-1.5">
+                      <Gauge className="w-4 h-4 text-teal-400" />
                       <span>
                         العداد السابق:{' '}
                         {lastServiceInfo?.current_odometer
                           ? `${Number(lastServiceInfo.current_odometer).toLocaleString()} كم`
                           : selectedVehicle.last_odometer
                           ? `${Number(selectedVehicle.last_odometer).toLocaleString()} كم`
-                          : 'لا يوجد قراءة سابقة'}
+                          : 'لا يوجد قراءة'}
                       </span>
                     </span>
                   </div>
@@ -1243,19 +1279,19 @@ export default function PosScreen({
                 <button
                   type="button"
                   onClick={handleRepeatLastService}
-                  className="min-h-[38px] px-3 rounded-xl bg-teal-500/20 hover:bg-teal-500/30 text-teal-300 border border-teal-500/40 font-black text-xs flex items-center gap-1.5 transition active:scale-95 shadow-sm"
+                  className="min-h-[42px] px-3.5 rounded-xl bg-teal-500/25 hover:bg-teal-500/35 text-teal-200 border border-teal-400/50 font-black text-xs flex items-center gap-1.5 transition active:scale-95 shadow-sm"
                   title="تكرار بنود آخر خدمة غيار زيت للسلة لتعديلها"
                 >
-                  <RotateCcw className="w-3.5 h-3.5" />
-                  <span>🔄 تكرار آخر غيار زيت</span>
+                  <RotateCcw className="w-4 h-4" />
+                  <span>🔄 تكرار آخر غيار</span>
                 </button>
 
                 <button
                   type="button"
                   onClick={() => setShowHistoryDrawer(true)}
-                  className="min-h-[38px] px-3 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-300 border border-white/10 font-bold text-xs flex items-center gap-1.5 transition active:scale-95"
+                  className="min-h-[42px] px-3.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white border border-white/20 font-black text-xs flex items-center gap-1.5 transition active:scale-95"
                 >
-                  <History className="w-3.5 h-3.5 text-amber-400" />
+                  <History className="w-4 h-4 text-amber-400" />
                   <span>السجل</span>
                 </button>
 
@@ -1265,10 +1301,10 @@ export default function PosScreen({
                     setEditingVehicle(selectedVehicle);
                     setShowNewVehicleModal(true);
                   }}
-                  className="min-h-[38px] px-3 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-300 border border-white/10 font-bold text-xs flex items-center gap-1 transition active:scale-95"
+                  className="min-h-[42px] px-3.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white border border-white/20 font-black text-xs flex items-center gap-1 transition active:scale-95"
                   title="تعديل بيانات العميل أو إضافة اللوحة"
                 >
-                  <Edit className="w-3.5 h-3.5" />
+                  <Edit className="w-4 h-4 text-slate-300" />
                   <span>تعديل</span>
                 </button>
 
@@ -1278,7 +1314,7 @@ export default function PosScreen({
                     setSelectedVehicle(null);
                     setLastServiceInfo(null);
                   }}
-                  className="w-8 h-8 rounded-xl bg-slate-800 hover:bg-rose-500/20 hover:text-rose-400 text-slate-400 flex items-center justify-center transition"
+                  className="w-10 h-10 rounded-xl bg-slate-800 hover:bg-rose-500/25 hover:text-rose-300 text-slate-300 flex items-center justify-center transition font-black text-lg border border-white/10"
                   title="إلغاء اختيار السيارة"
                 >
                   &times;
@@ -1347,55 +1383,28 @@ export default function PosScreen({
           {posMode === 'quick' && (
             <div className="space-y-3 animate-in fade-in duration-150">
               {/* Pinned Quick Items Row */}
-              <div className="apple-glass rounded-3xl p-3.5 border border-white/10 space-y-2.5">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-black text-amber-300 flex items-center gap-1.5">
-                    <Star className="w-4 h-4 fill-amber-400/40 text-amber-400" />
-                    <span>الأصناف والخدمات السريعة الأكثر طلباً (نقرة واحدة للإضافة):</span>
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => setShowQuickGridConfigModal(true)}
-                    className="text-[11px] text-slate-400 hover:text-amber-300 font-bold flex items-center gap-1 px-2 py-1 rounded-lg bg-slate-900 border border-white/10 transition active:scale-95"
-                    title="تخصيص الأصناف السريعة وتثبيتها من المخزون"
-                  >
-                    <Settings2 className="w-3.5 h-3.5" />
-                    <span>⚙️ تخصيص الأصناف السريعة</span>
-                  </button>
+                            <div className="apple-glass rounded-2xl px-3.5 py-2 border border-white/10 flex items-center justify-between text-xs shadow-sm">
+                <div className="flex items-center gap-2">
+                  <Star className="w-3.5 h-3.5 fill-amber-400/40 text-amber-400" />
+                  <span className="font-bold text-amber-300">الأصناف السريعة الأكثر طلباً:</span>
+                  <span className="text-[11px] text-slate-400 font-mono">({pinnedItems.length} صنف متاح)</span>
                 </div>
-
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                  {pinnedItems.map((item) => (
-                    <button
-                      key={item.id}
-                      type="button"
-                      onClick={() =>
-                        handleAddToCart({
-                          inventory_id: item.id,
-                          item_type: item.item_type || (item.category === 'service' ? 'service' : 'product'),
-                          description: item.name,
-                          qty: 1,
-                          unit_price: Number(item.sell_price) || 0,
-                        })
-                      }
-                      className="p-2.5 rounded-2xl bg-slate-900/90 hover:bg-amber-500/20 border border-white/10 hover:border-amber-400 text-right transition active:scale-95 group shadow-sm flex flex-col justify-between min-h-[64px]"
-                    >
-                      <div className="font-extrabold text-white text-xs group-hover:text-amber-300 transition truncate">
-                        {item.name}
-                      </div>
-                      <div className="flex items-center justify-between mt-1 text-[11px] font-mono">
-                        <span className="text-amber-400 font-black">{Number(item.sell_price).toLocaleString()} ر.ي</span>
-                        <span className="text-[10px] text-slate-400 group-hover:text-amber-200">+ إضافة</span>
-                      </div>
-                    </button>
-                  ))}
-                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowQuickGridConfigModal(true)}
+                  className="text-[11px] text-slate-400 hover:text-amber-300 font-bold flex items-center gap-1 px-2.5 py-1 rounded-lg bg-slate-900 border border-white/10 transition active:scale-95"
+                  title="تخصيص الأصناف السريعة وتثبيتها من المخزون"
+                >
+                  <Settings2 className="w-3.5 h-3.5" />
+                  <span>⚙️ تخصيص</span>
+                </button>
               </div>
 
               {/* Categorical Drilldown Tiles (رقع، زيوت، سوائل، بطاريات) */}
               <div className="apple-glass rounded-3xl p-3.5 border border-white/10 space-y-3">
-                <div className="text-xs font-black text-slate-300">
-                  تصفح المنتجات والخدمات حسب القسم:
+                <div className="text-[15px] font-black text-amber-300 flex items-center justify-between">
+                  <span>🏷️ أقسام المنتجات والخدمات الرئيسية:</span>
+                  <span className="text-xs font-mono text-slate-400 font-normal">اختر القسم للتصفح الفوري</span>
                 </div>
 
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
@@ -1411,15 +1420,20 @@ export default function PosScreen({
                         key={cat.id}
                         type="button"
                         onClick={() => setQuickActiveCategory(isSelected ? 'all' : cat.id)}
-                        className={`min-h-[58px] p-2.5 rounded-2xl border text-right transition flex flex-col justify-between active:scale-95 ${
+                        className={`min-h-[66px] p-3 rounded-2xl border-2 text-right transition flex flex-col justify-between active:scale-95 ${
                           isSelected
-                            ? 'bg-amber-500/20 border-amber-400 text-white font-black shadow-md'
-                            : 'bg-slate-900/80 border-white/10 text-slate-300 hover:text-white hover:bg-slate-800'
+                            ? 'bg-amber-500/20 border-amber-400 text-amber-300 font-black shadow-lg shadow-amber-500/20'
+                            : 'bg-slate-900/90 border-white/10 text-white hover:border-amber-400/50'
                         }`}
                       >
-                        <div className="text-xs font-extrabold truncate">{cat.label}</div>
-                        <div className="text-[10px] text-slate-400 font-mono mt-0.5">
-                          {cat.count} أصناف متاحة {isSelected ? '▲ إخفاء' : '▼ عرض'}
+                        <div className="text-[15px] font-black truncate">{cat.label}</div>
+                        <div className="mt-1 flex items-center justify-between">
+                          <span className="px-2 py-0.5 rounded-lg bg-amber-400/15 text-amber-300 text-xs font-black font-mono">
+                            {cat.count} أصناف
+                          </span>
+                          <span className="text-xs font-bold text-slate-400">
+                            {isSelected ? '▲ إخفاء' : '▼ تصفح'}
+                          </span>
                         </div>
                       </button>
                     );
@@ -1428,15 +1442,15 @@ export default function PosScreen({
 
                 {/* Expanded Category Products Grid */}
                 {quickActiveCategory !== 'all' && (
-                  <div className="pt-2 border-t border-white/10 space-y-2 animate-in fade-in">
-                    <div className="flex items-center justify-between text-xs">
-                      <span className="font-bold text-slate-300">
+                  <div className="pt-2.5 border-t border-white/10 space-y-2 animate-in fade-in">
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="font-black text-amber-300">
                         قائمة أصناف القسم ({quickCategoryProducts.length} صنف):
                       </span>
                       <button
                         type="button"
                         onClick={() => setQuickActiveCategory('all')}
-                        className="text-[11px] text-slate-400 hover:text-white"
+                        className="text-xs font-bold text-slate-300 hover:text-white px-2 py-0.5 rounded-lg bg-slate-800"
                       >
                         إغلاق القائمة ✕
                       </button>
@@ -1456,25 +1470,35 @@ export default function PosScreen({
                               unit_price: Number(prod.sell_price) || 0,
                             })
                           }
-                          className="p-2.5 rounded-2xl bg-slate-900/90 hover:bg-amber-500/15 border border-white/10 hover:border-amber-400/50 text-right transition active:scale-[0.98] flex items-center justify-between gap-2"
+                          className={`p-3 rounded-2xl text-right transition active:scale-[0.98] flex items-center justify-between gap-2 border-2 ${
+                            prod.item_type !== 'service' && prod.stock_qty <= 0
+                              ? 'bg-rose-950/20 border-rose-500/30 opacity-80 hover:border-rose-400'
+                              : 'bg-slate-900/90 hover:bg-amber-500/15 border-white/10 hover:border-amber-400/60'
+                          }`}
                         >
                           <div className="min-w-0 flex-1">
-                            <div className="font-extrabold text-xs text-white truncate flex items-center gap-1.5">
+                            <div className="font-black text-[15px] text-white truncate flex items-center gap-1.5">
                               <span>{prod.name}</span>
                               {prod.viscosity && (
-                                <span className="text-[10px] px-1.5 rounded bg-amber-500/20 text-amber-300 font-mono">
+                                <span className="text-xs px-2 py-0.5 rounded-lg bg-amber-500/20 text-amber-300 font-mono font-black">
                                   {prod.viscosity}
                                 </span>
                               )}
                             </div>
-                            <div className="text-[11px] text-slate-400 font-mono flex items-center gap-2 mt-0.5">
-                              <span className="text-amber-400 font-bold">{Number(prod.sell_price).toLocaleString()} ر.ي</span>
+                            <div className="text-xs text-slate-300 font-mono flex items-center gap-2 mt-1">
+                              <span className="text-amber-400 font-black text-sm">{Number(prod.sell_price).toLocaleString()} ر.ي</span>
                               <span>&bull;</span>
-                              <span>{prod.item_type === 'service' ? 'خدمة ورشة' : `متبقي: ${prod.stock_qty}`}</span>
+                              <span className={`font-bold ${prod.item_type !== 'service' && prod.stock_qty <= 0 ? 'text-rose-400' : ''}`}>
+                                {prod.item_type === 'service' ? 'خدمة ورشة' : `متبقي: ${prod.stock_qty}`}
+                              </span>
                             </div>
                           </div>
-                          <span className="px-2 py-1 rounded-xl bg-amber-500/20 text-amber-300 text-[11px] font-bold border border-amber-500/30 flex-shrink-0">
-                            + إضافة
+                          <span className={`px-3 py-1.5 rounded-xl text-xs font-black shadow-sm flex-shrink-0 ${
+                            prod.item_type !== 'service' && prod.stock_qty <= 0
+                              ? 'bg-rose-500/20 text-rose-300 border border-rose-500/40'
+                              : 'bg-amber-400 text-slate-950'
+                          }`}>
+                            {prod.item_type !== 'service' && prod.stock_qty <= 0 ? 'نفد المخزون' : '+ إضافة'}
                           </span>
                         </button>
                       ))}
@@ -1482,39 +1506,23 @@ export default function PosScreen({
                   </div>
                 )}
               </div>
-
-              {/* Technician Selector Strip (Salaried Workers - No Labor Commissions) */}
-              <div className="apple-glass rounded-3xl p-3 border border-white/10">
-                <div className="text-xs font-bold text-slate-300 mb-2 flex items-center justify-between">
-                  <span className="flex items-center gap-1.5">
-                    <UserCheck className="w-4 h-4 text-amber-400" />
-                    <span>الفني المسؤول عن تنفيذ الخدمة:</span>
-                  </span>
-                  <span className="text-[11px] text-slate-400 font-mono">طاقم المركز المعتمد</span>
+              {/* Technician Selector Strip - الخيار 2 المعتمد: قائمة منسدلة أنيقة مدمجة بسطر واحد */}
+              <div className="apple-glass rounded-2xl px-3.5 py-1.5 border border-white/10 flex items-center justify-between text-xs shadow-sm">
+                <div className="flex items-center gap-2">
+                  <UserCheck className="w-3.5 h-3.5 text-amber-400" />
+                  <span className="font-bold text-slate-300">الفني المسؤول:</span>
                 </div>
-                <div className="grid grid-cols-3 gap-2">
-                  {workers.map((w) => {
-                    const isSelected = selectedWorkerId === w.id;
-                    return (
-                      <button
-                        key={w.id}
-                        type="button"
-                        onClick={() => setSelectedWorkerId(w.id)}
-                        className={`min-h-[44px] px-3 py-1.5 rounded-2xl border text-right transition flex items-center justify-between ${
-                          isSelected
-                            ? 'bg-amber-500/20 border-amber-400 text-white font-bold shadow-md shadow-amber-500/10'
-                            : 'bg-slate-900/60 border-white/10 text-slate-400 hover:text-slate-200'
-                        }`}
-                      >
-                        <div className="truncate">
-                          <div className="text-xs font-extrabold truncate">{w.name.split(' ')[0]}</div>
-                          <div className="text-[10px] text-slate-400 truncate">{w.role.split(' ')[1] || w.role}</div>
-                        </div>
-                        {isSelected && <Check className="w-4 h-4 text-amber-400 stroke-[3] flex-shrink-0" />}
-                      </button>
-                    );
-                  })}
-                </div>
+                <select
+                  value={selectedWorkerId || ''}
+                  onChange={(e) => setSelectedWorkerId(Number(e.target.value))}
+                  className="bg-slate-900 border border-white/15 text-white font-bold text-xs rounded-xl px-2.5 py-1 focus:outline-none focus:border-amber-400"
+                >
+                  {workers.map((w) => (
+                    <option key={w.id} value={w.id}>
+                      {w.name} ({w.role})
+                    </option>
+                  ))}
+                </select>
               </div>
             </div>
           )}
@@ -1531,22 +1539,23 @@ export default function PosScreen({
                   </span>
 
                   {/* Single Default Interval Badge - Editable on click (Keyboard only, no arrows) */}
-                  <div className="flex items-center gap-1.5 bg-slate-900 border border-teal-500/40 px-3 py-1.5 rounded-xl shadow-inner">
-                    <span className="text-[11px] text-teal-300 font-bold">مسافة الغيار الافتراضية:</span>
-                    <span className="text-teal-400 font-bold text-xs">+</span>
-                    <input
-                      type="text"
-                      inputMode="numeric"
-                      value={kmInterval}
-                      onChange={(e) => {
-                        const val = e.target.value.replace(/\D/g, '');
-                        setKmInterval(val ? Number(val) : '');
-                        setManualNextOdometer('');
-                      }}
-                      className="w-16 min-h-[28px] px-1 bg-slate-950 border border-teal-500/40 rounded-lg text-teal-300 font-mono font-black text-center text-xs focus:outline-none focus:ring-1 focus:ring-teal-400 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                      title="أدخل مسافة الكيلومترات الافتراضية بالكيبورد"
-                    />
-                    <span className="text-[11px] text-teal-300 font-bold">كم (افتراضي)</span>
+                  <div className="flex items-center gap-2 bg-slate-900 border border-teal-500/40 px-3 py-1.5 rounded-xl">
+                    <span className="text-[13px] text-teal-200 font-black">مسافة الغيار:</span>
+                    <div className="flex items-center bg-slate-950 border border-teal-500/50 rounded-lg px-2 py-0.5">
+                      <span className="text-teal-400 font-bold text-xs ml-1">+</span>
+                      <input
+                        type="text"
+                        inputMode="numeric"
+                        value={kmInterval}
+                        onChange={(e) => {
+                          const val = e.target.value.replace(/\D/g, '');
+                          setKmInterval(val ? Number(val) : '');
+                          setManualNextOdometer('');
+                        }}
+                        className="w-14 text-amber-300 font-mono font-black text-center text-sm bg-transparent focus:outline-none"
+                      />
+                      <span className="text-xs text-slate-400 font-mono">كم</span>
+                    </div>
                   </div>
                 </div>
 

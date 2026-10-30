@@ -8,6 +8,8 @@ router.get('/vouchers/:id', supplierController.getVoucherById);
 router.get('/:id', supplierController.getById);
 router.post('/', supplierController.create);
 router.put('/:id', supplierController.update);
+router.patch('/:id/toggle-active', supplierController.toggleActive);
+router.delete('/:id', supplierController.delete);
 router.post('/:id/pay', supplierController.payDebt);
 
 module.exports = router;

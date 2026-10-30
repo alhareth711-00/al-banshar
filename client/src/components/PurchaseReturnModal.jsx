@@ -51,6 +51,8 @@ export default function PurchaseReturnModal({
     const found = suppliers.find((s) => String(s.id) === String(val));
     if (found) {
       setSupplierName(found.name);
+    } else {
+      setSupplierName('');
     }
   };
 
@@ -216,6 +218,7 @@ export default function PurchaseReturnModal({
                 )}
               </label>
               <select
+                autoFocus
                 value={supplierId}
                 onChange={handleSupplierChange}
                 className="w-full min-h-[40px] px-3 rounded-xl bg-slate-950 border border-white/15 text-white font-bold cursor-pointer"

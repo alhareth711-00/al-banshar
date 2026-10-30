@@ -11,7 +11,12 @@ export default function TurnoverAnalyticsModal({ isOpen, onClose, onEditItem }) 
     if (isOpen) {
       fetchAnalytics(period);
     }
-  }, [isOpen, period]);
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, period, onClose]);
 
   const fetchAnalytics = async (days) => {
     try {

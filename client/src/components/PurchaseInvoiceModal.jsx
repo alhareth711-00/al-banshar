@@ -97,6 +97,9 @@ export default function PurchaseInvoiceModal({
         d.setDate(d.getDate() + Number(found.credit_days));
         setDueDate(d.toISOString().split('T')[0]);
       }
+    } else {
+      setSupplierName('');
+      setDueDate('');
     }
   };
 
@@ -110,6 +113,8 @@ export default function PurchaseInvoiceModal({
       const isCarton = updated[index].is_carton;
       const unitCost = found ? found.cost_price : '';
       const cartonCost = found && found.cost_price ? found.cost_price * defUnitsPerCarton : '';
+      const cQty = Math.max(1, Number(updated[index].carton_qty) || 1);
+      const calculatedQty = isCarton ? cQty * defUnitsPerCarton : (updated[index].qty || 1);
 
       updated[index] = {
         ...updated[index],
@@ -117,6 +122,7 @@ export default function PurchaseInvoiceModal({
         units_per_carton: defUnitsPerCarton,
         unit_cost: unitCost,
         carton_cost: cartonCost,
+        qty: calculatedQty,
         unit_sell: found ? found.sell_price : '',
       };
       return updated;
@@ -223,7 +229,7 @@ export default function PurchaseInvoiceModal({
     return totalBillAmount;
   }, [paymentMethod, paidAmountInput, totalBillAmount]);
 
-  const remainingDebt = Math.max(0, totalBillAmount - effectivePaidAmount) + (hasShipping && shippingPayer === 'supplier_account' ? numShippingCost : 0);
+  const remainingDebt = Math.max(0, totalBillAmount - effectivePaidAmount);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -363,6 +369,7 @@ export default function PurchaseInvoiceModal({
                 )}
               </label>
               <select
+                autoFocus
                 value={supplierId}
                 onChange={handleSupplierChange}
                 className="w-full min-h-[42px] px-3 rounded-xl bg-slate-950 border border-white/15 text-white text-xs cursor-pointer font-bold"
@@ -706,33 +713,22 @@ export default function PurchaseInvoiceModal({
                 </div>
 
                 <div>
-                  <label className="block text-slate-300 font-bold mb-1">جهة سداد أجور الشحن:</label>
-                  <div className="grid grid-cols-2 gap-1.5">
-                    <button
-                      type="button"
-                      onClick={() => setShippingPayer('cash_drawer')}
-                      className={`p-2 rounded-xl text-center text-[11px] font-bold border transition ${
-                        shippingPayer === 'cash_drawer'
-                          ? 'bg-blue-500 text-slate-950 border-blue-400 font-black'
-                          : 'bg-slate-950 text-slate-400 border-white/10 hover:text-white'
-                      }`}
-                    >
-                      💵 نقداً من الدرج فورياً
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setShippingPayer('supplier_account')}
-                      className={`p-2 rounded-xl text-center text-[11px] font-bold border transition ${
-                        shippingPayer === 'supplier_account'
-                          ? 'bg-blue-500 text-slate-950 border-blue-400 font-black'
-                          : 'bg-slate-950 text-slate-400 border-white/10 hover:text-white'
-                      }`}
-                    >
-                      📝 مضاف لذمة المورد
-                    </button>
-                  </div>
-                  <div className="text-[10px] text-slate-400 mt-1">
-                    {shippingPayer === 'cash_drawer' ? 'تخصم كمصروف شحن من درج الكاشير' : 'تضاف على إجمالي الدين المستحق للمورد'}
+                  <label className="block text-slate-300 font-bold mb-1">طريقة خصم وسداد أجور النقل:</label>
+                  <div className="p-2.5 rounded-xl bg-slate-950 border border-emerald-500/40 flex items-center gap-2.5">
+                    <span className="p-1.5 rounded-lg bg-emerald-500/20 text-emerald-400 font-bold text-sm">
+                      💵
+                    </span>
+                    <div className="flex-1">
+                      <div className="font-extrabold text-emerald-300 text-xs flex items-center justify-between">
+                        <span>خصم نقدي مباشر من الصندوق (الدرج)</span>
+                        <span className="text-[10px] bg-emerald-500/15 px-2 py-0.5 rounded text-emerald-300 border border-emerald-500/30">
+                          لا يُحمّل على المورد
+                        </span>
+                      </div>
+                      <div className="text-[10px] text-slate-400 mt-0.5">
+                        تُصرف أجور التوصيل لسائق النقل كاش من الدرج فوراً، وتُوزع على تكلفة العلب فقط.
+                      </div>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -816,7 +812,7 @@ export default function PurchaseInvoiceModal({
                 <div className="flex justify-between items-center text-xs text-blue-300">
                   <span>أجور النقل والشحن الموزعة على التكلفة:</span>
                   <span className="font-mono font-bold">
-                    + {numShippingCost.toLocaleString()} ر.ي ({shippingPayer === 'cash_drawer' ? 'مسدد كاش من الدرج' : 'مضاف على حساب المورد'})
+                    + {numShippingCost.toLocaleString()} ر.ي (خصم نقدي مباشر من الصندوق)
                   </span>
                 </div>
               )}

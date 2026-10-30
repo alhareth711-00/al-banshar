@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Car, CheckCircle2, AlertCircle, Plus, X, Search, Sparkles, ArrowRight } from 'lucide-react';
+import { Car, CheckCircle2, AlertCircle, Plus, X } from 'lucide-react';
 import { playMatchChime } from '../utils/soundEffects';
 
 const easternDigits = ['٠', '١', '٢', '٣', '٤', '٥', '٦', '٧', '٨', '٩'];
@@ -237,15 +237,20 @@ export default function PlateSearchFlyout({
         >
           {/* Top Header Strip: اليَمَن في اليمين | الصنف المكتشف أو غير محدد في الشمال */}
           <div className="py-2 px-5 flex items-center justify-between border-b-2 border-slate-950 bg-black/5">
-            <span className="text-xl sm:text-2xl font-black text-slate-950 tracking-wider">
-              اليَمَن
+            <span
+              className="text-xl sm:text-2xl font-black text-slate-950 inline-block origin-right"
+              style={{ transform: 'scaleX(2.2)', letterSpacing: '0.08em' }}
+            >
+              اليــــمــــن
             </span>
 
             <div className="flex items-center gap-2">
               {detectedType ? (
-                <span className="text-lg sm:text-xl font-black text-slate-950 tracking-wider flex items-center gap-1.5 animate-in fade-in">
-                  <Sparkles className="w-4 h-4 text-slate-950 inline" />
-                  <span>{detectedType}</span>
+                <span
+                  className="text-xl sm:text-2xl font-black text-slate-950 inline-block origin-left animate-in fade-in"
+                  style={{ transform: 'scaleX(2.2)', letterSpacing: '0.08em' }}
+                >
+                  {detectedType === 'نقل' ? 'نـــــقـــــل' : detectedType === 'أجرة' ? 'أجـــــرة' : detectedType === 'خصوصي' ? 'خــصــوصــي' : detectedType}
                 </span>
               ) : (
                 <span className="text-xs sm:text-sm font-bold text-slate-700 bg-black/10 px-3 py-1 rounded-full border border-black/15">
@@ -404,18 +409,47 @@ export default function PlateSearchFlyout({
                 </div>
 
                 <div className="grid grid-cols-2 gap-2 text-xs">
-                  <div className="bg-slate-950/60 p-2.5 rounded-xl border border-white/5">
-                    <span className="text-slate-400 block text-[11px]">اسم العميل:</span>
-                    <span className="font-extrabold text-white text-sm">{matchedVehicle.customer_name}</span>
-                    <span className="text-slate-400 font-mono text-[11px] block mt-0.5">{matchedVehicle.phone}</span>
+                  {/* VIP Customer Card (20px Typography & Arranged Layout) */}
+                  <div className="bg-[#0b1220] p-3.5 rounded-2xl border-2 border-cyan-500/50 flex flex-col justify-between shadow-xl shadow-cyan-950/50 min-h-[96px]">
+                    {/* Customer Name Header */}
+                    <div className="flex items-center gap-2.5">
+                      <div className="w-8 h-8 rounded-xl bg-cyan-500/20 text-cyan-300 border border-cyan-400/50 flex items-center justify-center text-sm font-black shrink-0 shadow-inner">
+                        👤
+                      </div>
+                      <div className="font-black text-white text-[20px] leading-tight truncate tracking-tight" title={matchedVehicle.customer_name}>
+                        {matchedVehicle.customer_name}
+                      </div>
+                    </div>
+
+                    {/* Prominent Phone Number Badge */}
+                    <div className="mt-2.5 flex items-center justify-center gap-2 bg-[#070b14] px-3 py-1.5 rounded-xl border border-cyan-500/30">
+                      <span className="text-cyan-400 text-base">📱</span>
+                      <span className="font-mono text-cyan-300 text-[20px] font-black tracking-widest">
+                        {matchedVehicle.phone || 'بدون هاتف'}
+                      </span>
+                    </div>
                   </div>
 
-                  <div className="bg-slate-950/60 p-2.5 rounded-xl border border-white/5">
-                    <span className="text-slate-400 block text-[11px]">السيارة والزيت المعتمد:</span>
-                    <span className="font-bold text-white text-xs">{matchedVehicle.car_make_model}</span>
-                    <span className="text-amber-400 font-bold text-[11px] block mt-0.5">
-                      🛢️ {matchedVehicle.preferred_oil_brand || 'تويوتا'} ({matchedVehicle.preferred_viscosity || '20W-50'})
-                    </span>
+                  {/* Car & Approved Oil Card (Model 1 Enlarged) */}
+                  <div className="bg-[#0b1220] p-3 rounded-xl border-2 border-cyan-500/50 flex flex-col justify-between shadow-lg shadow-cyan-950/50">
+                    <div className="flex items-center gap-2">
+                      <div className="w-7 h-7 rounded-lg bg-cyan-500/20 text-cyan-300 border border-cyan-400/40 flex items-center justify-center text-sm shrink-0">
+                        🚗
+                      </div>
+                      <div className="font-black text-white text-lg leading-tight truncate" title={matchedVehicle.car_make_model}>
+                        {matchedVehicle.car_make_model || 'سيارة غير محددة'}
+                      </div>
+                    </div>
+                    <div className="mt-2 flex items-stretch gap-1.5 w-full">
+                      <div className="flex-1 flex items-center gap-2 bg-gradient-to-r from-amber-500/20 to-amber-950/40 border border-amber-400/50 px-3 py-1.5 rounded-xl shadow-inner">
+                        <span className="text-base">🛢️</span>
+                        <span className="font-black text-amber-300 text-sm tracking-tight">{matchedVehicle.preferred_oil_brand || 'تويوتا'}</span>
+                      </div>
+                      <div className="flex items-center gap-1.5 bg-[#070b14] border border-cyan-400/50 px-3 py-1.5 rounded-xl shadow-inner">
+                        <span className="text-[11px] font-bold text-cyan-400">اللزوجة:</span>
+                        <span className="font-mono text-cyan-300 font-black text-base tracking-wider">{matchedVehicle.preferred_viscosity || '20W-50'}</span>
+                      </div>
+                    </div>
                   </div>
                 </div>
 

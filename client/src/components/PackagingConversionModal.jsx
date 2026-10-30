@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { X, Layers, ArrowLeftRight, CheckCircle, AlertTriangle, Box, Droplets } from 'lucide-react';
 
 export default function PackagingConversionModal({ isOpen, onClose, inventory = [], onConversionCompleted }) {
@@ -8,6 +8,15 @@ export default function PackagingConversionModal({ isOpen, onClose, inventory = 
   const [unitsPerPack, setUnitsPerPack] = useState(24);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState('');
+
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, onClose]);
 
   // Potential parent items (cartons, bulk drums, 4L, etc.)
   const parentCandidates = useMemo(() => {

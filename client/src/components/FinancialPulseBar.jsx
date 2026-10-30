@@ -170,17 +170,17 @@ export default function FinancialPulseBar({
                 onClick={() => setShowLiquidModal(true)}
                 className="apple-glass-card rounded-2xl p-3 border border-emerald-500/25 hover:border-emerald-500/50 cursor-pointer tap-bounce group"
               >
-                <div className="flex items-center justify-between text-slate-300 text-xs font-bold">
+                <div className="flex items-center justify-between text-white text-[15.5px] font-black">
                   <span>النقدية والمحافظ (خزينة):</span>
                   <div className="w-6 h-6 rounded-lg bg-emerald-500/20 text-emerald-400 flex items-center justify-center">
                     <Wallet className="w-3.5 h-3.5" />
                   </div>
                 </div>
-                <div className="kiosk-stat-val text-emerald-400 mt-1 flex items-baseline gap-1">
+                <div className="kiosk-stat-val text-emerald-400 text-3xl font-black font-mono mt-1 flex items-baseline gap-1">
                   <span>{liquid.total.toLocaleString()}</span>
                   <span className="text-xs font-sans text-slate-400 font-normal">ر.ي</span>
                 </div>
-                <div className="text-xs text-slate-400 mt-1 truncate flex items-center justify-between">
+                <div className="text-[13px] font-extrabold text-slate-200 mt-1 truncate flex items-center justify-between">
                   <span>الدرج: {liquid.cash_drawer.toLocaleString()} ر.ي</span>
                   <span className="text-emerald-400 font-bold group-hover:underline">التفاصيل &larr;</span>
                 </div>
@@ -188,17 +188,17 @@ export default function FinancialPulseBar({
 
               {/* Card 2: Inventory Value at WAC Cost */}
               <div className="apple-glass-card rounded-2xl p-3 border border-blue-500/25">
-                <div className="flex items-center justify-between text-slate-300 text-xs font-bold">
+                <div className="flex items-center justify-between text-white text-[15.5px] font-black">
                   <span>قيمة المخزون بالتكلفة (WAC):</span>
                   <div className="w-6 h-6 rounded-lg bg-blue-500/20 text-blue-400 flex items-center justify-center">
                     <Package className="w-3.5 h-3.5" />
                   </div>
                 </div>
-                <div className="kiosk-stat-val text-blue-400 mt-1 flex items-baseline gap-1">
+                <div className="kiosk-stat-val text-blue-400 text-3xl font-black font-mono mt-1 flex items-baseline gap-1">
                   <span>{inventory.cost_value.toLocaleString()}</span>
                   <span className="text-xs font-sans text-slate-400 font-normal">ر.ي</span>
                 </div>
-                <div className="text-xs text-slate-400 mt-1 truncate flex items-center justify-between">
+                <div className="text-[13px] font-extrabold text-slate-200 mt-1 truncate flex items-center justify-between">
                   <span>البيع: {inventory.sell_value.toLocaleString()} ر.ي</span>
                   {inventory.low_stock_count > 0 && (
                     <span className="badge-kiosk bg-rose-500/20 text-rose-300 border border-rose-500/30 animate-calm-pulse">
@@ -213,17 +213,17 @@ export default function FinancialPulseBar({
                 onClick={onOpenStatement}
                 className="apple-glass-card rounded-2xl p-3 border border-amber-500/25 hover:border-amber-500/50 cursor-pointer tap-bounce group"
               >
-                <div className="flex items-center justify-between text-slate-300 text-xs font-bold">
+                <div className="flex items-center justify-between text-white text-[15.5px] font-black">
                   <span>ديون الزبائن المستحقة:</span>
                   <div className="w-6 h-6 rounded-lg bg-amber-500/20 text-amber-400 flex items-center justify-center">
                     <Receipt className="w-3.5 h-3.5" />
                   </div>
                 </div>
-                <div className="kiosk-stat-val text-amber-400 mt-1 flex items-baseline gap-1">
+                <div className="kiosk-stat-val text-amber-400 text-3xl font-black font-mono mt-1 flex items-baseline gap-1">
                   <span>{debts.total_customer_debts.toLocaleString()}</span>
                   <span className="text-xs font-sans text-slate-400 font-normal">ر.ي</span>
                 </div>
-                <div className="text-xs text-slate-400 mt-1 truncate flex items-center justify-between">
+                <div className="text-[13px] font-extrabold text-slate-200 mt-1 truncate flex items-center justify-between">
                   <span>المدينين: {debts.debtors_count} عميل</span>
                   <span className="text-amber-400 font-bold group-hover:underline">كشف الحساب &larr;</span>
                 </div>
@@ -231,19 +231,19 @@ export default function FinancialPulseBar({
 
               {/* Card 4: Today's Profit & Pure Services */}
               <div className="apple-glass-card rounded-2xl p-3 border border-purple-500/25">
-                <div className="flex items-center justify-between text-slate-300 text-xs font-bold">
+                <div className="flex items-center justify-between text-white text-[15.5px] font-black">
                   <span>أرباح وخدمات اليوم:</span>
                   <div className="w-6 h-6 rounded-lg bg-purple-500/20 text-purple-400 flex items-center justify-center">
                     <TrendingUp className="w-3.5 h-3.5" />
                   </div>
                 </div>
-                <div className="kiosk-stat-val text-white mt-1 flex items-baseline gap-1">
+                <div className="kiosk-stat-val text-white text-3xl font-black font-mono mt-1 flex items-baseline gap-1">
                   <span className={today.net_profit >= 0 ? 'text-emerald-400' : 'text-rose-400'}>
                     {today.net_profit.toLocaleString()}
                   </span>
                   <span className="text-xs font-sans text-slate-400 font-normal">ر.ي صافي</span>
                 </div>
-                <div className="text-xs text-purple-300 mt-1 truncate flex items-center justify-between">
+                <div className="text-[13px] font-extrabold text-slate-200 text-purple-300 mt-1 truncate flex items-center justify-between">
                   <span>إيراد خدمات: {today.pure_labor_revenue.toLocaleString()} ر.ي</span>
                   <span className="text-slate-400">{today.total_invoices} سيارات</span>
                 </div>
@@ -256,68 +256,68 @@ export default function FinancialPulseBar({
             <>
               {/* Worker Card 1: Shift Total Sales */}
               <div className="apple-glass-card rounded-2xl p-3 border border-emerald-500/25">
-                <div className="flex items-center justify-between text-slate-300 text-xs font-bold">
+                <div className="flex items-center justify-between text-white text-[15.5px] font-black">
                   <span>مبيعات اليوم الإجمالية:</span>
                   <div className="w-6 h-6 rounded-lg bg-emerald-500/20 text-emerald-400 flex items-center justify-center">
                     <Wallet className="w-3.5 h-3.5" />
                   </div>
                 </div>
-                <div className="kiosk-stat-val text-emerald-400 mt-1 flex items-baseline gap-1">
+                <div className="kiosk-stat-val text-emerald-400 text-3xl font-black font-mono mt-1 flex items-baseline gap-1">
                   <span>{((today.goods_sales || 0) + (today.pure_labor_revenue || 0)).toLocaleString()}</span>
                   <span className="text-xs font-sans text-slate-400 font-normal">ر.ي</span>
                 </div>
-                <div className="text-xs text-slate-400 mt-1 truncate">
+                <div className="text-[13px] font-extrabold text-slate-200 mt-1 truncate">
                   القطع: {(today.goods_sales || 0).toLocaleString()} • الخدمات: {(today.pure_labor_revenue || 0).toLocaleString()}
                 </div>
               </div>
 
               {/* Worker Card 2: Cars Served Today */}
               <div className="apple-glass-card rounded-2xl p-3 border border-amber-500/25">
-                <div className="flex items-center justify-between text-slate-300 text-xs font-bold">
+                <div className="flex items-center justify-between text-white text-[15.5px] font-black">
                   <span>سيارات مخدومة اليوم:</span>
                   <div className="w-6 h-6 rounded-lg bg-amber-500/20 text-amber-400 flex items-center justify-center">
                     <Car className="w-3.5 h-3.5" />
                   </div>
                 </div>
-                <div className="kiosk-stat-val text-amber-400 mt-1 flex items-baseline gap-1">
+                <div className="kiosk-stat-val text-amber-400 text-3xl font-black font-mono mt-1 flex items-baseline gap-1">
                   <span>{today.total_invoices || 0}</span>
                   <span className="text-xs font-sans text-slate-400 font-normal">سيارات منجزة</span>
                 </div>
-                <div className="text-xs text-slate-400 mt-1 truncate">
+                <div className="text-[13px] font-extrabold text-slate-200 mt-1 truncate">
                   أداء تشغيلي مستمر للوردية 🚗
                 </div>
               </div>
 
               {/* Worker Card 3: Low Stock Alerts */}
               <div className="apple-glass-card rounded-2xl p-3 border border-rose-500/25">
-                <div className="flex items-center justify-between text-slate-300 text-xs font-bold">
+                <div className="flex items-center justify-between text-white text-[15.5px] font-black">
                   <span>نواقص المخزن للمتابعة:</span>
                   <div className="w-6 h-6 rounded-lg bg-rose-500/20 text-rose-400 flex items-center justify-center">
                     <Package className="w-3.5 h-3.5" />
                   </div>
                 </div>
-                <div className="kiosk-stat-val text-rose-400 mt-1 flex items-baseline gap-1">
+                <div className="kiosk-stat-val text-rose-400 text-3xl font-black font-mono mt-1 flex items-baseline gap-1">
                   <span>{inventory.low_stock_count || 0}</span>
                   <span className="text-xs font-sans text-slate-400 font-normal">أصناف قاربت النفاد</span>
                 </div>
-                <div className="text-xs text-rose-300 mt-1 truncate">
+                <div className="text-[13px] font-extrabold text-slate-200 text-rose-300 mt-1 truncate">
                   {inventory.low_stock_count > 0 ? '⚠️ يلزم تنبيه الإدارة لطلب بضاعة' : 'المخزون متوفر ومستقر ✅'}
                 </div>
               </div>
 
               {/* Worker Card 4: Oils & Services Sales */}
               <div className="apple-glass-card rounded-2xl p-3 border border-teal-500/25">
-                <div className="flex items-center justify-between text-slate-300 text-xs font-bold">
+                <div className="flex items-center justify-between text-white text-[15.5px] font-black">
                   <span>مبيعات الزيوت والخدمات:</span>
                   <div className="w-6 h-6 rounded-lg bg-teal-500/20 text-teal-400 flex items-center justify-center">
                     <Droplets className="w-3.5 h-3.5" />
                   </div>
                 </div>
-                <div className="kiosk-stat-val text-teal-400 mt-1 flex items-baseline gap-1">
+                <div className="kiosk-stat-val text-teal-400 text-3xl font-black font-mono mt-1 flex items-baseline gap-1">
                   <span>{((today.goods_sales || 0) + (today.pure_labor_revenue || 0)).toLocaleString()}</span>
                   <span className="text-xs font-sans text-slate-400 font-normal">ر.ي</span>
                 </div>
-                <div className="text-xs text-slate-400 mt-1 truncate">
+                <div className="text-[13px] font-extrabold text-slate-200 mt-1 truncate">
                   إجمالي مبيعات اليوم للوردية 🛢️
                 </div>
               </div>

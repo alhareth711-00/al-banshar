@@ -25,8 +25,8 @@ const purchaseController = {
 
   getOverduePayables: asyncHandler(async (req, res) => {
     const payables = purchaseModel.getOverduePayables();
-    const today = new Date().toISOString().split('T')[0];
-    const overdueBills = payables.filter(p => p.due_date && p.due_date <= today);
+    const today = new Date().toLocaleDateString('en-CA');
+    const overdueBills = payables.filter(p => p.due_date && p.due_date < today);
     const totalOverdueDebt = overdueBills.reduce((acc, p) => acc + (Number(p.remaining_debt) || 0), 0);
 
     res.json({

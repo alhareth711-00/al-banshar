@@ -158,12 +158,13 @@ export default function App() {
   // Fetch initial master data
   const fetchData = useCallback(async () => {
     try {
-      // 1. Fetch Inventory
-      const invRes = await fetch('/api/inventory');
+      // 1. Fetch Inventory (include all items so archived items can be reviewed & restored)
+      const invRes = await fetch('/api/inventory?is_active=all');
       const invData = await invRes.json();
       if (invData.success) {
-        setInventory(invData.data || []);
-        const low = (invData.data || []).filter((i) => i.stock_qty <= i.min_stock_alert).length;
+        const items = invData.data || [];
+        setInventory(items);
+        const low = items.filter((i) => i.is_active === 1 && i.item_type !== 'service' && i.stock_qty <= i.min_stock_alert).length;
         setLowStockCount(low);
       }
 
@@ -231,73 +232,81 @@ export default function App() {
       />
 
       {/* Main App Workspace with Global Smooth Scrollability */}
-      <main className="flex-1 flex flex-col p-3 lg:px-6 lg:py-4 overflow-y-auto overflow-x-hidden min-w-0 min-h-0 bg-[#070b14] space-y-3">
-        {/* Real-time Financial Pulse Bar (Upgrade 2 & Action Center) */}
-        <FinancialPulseBar
-          onOpenStatement={() => handleOpenStatementGuarded('customer', null)}
-          onOpenBayProfitability={handleOpenBayProfitabilityGuarded}
-          refreshTrigger={pulseRefreshTrigger}
-          isOwnerMode={isOwnerMode}
-          onToggleOwnerMode={handleToggleOwnerMode}
-        />
 
-        {activeTab === 'pos' && (
-          <ErrorBoundary>
-            <PosScreen
-              inventory={inventory}
-              workers={workers}
-              onRefreshData={handleDataRefreshed}
-              initialVehicle={posPreselectedVehicle}
-              onOpenStatement={(vehId) => handleOpenStatementGuarded('customer', vehId)}
-              isOwnerMode={isOwnerMode}
-              onRequireOwnerAuth={requireOwnerAuth}
-            />
-          </ErrorBoundary>
-        )}
 
-        {activeTab === 'radar' && (
-          <RetentionRadar onSelectVehicleForPos={handleSelectVehicleForPos} />
-        )}
 
-        {activeTab === 'inventory' && (
-          <InventoryView
-            inventory={inventory}
+        <main className="flex-1 flex flex-col p-3 lg:px-6 lg:py-4 overflow-y-auto overflow-x-hidden min-w-0 min-h-0 bg-[#070b14] space-y-3">
+      {/* Real-time Financial Pulse Bar (Upgrade 2 & Action Center) */}
+      <FinancialPulseBar
+        onOpenStatement={() => handleOpenStatementGuarded('customer', null)}
+        onOpenBayProfitability={handleOpenBayProfitabilityGuarded}
+        refreshTrigger={pulseRefreshTrigger}
+        isOwnerMode={isOwnerMode}
+        onToggleOwnerMode={handleToggleOwnerMode}
+      />
+
+      {activeTab === 'pos' && (
+        <ErrorBoundary>
+          <PosScreen
+            inventory={inventory.filter((i) => i.is_active === 1)}
+            workers={workers}
             onRefreshData={handleDataRefreshed}
+            initialVehicle={posPreselectedVehicle}
+            onOpenStatement={(vehId) => handleOpenStatementGuarded('customer', vehId)}
             isOwnerMode={isOwnerMode}
             onRequireOwnerAuth={requireOwnerAuth}
           />
-        )}
+        </ErrorBoundary>
+      )}
 
-        {activeTab === 'purchases' && (
-          <PurchasesView
-            inventory={inventory}
-            onRefreshData={handleDataRefreshed}
-            onOpenSupplierStatement={(suppId) => handleOpenStatement('supplier', suppId)}
-          />
-        )}
+      {activeTab === 'radar' && (
+        <RetentionRadar onSelectVehicleForPos={handleSelectVehicleForPos} />
+      )}
 
-        {activeTab === 'vault' && (
-          <FinancialVaultHub
-            onRefreshData={handleDataRefreshed}
-            onOpenStatement={handleOpenStatement}
-          />
-        )}
+      {activeTab === 'inventory' && (
+        <InventoryView
+          inventory={inventory}
+          onRefreshData={handleDataRefreshed}
+          isOwnerMode={isOwnerMode}
+          onRequireOwnerAuth={requireOwnerAuth}
+        />
+      )}
 
-        {activeTab === 'workers' && (
-          <WorkersView
-            workers={workers}
-            onRefreshData={handleDataRefreshed}
-            onOpenCustomerStatement={(vehId) => handleOpenStatement('customer', vehId)}
-            onOpenWorkerStatement={(wId) => handleOpenStatement('worker', wId)}
-          />
-        )}
+      {activeTab === 'purchases' && (
+        <PurchasesView
+          inventory={inventory}
+          onRefreshData={handleDataRefreshed}
+          onOpenSupplierStatement={(suppId) => handleOpenStatementGuarded('supplier', suppId)}
+          isOwnerMode={isOwnerMode}
+          onRequireOwnerAuth={requireOwnerAuth}
+        />
+      )}
 
-        {activeTab === 'report' && (
-          <ClosingReport
-            onOpenBayProfitability={() => setShowBayModal(true)}
-          />
-        )}
-      </main>
+      {activeTab === 'vault' && (
+        <FinancialVaultHub
+          onRefreshData={handleDataRefreshed}
+          onOpenStatement={handleOpenStatement}
+        />
+      )}
+
+      {activeTab === 'workers' && (
+        <WorkersView
+          workers={workers}
+          onRefreshData={handleDataRefreshed}
+          onOpenCustomerStatement={(vehId) => handleOpenStatement('customer', vehId)}
+          onOpenWorkerStatement={(wId) => handleOpenStatement('worker', wId)}
+        />
+      )}
+
+      {activeTab === 'report' && (
+        <ClosingReport
+          onOpenBayProfitability={() => setShowBayModal(true)}
+        />
+      )}
+        </main>
+
+
+
 
       {/* Shop Identity & WhatsApp Settings Modal */}
       <SettingsModal

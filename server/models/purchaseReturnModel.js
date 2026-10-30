@@ -3,6 +3,25 @@ const { formatDate } = require('../utils/helpers');
 const { roundMoney, safeNum } = require('../utils/mathPrecision');
 const { postPurchaseReturn } = require('../utils/accountingEngine');
 
+function logAudit(action, entity_type, entity_id, old_data, new_data, performed_by = 'system') {
+  try {
+    db.prepare(`
+      INSERT INTO financial_audit_logs (
+        action, entity_type, entity_id, old_data, new_data, performed_by, created_at
+      ) VALUES (?, ?, ?, ?, ?, ?, datetime('now', 'localtime'))
+    `).run(
+      action,
+      entity_type,
+      entity_id || null,
+      old_data ? (typeof old_data === 'string' ? old_data : JSON.stringify(old_data)) : null,
+      new_data ? (typeof new_data === 'string' ? new_data : JSON.stringify(new_data)) : null,
+      performed_by
+    );
+  } catch (e) {
+    console.warn('[AuditLog] Failed to log:', e.message);
+  }
+}
+
 function generateReturnNumber() {
   const today = formatDate().replace(/-/g, '');
   const prefix = `PR-${today}-`;
@@ -264,7 +283,17 @@ const purchaseReturnModel = {
     });
 
     const newId = execute();
-    return this.getById(newId);
+    const result = this.getById(newId);
+    logAudit('CREATE_PURCHASE_RETURN', 'purchase_return', newId, null, {
+      return_number: result?.return_number,
+      supplier_name: result?.supplier_name,
+      total_amount: result?.total_amount,
+      refund_amount: result?.refund_amount,
+      debt_reduction_amount: result?.debt_reduction_amount,
+      reason: result?.reason,
+      items_count: result?.items?.length,
+    });
+    return result;
   },
 };
 
