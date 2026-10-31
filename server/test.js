@@ -356,7 +356,7 @@ async function runTests() {
 
     // 1. Create a custom service on the fly (إضافة خدمة جديدة للكتالوج)
     const newServiceRes = await request('POST', '/api/inventory', {
-      name: 'خدمة غسيل بستم بالديزل سريع',
+      name: `خدمة غسيل بستم بالديزل سريع ${Date.now()}`,
       category: 'service',
       item_type: 'service',
       brand: 'خدمات الورشة',

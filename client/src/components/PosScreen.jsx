@@ -16,7 +16,6 @@ import {
   Calendar,
   Wallet,
   CreditCard,
-  UserCheck,
   Sparkles,
   ShieldCheck,
   CheckCircle,
@@ -54,6 +53,7 @@ import {
   getQuickGridItemIds,
   getShopSettings,
   shouldPreventNegativeStock,
+  getOilVolumePresets,
 } from '../utils/settings';
 
 const getInitialNextServiceDate = () => {
@@ -117,6 +117,8 @@ export default function PosScreen({
   const [showReceiptModal, setShowReceiptModal] = useState(false);
   const [showQuickGridConfigModal, setShowQuickGridConfigModal] = useState(false);
   const [showOilModal, setShowOilModal] = useState(false);
+  const [selectedOilPresetQty, setSelectedOilPresetQty] = useState(null);
+  const [oilVolumePresets, setOilVolumePresets] = useState(getOilVolumePresets());
   const [pickerModalType, setPickerModalType] = useState(null);
   const [completedInvoice, setCompletedInvoice] = useState(null);
   const [lastSubmittedInvoice, setLastSubmittedInvoice] = useState(null);
@@ -138,14 +140,17 @@ export default function PosScreen({
 
   // Cart State
   const [cartItems, setCartItems] = useState([]);
-  const [selectedWorkerId, setSelectedWorkerId] = useState('');
-  const [specialDiscount, setSpecialDiscount] = useState(0);
+  const [specialDiscount, setSpecialDiscount] = useState('');
+  const [discountType, setDiscountType] = useState('fixed'); // 'fixed' (ر.ي) | 'percent' (%)
   const [invoiceNotes, setInvoiceNotes] = useState('');
 
   // Payment State
-  const [paymentMethod, setPaymentMethod] = useState('cash'); // 'cash' | 'jeeb' | 'jawali' | 'kuraimi' | 'credit'
+  const [paymentMethod, setPaymentMethod] = useState('cash'); // 'cash' | 'jeeb' | 'jawali' | 'kuraimi' | 'credit' | 'split'
   const [walletRefNumber, setWalletRefNumber] = useState('');
   const [paidAmountInput, setPaidAmountInput] = useState('');
+  const [splitCashAmount, setSplitCashAmount] = useState('');
+  const [splitElectronicMethod, setSplitElectronicMethod] = useState('kuraimi');
+  const [splitElectronicAmount, setSplitElectronicAmount] = useState('');
   const [isSubmittingInvoice, setIsSubmittingInvoice] = useState(false);
   const [isVoidingInvoice, setIsVoidingInvoice] = useState(false);
   const [cartNoticeMessage, setCartNoticeMessage] = useState('');
@@ -199,7 +204,14 @@ export default function PosScreen({
     return selectedVehicle;
   }, [posMode, quickCustomerOverride, selectedVehicle]);
 
-  // Click Outside to Dismiss Autocomplete Dropdown
+  const submitInvoiceRef = useRef(null);
+  submitInvoiceRef.current = () => {
+    if (cartItems.length > 0 && !isSubmittingInvoice) {
+      handleSubmitInvoice();
+    }
+  };
+
+  // Click Outside to Dismiss Autocomplete Dropdown & Keyboard Shortcuts
   useEffect(() => {
     const handleClickOutside = (e) => {
       if (searchContainerRef.current && !searchContainerRef.current.contains(e.target)) {
@@ -215,6 +227,16 @@ export default function PosScreen({
       } else if (e.key === 'F3') {
         e.preventDefault();
         customerSearchInputRef.current?.focus();
+      } else if (e.key === 'Enter') {
+        const tag = (e.target && e.target.tagName) ? e.target.tagName.toLowerCase() : '';
+        // If not typing in input, textarea, or button
+        if (tag !== 'input' && tag !== 'textarea' && tag !== 'select') {
+          e.preventDefault();
+          submitInvoiceRef.current?.();
+        }
+      } else if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+        e.preventDefault();
+        submitInvoiceRef.current?.();
       }
     };
     document.addEventListener('mousedown', handleClickOutside);
@@ -222,6 +244,9 @@ export default function PosScreen({
     return () => {
       document.removeEventListener('mousedown', handleClickOutside);
       document.removeEventListener('keydown', handleKeyDown);
+      if (document.activeElement && typeof document.activeElement.blur === 'function') {
+        document.activeElement.blur();
+      }
     };
   }, []);
 
@@ -272,11 +297,16 @@ export default function PosScreen({
     const handlePinnedUpdate = () => {
       setPinnedQuickIds(getQuickGridItemIds() || []);
     };
+    const handleVolumePresetsUpdate = () => {
+      setOilVolumePresets(getOilVolumePresets());
+    };
     window.addEventListener('quick_lube_settings_updated', handleSettingsUpdate);
     window.addEventListener('quick_lube_pinned_items_updated', handlePinnedUpdate);
+    window.addEventListener('quick_lube_volume_presets_updated', handleVolumePresetsUpdate);
     return () => {
       window.removeEventListener('quick_lube_settings_updated', handleSettingsUpdate);
       window.removeEventListener('quick_lube_pinned_items_updated', handlePinnedUpdate);
+      window.removeEventListener('quick_lube_volume_presets_updated', handleVolumePresetsUpdate);
     };
   }, []);
 
@@ -306,12 +336,7 @@ export default function PosScreen({
     }
   }, [initialVehicle]);
 
-  // Set default technician
-  useEffect(() => {
-    if (workers.length > 0 && !selectedWorkerId) {
-      setSelectedWorkerId(workers[0].id);
-    }
-  }, [workers, selectedWorkerId]);
+
 
   // Search vehicles & customers (searches by Plate, Name, Phone)
   useEffect(() => {
@@ -340,12 +365,17 @@ export default function PosScreen({
 
   // Handle vehicle/customer selection
   const handleSelectVehicle = (vehicle) => {
-    setSelectedVehicle(vehicle);
-    setQuickCustomerOverride(vehicle);
+    if (!vehicle) return;
+    const normalized = {
+      ...vehicle,
+      id: vehicle.id || vehicle.vehicle_id,
+    };
+    setSelectedVehicle(normalized);
+    setQuickCustomerOverride(normalized);
     setPosMode('oil');
-    fetchVehicleLastService(vehicle.id);
-    if (vehicle.last_odometer) {
-      setCurrentOdometer(String(vehicle.last_odometer));
+    fetchVehicleLastService(normalized.id);
+    if (normalized.last_odometer) {
+      setCurrentOdometer(String(normalized.last_odometer));
     } else {
       setCurrentOdometer('');
     }
@@ -403,12 +433,13 @@ export default function PosScreen({
 
   // Cart Operations
   const handleAddToCart = (item) => {
+    const itemQty = Number(item.qty) || 1;
     // 1. Negative stock check if item is a product and setting is active
     if (item.inventory_id && item.item_type !== 'service' && shouldPreventNegativeStock()) {
       const invMatch = inventory.find((i) => i.id === item.inventory_id);
       if (invMatch) {
         const inCart = (cartItems.find((i) => i.inventory_id === item.inventory_id)?.qty || 0);
-        const requestedTotal = inCart + (item.qty || 1);
+        const requestedTotal = inCart + itemQty;
         if (invMatch.stock_qty <= 0) {
           setCartNoticeMessage(`⚠️ نفدت الكمية من المخزن! الصنف "${invMatch.name}" رصيده (${invMatch.stock_qty}). تم منع البيع بالسالب.`);
           setTimeout(() => setCartNoticeMessage(''), 5000);
@@ -435,15 +466,21 @@ export default function PosScreen({
       );
       if (existingIdx > -1) {
         const updated = [...prev];
-        const newQty = updated[existingIdx].qty + (item.qty || 1);
+        const newQty = Math.round((Number(updated[existingIdx].qty || 0) + itemQty) * 100) / 100;
         updated[existingIdx] = {
           ...updated[existingIdx],
           qty: newQty,
-          subtotal: newQty * updated[existingIdx].unit_price,
+          subtotal: Math.round(newQty * Number(updated[existingIdx].unit_price || 0) * 100) / 100,
         };
         return updated;
       }
-      return [...prev, { ...item, labor_fee: 0 }];
+      return [...prev, {
+        ...item,
+        qty: itemQty,
+        unit_price: Number(item.unit_price) || 0,
+        labor_fee: 0,
+        subtotal: Math.round(itemQty * Number(item.unit_price || 0) * 100) / 100,
+      }];
     });
   };
 
@@ -453,23 +490,63 @@ export default function PosScreen({
     }
   };
 
-  const handleUpdateItemQty = (index, delta) => {
+  const handleSetItemQty = (index, rawValue) => {
     setCartItems((prev) => {
       const updated = [...prev];
       const targetItem = updated[index];
-      if (delta > 0 && targetItem.inventory_id && targetItem.item_type !== 'service' && shouldPreventNegativeStock()) {
+      if (!targetItem) return prev;
+
+      const parsed = parseFloat(rawValue);
+      if (isNaN(parsed) || parsed <= 0) {
+        updated[index] = {
+          ...targetItem,
+          qty: rawValue,
+        };
+        return updated;
+      }
+
+      if (targetItem.inventory_id && targetItem.item_type !== 'service' && shouldPreventNegativeStock()) {
         const invMatch = inventory.find((i) => i.id === targetItem.inventory_id);
-        if (invMatch && targetItem.qty + delta > invMatch.stock_qty) {
+        if (invMatch && parsed > invMatch.stock_qty) {
           setCartNoticeMessage(`⚠️ الرصيد المتاح من "${invMatch.name}" هو (${invMatch.stock_qty}) فقط! تم منع البيع بالسالب.`);
           setTimeout(() => setCartNoticeMessage(''), 4000);
           return prev;
         }
       }
-      const newQty = Math.max(1, targetItem.qty + delta);
+
+      const cleanQty = Math.round(parsed * 100) / 100;
+      updated[index] = {
+        ...targetItem,
+        qty: cleanQty,
+        subtotal: Math.round(cleanQty * Number(targetItem.unit_price || 0) * 100) / 100,
+      };
+      return updated;
+    });
+  };
+
+  const handleUpdateItemQty = (index, delta) => {
+    setCartItems((prev) => {
+      const updated = [...prev];
+      const targetItem = updated[index];
+      if (!targetItem) return prev;
+      const currentQty = Number(targetItem.qty) || 1;
+      let step = delta;
+      if (Math.abs(delta) === 1 && currentQty < 2 && currentQty > 0) {
+        step = delta > 0 ? 0.5 : -0.5;
+      }
+      const newQty = Math.max(0.1, Math.round((currentQty + step) * 100) / 100);
+      if (delta > 0 && targetItem.inventory_id && targetItem.item_type !== 'service' && shouldPreventNegativeStock()) {
+        const invMatch = inventory.find((i) => i.id === targetItem.inventory_id);
+        if (invMatch && newQty > invMatch.stock_qty) {
+          setCartNoticeMessage(`⚠️ الرصيد المتاح من "${invMatch.name}" هو (${invMatch.stock_qty}) فقط! تم منع البيع بالسالب.`);
+          setTimeout(() => setCartNoticeMessage(''), 4000);
+          return prev;
+        }
+      }
       updated[index] = {
         ...targetItem,
         qty: newQty,
-        subtotal: newQty * targetItem.unit_price,
+        subtotal: Math.round(newQty * Number(targetItem.unit_price || 0) * 100) / 100,
       };
       return updated;
     });
@@ -535,38 +612,55 @@ export default function PosScreen({
 
   // Financial Separation: Goods Sales vs Services Revenue
   const goodsTotal = useMemo(() => {
-    return cartItems
+    const sum = cartItems
       .filter((item) => item.item_type !== 'service')
-      .reduce((acc, item) => acc + (item.unit_price * item.qty), 0);
+      .reduce((acc, item) => acc + ((Number(item.unit_price) || 0) * (Number(item.qty) || 0)), 0);
+    return Math.round(sum * 100) / 100;
   }, [cartItems]);
 
   const servicesTotal = useMemo(() => {
-    return cartItems
+    const sum = cartItems
       .filter((item) => item.item_type === 'service')
-      .reduce((acc, item) => acc + (item.unit_price * item.qty), 0);
+      .reduce((acc, item) => acc + ((Number(item.unit_price) || 0) * (Number(item.qty) || 0)), 0);
+    return Math.round(sum * 100) / 100;
   }, [cartItems]);
 
-  const grossTotal = goodsTotal + servicesTotal;
+  const grossTotal = Math.round((goodsTotal + servicesTotal) * 100) / 100;
 
   // Fleet discount auto-calculation
   useEffect(() => {
     if (activeCustomer && Number(activeCustomer.discount_percent) > 0 && grossTotal > 0) {
       const fleetDiscount = Math.round(grossTotal * (Number(activeCustomer.discount_percent) / 100));
       setSpecialDiscount(fleetDiscount);
+      setDiscountType('fixed');
     }
   }, [activeCustomer, grossTotal]);
 
+  const calculatedDiscount = useMemo(() => {
+    const val = Number(specialDiscount) || 0;
+    if (val <= 0) return 0;
+    if (discountType === 'percent') {
+      return Math.round(grossTotal * (Math.min(100, val) / 100));
+    }
+    return Math.min(grossTotal, val);
+  }, [grossTotal, specialDiscount, discountType]);
+
   const netTotal = useMemo(() => {
-    return Math.max(0, grossTotal - Number(specialDiscount));
-  }, [grossTotal, specialDiscount]);
+    return Math.max(0, grossTotal - calculatedDiscount);
+  }, [grossTotal, calculatedDiscount]);
 
   const effectivePaidAmount = useMemo(() => {
     if (paymentMethod === 'credit') {
       const p = parseFloat(paidAmountInput);
       return isNaN(p) ? 0 : Math.min(netTotal, Math.max(0, p));
     }
+    if (paymentMethod === 'split') {
+      const cash = parseFloat(splitCashAmount) || 0;
+      const elec = parseFloat(splitElectronicAmount) || 0;
+      return Math.min(netTotal, Math.max(0, cash + elec));
+    }
     return netTotal;
-  }, [paymentMethod, paidAmountInput, netTotal]);
+  }, [paymentMethod, paidAmountInput, splitCashAmount, splitElectronicAmount, netTotal]);
 
   const remainingDebt = useMemo(() => {
     return Math.max(0, netTotal - effectivePaidAmount);
@@ -594,6 +688,22 @@ export default function PosScreen({
         cancelBtnText: 'حسناً',
       });
       return;
+    }
+
+    // Split payment validation
+    if (paymentMethod === 'split') {
+      const cash = Number(splitCashAmount) || 0;
+      const elec = Number(splitElectronicAmount) || 0;
+      if (Math.round((cash + elec) * 100) !== Math.round(netTotal * 100)) {
+        setTouchAlert({
+          isOpen: true,
+          title: '⚠️ مبالغ الدفع المجزأ غير متطابقة',
+          message: `إجمالي المبلغ المقسم (${(cash + elec).toLocaleString()} ر.ي) لا يساوي الصافي المطلوب (${netTotal.toLocaleString()} ر.ي)!\n\nيرجى تعديل المبالغ لتتطابق تماماً مع إجمالي الفاتورة.`,
+          type: 'warning',
+          cancelBtnText: 'تصحيح المبالغ',
+        });
+        return;
+      }
     }
 
     // Poka-Yoke: Prevent anonymous credit sales
@@ -686,7 +796,7 @@ export default function PosScreen({
       setIsSubmittingInvoice(true);
 
       // Determine vehicle_id for backend
-      let vehicleIdToSubmit = activeCustomer?.id;
+      let vehicleIdToSubmit = activeCustomer?.id || activeCustomer?.vehicle_id;
       if (!vehicleIdToSubmit || vehicleIdToSubmit === 'quick') {
         // Find seeded 'فاتورة سريعة' vehicle_id
         const searchRes = await fetch('/api/vehicles/search?q=فاتورة+سريعة');
@@ -709,7 +819,8 @@ export default function PosScreen({
         const cat = (item.category || item.product_category || '').toLowerCase();
         return desc.includes('زيت') || desc.includes('oil') || desc.includes('سيفون') || cat.includes('oil');
       });
-      const hasVehicleAttached = selectedVehicle && selectedVehicle.id && selectedVehicle.id !== 'quick';
+      const effectiveVehicleId = selectedVehicle?.id || selectedVehicle?.vehicle_id;
+      const hasVehicleAttached = selectedVehicle && effectiveVehicleId && effectiveVehicleId !== 'quick';
       const hasOdo = Number(currentOdometer) > 0;
 
       const isOilService = posMode === 'oil' || (hasVehicleAttached && (hasOilOrLube || hasOdo)) || hasOilOrLube;
@@ -717,7 +828,7 @@ export default function PosScreen({
 
       const payload = {
         vehicle_id: vehicleIdToSubmit,
-        worker_id: selectedWorkerId || null,
+        worker_id: null, // إلغاء إرفاق الفني نهائياً بناءً على طلب المالك
         service_status: statusToSave,
         current_odometer: isOilService ? (Number(currentOdometer) || 0) : 0,
         next_odometer: isOilService ? (Number(nextOdometer) || 0) : 0,
@@ -725,20 +836,25 @@ export default function PosScreen({
         items_total: goodsTotal,
         labor_total: servicesTotal,
         scrap_battery_deduction: 0,
-        discount: Number(specialDiscount) || 0,
+        discount: calculatedDiscount,
         payment_method: paymentMethod,
         wallet_ref_number: walletRefNumber || null,
         paid_amount: effectivePaidAmount,
+        split_payments: paymentMethod === 'split' ? {
+          cash: Number(splitCashAmount) || 0,
+          [splitElectronicMethod]: Number(splitElectronicAmount) || 0,
+        } : null,
+        prevent_negative_stock: shouldPreventNegativeStock(),
         notes: noteToSave,
         items: cartItems.map((item) => ({
           inventory_id: item.inventory_id || null,
           item_type: item.item_type || 'product',
           description: item.description,
-          qty: item.qty,
-          unit_price: item.unit_price,
+          qty: Number(item.qty) || 1,
+          unit_price: Number(item.unit_price) || 0,
           labor_fee: 0,
           warranty_serial: item.warranty_serial || null,
-          subtotal: item.qty * item.unit_price,
+          subtotal: Math.round((Number(item.qty) || 1) * (Number(item.unit_price) || 0) * 100) / 100,
         })),
       };
 
@@ -758,7 +874,6 @@ export default function PosScreen({
       const completedData = {
         ...data.data,
         safetyPoints: isOilService ? safetyPoints : null,
-        worker_name: workers.find((w) => w.id === selectedWorkerId)?.name || 'فني المركز',
       };
 
       setLastSubmittedInvoice(completedData);
@@ -845,11 +960,14 @@ export default function PosScreen({
       setManualNextOdometer('');
       setServiceDateInput(getInitialNextServiceDate());
     }
-    setSpecialDiscount(0);
+    setSpecialDiscount('');
+    setDiscountType('fixed');
     setInvoiceNotes('');
     setPaymentMethod('cash');
     setPaidAmountInput('');
     setWalletRefNumber('');
+    setSplitCashAmount('');
+    setSplitElectronicAmount('');
   };
 
   // Pinned Quick Items from Inventory
@@ -1383,22 +1501,52 @@ export default function PosScreen({
           {posMode === 'quick' && (
             <div className="space-y-3 animate-in fade-in duration-150">
               {/* Pinned Quick Items Row */}
-                            <div className="apple-glass rounded-2xl px-3.5 py-2 border border-white/10 flex items-center justify-between text-xs shadow-sm">
+              <div className="apple-glass rounded-2xl px-3.5 py-2 border border-white/10 flex items-center justify-between text-xs shadow-sm">
                 <div className="flex items-center gap-2">
                   <Star className="w-3.5 h-3.5 fill-amber-400/40 text-amber-400" />
-                  <span className="font-bold text-amber-300">الأصناف السريعة الأكثر طلباً:</span>
-                  <span className="text-[11px] text-slate-400 font-mono">({pinnedItems.length} صنف متاح)</span>
+                  <span className="font-bold text-amber-300">الخدمات والأصناف السريعة الأكثر طلباً:</span>
+                  <span className="text-[11px] text-slate-400 font-mono">({pinnedItems.length} صنف مثبت)</span>
                 </div>
                 <button
                   type="button"
                   onClick={() => setShowQuickGridConfigModal(true)}
                   className="text-[11px] text-slate-400 hover:text-amber-300 font-bold flex items-center gap-1 px-2.5 py-1 rounded-lg bg-slate-900 border border-white/10 transition active:scale-95"
-                  title="تخصيص الأصناف السريعة وتثبيتها من المخزون"
+                  title="تخصيص الخدمات والأصناف السريعة وتثبيتها من المخزون"
                 >
                   <Settings2 className="w-3.5 h-3.5" />
                   <span>⚙️ تخصيص</span>
                 </button>
               </div>
+
+              {/* Instant 1-Touch Pinned Grid */}
+              {pinnedItems.length > 0 && (
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                  {pinnedItems.map((item) => (
+                    <button
+                      key={item.id}
+                      type="button"
+                      onClick={() =>
+                        handleAddToCart({
+                          inventory_id: item.id,
+                          item_type: item.item_type || (item.category === 'service' ? 'service' : 'product'),
+                          description: item.name,
+                          qty: 1,
+                          unit_price: Number(item.sell_price) || 0,
+                        })
+                      }
+                      className="p-3 rounded-2xl bg-gradient-to-br from-slate-900 via-slate-900 to-amber-950/20 border border-white/15 hover:border-amber-400 text-right transition active:scale-95 shadow-sm flex flex-col justify-between min-h-[72px] group"
+                    >
+                      <div className="font-black text-xs text-white group-hover:text-amber-300 transition truncate">{item.name}</div>
+                      <div className="flex items-center justify-between mt-1 text-[11px] font-mono">
+                        <span className="text-amber-400 font-bold">{Number(item.sell_price).toLocaleString()} ر.ي</span>
+                        <span className="text-[10px] text-slate-400 font-sans">
+                          {item.item_type === 'service' ? 'خدمة' : `متاح: ${item.stock_qty}`}
+                        </span>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              )}
 
               {/* Categorical Drilldown Tiles (رقع، زيوت، سوائل، بطاريات) */}
               <div className="apple-glass rounded-3xl p-3.5 border border-white/10 space-y-3">
@@ -1505,24 +1653,6 @@ export default function PosScreen({
                     </div>
                   </div>
                 )}
-              </div>
-              {/* Technician Selector Strip - الخيار 2 المعتمد: قائمة منسدلة أنيقة مدمجة بسطر واحد */}
-              <div className="apple-glass rounded-2xl px-3.5 py-1.5 border border-white/10 flex items-center justify-between text-xs shadow-sm">
-                <div className="flex items-center gap-2">
-                  <UserCheck className="w-3.5 h-3.5 text-amber-400" />
-                  <span className="font-bold text-slate-300">الفني المسؤول:</span>
-                </div>
-                <select
-                  value={selectedWorkerId || ''}
-                  onChange={(e) => setSelectedWorkerId(Number(e.target.value))}
-                  className="bg-slate-900 border border-white/15 text-white font-bold text-xs rounded-xl px-2.5 py-1 focus:outline-none focus:border-amber-400"
-                >
-                  {workers.map((w) => (
-                    <option key={w.id} value={w.id}>
-                      {w.name} ({w.role})
-                    </option>
-                  ))}
-                </select>
               </div>
             </div>
           )}
@@ -1632,28 +1762,75 @@ export default function PosScreen({
                 </div>
               </div>
 
+              {/* General Oil Volume Presets Bar */}
+              <div className="apple-glass rounded-3xl p-3.5 border border-white/10 space-y-2.5">
+                <div className="flex items-center justify-between text-xs">
+                  <div className="flex items-center gap-1.5 font-black text-amber-300">
+                    <Droplets className="w-4 h-4 text-amber-400" />
+                    <span>اختصارات كميات الزيوت العامة (نقرة واحدة):</span>
+                  </div>
+                  <span className="text-[11px] text-slate-400 font-mono">تطبق الكمية مباشرة على الزيت المختار</span>
+                </div>
+                <div className="flex flex-wrap gap-1.5">
+                  {oilVolumePresets.map((qty) => (
+                    <button
+                      key={qty}
+                      type="button"
+                      onClick={() => {
+                        setSelectedOilPresetQty(qty);
+                        setShowOilModal(true);
+                      }}
+                      className="h-10 min-w-[54px] px-3.5 rounded-xl bg-slate-900 border border-amber-500/30 hover:border-amber-400 hover:bg-amber-500/20 text-white font-mono font-black text-xs flex items-center justify-center gap-1 transition active:scale-95 shadow-sm"
+                      title={`فتح محدد الزيت بـ ${qty} لتر`}
+                    >
+                      <span className="text-amber-300 text-sm">{qty}</span>
+                      <span className="text-[10px] text-slate-300 font-sans">لتر</span>
+                    </button>
+                  ))}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSelectedOilPresetQty(null);
+                      setShowOilModal(true);
+                    }}
+                    className="h-10 px-3.5 rounded-xl bg-amber-500/15 border border-amber-500/40 hover:bg-amber-500/25 text-amber-300 font-bold text-xs flex items-center gap-1 transition active:scale-95"
+                  >
+                    <span>🛢️ تخصيص كامل</span>
+                  </button>
+                </div>
+              </div>
+
               {/* Oil Change Action Cards: Oil Selector + 1-INVOICE ADD EXTRA ITEM BUTTON */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 {/* 1. Main Oil Selector */}
                 <button
                   type="button"
                   onClick={() => setShowOilModal(true)}
-                  className="min-h-[105px] p-4 rounded-3xl apple-glass-interactive border border-amber-500/30 hover:border-amber-400 flex flex-col justify-between group shadow-xl active:scale-[0.98] text-right"
+                  className="min-h-[110px] p-4 rounded-3xl apple-glass-interactive border border-amber-500/35 hover:border-amber-400 bg-gradient-to-br from-amber-500/15 via-slate-900/90 to-amber-950/20 flex flex-col justify-between group shadow-xl hover:shadow-amber-500/15 active:scale-[0.98] text-right transition-all relative overflow-hidden"
                 >
                   <div className="flex items-center justify-between w-full">
-                    <div className="w-11 h-11 rounded-2xl bg-amber-500/20 text-amber-400 border border-amber-500/30 flex items-center justify-center shadow-lg shadow-amber-500/10 group-hover:scale-110 transition-transform">
-                      <Droplets className="w-6 h-6 stroke-[2.2]" />
+                    <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-amber-400 to-amber-600 text-slate-950 border border-amber-300/40 flex items-center justify-center shadow-lg shadow-amber-500/25 group-hover:scale-110 transition-transform">
+                      <Droplets className="w-6 h-6 stroke-[2.4]" />
                     </div>
-                    <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 font-bold border border-amber-500/30">
-                      غيار الزيت الرئيسي
-                    </span>
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-[10px] px-2.5 py-1 rounded-full bg-amber-500/20 text-amber-300 font-bold border border-amber-500/30 flex items-center gap-1">
+                        <Sparkles className="w-3 h-3 text-amber-400" />
+                        <span>عبوات 1L وجالونات</span>
+                      </span>
+                    </div>
                   </div>
                   <div>
-                    <div className="text-base font-black text-white group-hover:text-amber-300 transition">
-                      🛢️ اختيار الزيت
+                    <div className="text-base font-black text-white group-hover:text-amber-300 transition flex items-center gap-2">
+                      <span>🛢️ محدد غيار الزيت الذكي</span>
                     </div>
-                    <div className="text-xs text-slate-400 mt-0.5">
-                      الماركة، اللزوجة، والعبوات والفلتر الأصلي
+                    <div className="text-xs text-slate-300 mt-0.5 line-clamp-1">
+                      {selectedVehicle && (selectedVehicle.preferred_oil_brand || selectedVehicle.preferred_viscosity) ? (
+                        <span className="text-amber-300 font-bold">
+                          الموصى للسيارة: {selectedVehicle.preferred_oil_brand || 'تويوتا'} ({selectedVehicle.preferred_viscosity || '20W-50'})
+                        </span>
+                      ) : (
+                        <span>الأكثر مبيعاً: عبوات 1 لتر بنقرة واحدة + الفلاتر</span>
+                      )}
                     </div>
                   </div>
                 </button>
@@ -1780,29 +1957,44 @@ export default function PosScreen({
                       </div>
                     </div>
 
-                    {/* Quantity Stepper */}
-                    <div className="flex items-center gap-1.5 flex-shrink-0">
+                    {/* Quantity Stepper (Supports typing decimals like 0.5, 3.5 & steps) */}
+                    <div className="flex items-center gap-1 flex-shrink-0">
                       <button
                         type="button"
                         onClick={() => handleUpdateItemQty(idx, -1)}
-                        className="w-8 h-8 rounded-xl bg-slate-800 hover:bg-slate-700 text-white flex items-center justify-center font-bold text-sm border border-white/10 active:scale-90 transition"
+                        className="w-7 h-7 rounded-lg bg-slate-800 hover:bg-slate-700 text-white flex items-center justify-center font-bold text-xs border border-white/10 active:scale-90 transition"
+                        title="إنقاص الكمية"
                       >
                         -
                       </button>
-                      <span className="w-7 text-center font-mono font-extrabold text-sm text-white">
-                        {item.qty}
-                      </span>
+                      <input
+                        type="number"
+                        inputMode="decimal"
+                        step="any"
+                        min="0.1"
+                        value={item.qty}
+                        onChange={(e) => handleSetItemQty(idx, e.target.value)}
+                        onBlur={() => {
+                          const num = parseFloat(item.qty);
+                          if (isNaN(num) || num <= 0) {
+                            handleSetItemQty(idx, 1);
+                          }
+                        }}
+                        className="w-12 h-7 text-center font-mono font-extrabold text-xs text-white bg-slate-950 border border-white/20 rounded-md focus:border-amber-400 focus:outline-none"
+                        title="انقر لتعديل الكمية مباشرة (يقبل الكسور مثل 0.5 أو 3.5)"
+                      />
                       <button
                         type="button"
                         onClick={() => handleUpdateItemQty(idx, 1)}
-                        className="w-8 h-8 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 flex items-center justify-center font-bold text-sm border border-amber-500/30 active:scale-90 transition"
+                        className="w-7 h-7 rounded-lg bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 flex items-center justify-center font-bold text-xs border border-amber-500/30 active:scale-90 transition"
+                        title="زيادة الكمية"
                       >
                         +
                       </button>
                       <button
                         type="button"
                         onClick={() => handleRemoveCartItem(idx)}
-                        className="w-8 h-8 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 flex items-center justify-center mr-1 border border-rose-500/20 active:scale-90 transition"
+                        className="w-7 h-7 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 flex items-center justify-center mr-1 border border-rose-500/20 active:scale-90 transition"
                         title="حذف البند"
                       >
                         <Trash2 className="w-3.5 h-3.5" />
@@ -1825,20 +2017,44 @@ export default function PosScreen({
                 </div>
               )}
 
-              {/* Extra Discount Input (Keyboard Only, No Spinners) */}
+              {/* Extra Discount Input (Fixed amount or Percentage) */}
               <div className="flex items-center justify-between gap-1 pt-1 border-t border-white/5">
-                <span className="text-slate-300 font-bold">خصم إضافي:</span>
+                <div className="flex items-center gap-1.5">
+                  <span className="text-slate-300 font-bold">الخصم:</span>
+                  <div className="flex items-center rounded-lg bg-slate-950 border border-white/10 p-0.5">
+                    <button
+                      type="button"
+                      onClick={() => setDiscountType('fixed')}
+                      className={`px-1.5 py-0.5 rounded text-[10px] font-black transition ${
+                        discountType === 'fixed' ? 'bg-amber-400 text-slate-950' : 'text-slate-400 hover:text-white'
+                      }`}
+                    >
+                      ر.ي
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setDiscountType('percent')}
+                      className={`px-1.5 py-0.5 rounded text-[10px] font-black transition ${
+                        discountType === 'percent' ? 'bg-amber-400 text-slate-950' : 'text-slate-400 hover:text-white'
+                      }`}
+                    >
+                      %
+                    </button>
+                  </div>
+                </div>
+
                 <div className="flex items-center gap-1 text-rose-400">
                   <input
-                    type="text"
-                    inputMode="numeric"
-                    pattern="[0-9]*"
+                    type="number"
+                    inputMode="decimal"
                     placeholder="0"
-                    value={specialDiscount || ''}
-                    onChange={(e) => setSpecialDiscount(Number(e.target.value.replace(/\D/g, '')) || 0)}
+                    value={specialDiscount}
+                    onChange={(e) => setSpecialDiscount(e.target.value)}
                     className="w-16 px-1.5 py-0.5 rounded-lg bg-slate-900 border border-rose-500/30 font-mono text-xs font-bold text-center text-rose-400 focus:outline-none"
                   />
-                  <span className="text-[10px] text-slate-400">ر.ي</span>
+                  <span className="text-[10px] text-slate-400 font-mono">
+                    {discountType === 'percent' ? `% (${calculatedDiscount.toLocaleString()} ر.ي)` : 'ر.ي'}
+                  </span>
                 </div>
               </div>
 
@@ -1854,13 +2070,14 @@ export default function PosScreen({
 
             {/* Payment Methods */}
             <div className="space-y-1.5">
-              <div className="grid grid-cols-5 gap-1">
+              <div className="grid grid-cols-3 sm:grid-cols-6 gap-1">
                 {[
                   { id: 'cash', label: '💵 كاش' },
                   { id: 'jeeb', label: '📱 جيب' },
                   { id: 'jawali', label: '📱 جوالي' },
                   { id: 'kuraimi', label: '🏦 كريمي' },
-                  { id: 'credit', label: '📝 آجل/جزئي' },
+                  { id: 'split', label: '🔀 مجزأ' },
+                  { id: 'credit', label: '📝 آجل' },
                 ].map((m) => {
                   const isSelected = paymentMethod === m.id;
                   const isCreditDisabled =
@@ -1874,8 +2091,15 @@ export default function PosScreen({
                       key={m.id}
                       type="button"
                       disabled={isCreditDisabled}
-                      onClick={() => setPaymentMethod(m.id)}
-                      className={`min-h-[42px] py-1 px-1 rounded-xl text-[11px] font-bold transition flex items-center justify-center border active:scale-95 ${
+                      onClick={() => {
+                        setPaymentMethod(m.id);
+                        if (m.id === 'split' && !splitCashAmount && !splitElectronicAmount) {
+                          const half = Math.round(netTotal / 2);
+                          setSplitCashAmount(String(half));
+                          setSplitElectronicAmount(String(netTotal - half));
+                        }
+                      }}
+                      className={`min-h-[40px] py-1 px-1 rounded-xl text-[11px] font-bold transition flex items-center justify-center border active:scale-95 ${
                         isCreditDisabled
                           ? 'opacity-40 cursor-not-allowed bg-slate-900 border-white/5 text-slate-500'
                           : isSelected
@@ -1900,6 +2124,75 @@ export default function PosScreen({
                     onChange={(e) => setWalletRefNumber(e.target.value)}
                     className="w-full min-h-[36px] px-3 rounded-xl bg-slate-900 border border-white/10 text-white font-mono text-xs font-bold focus:border-amber-400 focus:outline-none"
                   />
+                </div>
+              )}
+
+              {/* Split Payment Breakdown */}
+              {paymentMethod === 'split' && (
+                <div className="p-2.5 rounded-2xl bg-slate-900/90 border border-amber-500/30 space-y-2 animate-in fade-in text-xs">
+                  <div className="flex items-center justify-between font-bold text-amber-300 text-[11px]">
+                    <span>سداد مجزأ:</span>
+                    <span className="font-mono text-white">الصافي: {netTotal.toLocaleString()} ر.ي</span>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <label className="block text-[10px] text-slate-300 font-bold mb-1">💵 نقد كاش (الدرج):</label>
+                      <input
+                        type="number"
+                        inputMode="numeric"
+                        placeholder="0"
+                        value={splitCashAmount}
+                        onChange={(e) => {
+                          const val = e.target.value.replace(/\D/g, '');
+                          setSplitCashAmount(val);
+                          if (val && Number(val) <= netTotal) {
+                            setSplitElectronicAmount(String(Math.max(0, netTotal - Number(val))));
+                          }
+                        }}
+                        className="w-full min-h-[34px] px-2.5 rounded-xl bg-slate-950 border border-white/15 font-mono text-xs font-bold text-white text-center focus:border-amber-400 focus:outline-none"
+                      />
+                    </div>
+
+                    <div>
+                      <div className="flex items-center justify-between mb-1">
+                        <label className="text-[10px] text-slate-300 font-bold">💳 إلكتروني:</label>
+                        <select
+                          value={splitElectronicMethod}
+                          onChange={(e) => setSplitElectronicMethod(e.target.value)}
+                          className="bg-slate-950 border border-white/15 text-[10px] text-teal-300 rounded px-1 py-0.5 focus:outline-none"
+                        >
+                          <option value="kuraimi">الكريمي</option>
+                          <option value="jeeb">جيب</option>
+                          <option value="jawali">جوالي</option>
+                        </select>
+                      </div>
+                      <input
+                        type="number"
+                        inputMode="numeric"
+                        placeholder="0"
+                        value={splitElectronicAmount}
+                        onChange={(e) => {
+                          const val = e.target.value.replace(/\D/g, '');
+                          setSplitElectronicAmount(val);
+                          if (val && Number(val) <= netTotal) {
+                            setSplitCashAmount(String(Math.max(0, netTotal - Number(val))));
+                          }
+                        }}
+                        className="w-full min-h-[34px] px-2.5 rounded-xl bg-slate-950 border border-teal-500/30 font-mono text-xs font-bold text-teal-300 text-center focus:border-teal-400 focus:outline-none"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <input
+                      type="text"
+                      placeholder="رقم مرجع/إشعار الحوالة الإلكترونية..."
+                      value={walletRefNumber}
+                      onChange={(e) => setWalletRefNumber(e.target.value)}
+                      className="w-full min-h-[32px] px-2.5 rounded-xl bg-slate-950 border border-white/10 text-white font-mono text-[11px] focus:border-teal-400 focus:outline-none"
+                    />
+                  </div>
                 </div>
               )}
 
@@ -1986,8 +2279,13 @@ export default function PosScreen({
 
       <OilSelectorModal
         isOpen={showOilModal}
-        onClose={() => setShowOilModal(false)}
+        onClose={() => {
+          setShowOilModal(false);
+          setSelectedOilPresetQty(null);
+        }}
         inventory={inventory}
+        selectedVehicle={selectedVehicle}
+        initialQty1L={selectedOilPresetQty}
         preferredBrand={selectedVehicle ? selectedVehicle.preferred_oil_brand : 'تويوتا'}
         preferredViscosity={selectedVehicle ? selectedVehicle.preferred_viscosity : '20W-50'}
         onAddItemsToCart={(items) => handleAddMultipleToCart(items)}

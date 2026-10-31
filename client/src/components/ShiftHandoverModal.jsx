@@ -13,11 +13,22 @@ import {
   Sparkles,
   Layers,
   Check,
+  Calculator,
 } from 'lucide-react';
 import { getShopSettings } from '../utils/settings';
+import { tafqeet } from '../utils/tafqeet';
 
 export default function ShiftHandoverModal({ isOpen, onClose, currentShift, onShiftClosed }) {
   const [actualCash, setActualCash] = useState('');
+  const [useDenominations, setUseDenominations] = useState(false);
+  const [denominations, setDenominations] = useState({
+    1000: '',
+    500: '',
+    250: '',
+    100: '',
+    50: '',
+    coins: '',
+  });
   const [handedOverTo, setHandedOverTo] = useState('');
   const [notes, setNotes] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -53,8 +64,25 @@ export default function ShiftHandoverModal({ isOpen, onClose, currentShift, onSh
       setNotes('');
       setClosedSlip(null);
       setErrorMsg('');
+      setUseDenominations(false);
+      setDenominations({ 1000: '', 500: '', 250: '', 100: '', 50: '', coins: '' });
     }
   }, [isOpen, expectedCash]);
+
+  const handleDenominationChange = (key, countVal) => {
+    const val = countVal === '' ? '' : Math.max(0, parseInt(countVal, 10) || 0);
+    const updated = { ...denominations, [key]: val };
+    setDenominations(updated);
+
+    const sum = (Number(updated[1000]) || 0) * 1000 +
+                (Number(updated[500]) || 0) * 500 +
+                (Number(updated[250]) || 0) * 250 +
+                (Number(updated[100]) || 0) * 100 +
+                (Number(updated[50]) || 0) * 50 +
+                (Number(updated.coins) || 0);
+
+    setActualCash(String(sum));
+  };
 
   if (!isOpen) return null;
 
@@ -255,6 +283,15 @@ export default function ShiftHandoverModal({ isOpen, onClose, currentShift, onSh
                   </div>
                 </div>
 
+                {closedSlip.settlement_jv && (
+                  <div className="border-t border-emerald-500/20 pt-2 px-1 text-[11px] text-emerald-300 flex items-center justify-between">
+                    <span>قيد التسوية الآلي (الأستاذ العام):</span>
+                    <span className="font-mono font-bold text-white bg-emerald-950 px-2 py-0.5 rounded border border-emerald-500/30">
+                      {closedSlip.settlement_jv}
+                    </span>
+                  </div>
+                )}
+
                 {closedSlip.notes && (
                   <div className="border-t border-white/10 pt-2 text-[10px] text-slate-400">
                     ملاحظات: {closedSlip.notes}
@@ -327,58 +364,124 @@ export default function ShiftHandoverModal({ isOpen, onClose, currentShift, onSh
                     </div>
                   </div>
 
-                  {/* Actual Cash Input with Quick Stepper Chips */}
-                  <div className="p-4 rounded-2xl bg-slate-900/90 border-2 border-amber-500/50 space-y-2.5">
+                  {/* Actual Cash Input & Denominations Counter */}
+                  <div className="p-4 rounded-2xl bg-slate-900/90 border-2 border-amber-500/50 space-y-3">
                     <div className="flex justify-between items-center text-xs">
                       <label className="text-amber-300 font-extrabold flex items-center gap-1.5">
                         <DollarSign className="w-4 h-4 text-amber-400" />
                         <span>النقد الفعلي المعدود بالصندوق:</span>
                       </label>
-                      <span className="text-[11px] font-mono text-slate-400">
-                        المتوقع: {expectedCash.toLocaleString()}
-                      </span>
-                    </div>
-
-                    <input
-                      type="number"
-                      step="any"
-                      value={actualCash}
-                      onChange={(e) => setActualCash(e.target.value)}
-                      className="w-full min-h-[48px] px-4 rounded-xl bg-slate-950 border border-amber-500/50 text-amber-400 font-mono text-2xl font-black text-center focus:outline-none focus:border-amber-400"
-                      required
-                    />
-
-                    {/* Quick Stepper Chips */}
-                    <div className="flex items-center gap-1.5 pt-1">
                       <button
                         type="button"
-                        onClick={setExactExpected}
-                        className="flex-1 py-1 px-2 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold text-[11px] transition active:scale-95"
+                        onClick={() => setUseDenominations(!useDenominations)}
+                        className="px-2.5 py-1 rounded-xl bg-purple-500/20 text-purple-300 border border-purple-500/30 hover:bg-purple-500/30 font-bold text-[11px] flex items-center gap-1 transition"
                       >
-                        مطابق بالضبط
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => addCashStep(500)}
-                        className="py-1 px-2.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 font-mono font-bold text-[11px] transition active:scale-95"
-                      >
-                        +500
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => addCashStep(1000)}
-                        className="py-1 px-2.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 font-mono font-bold text-[11px] transition active:scale-95"
-                      >
-                        +1,000
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => addCashStep(5000)}
-                        className="py-1 px-2.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 font-mono font-bold text-[11px] transition active:scale-95"
-                      >
-                        +5,000
+                        <Calculator className="w-3.5 h-3.5" />
+                        <span>{useDenominations ? 'إدخال مباشر' : 'جرد الفئات الورقية 🧮'}</span>
                       </button>
                     </div>
+
+                    {useDenominations ? (
+                      /* Denominations Breakdown Grid (1000, 500, 250, 100, 50, coins) */
+                      <div className="space-y-2 p-3 rounded-xl bg-slate-950/80 border border-purple-500/30">
+                        <div className="text-[11px] font-bold text-slate-300 flex justify-between pb-1 border-b border-white/10">
+                          <span>الفئة النقدية</span>
+                          <span>العدد (ورقة)</span>
+                          <span>المجموع (ر.ي)</span>
+                        </div>
+                        {[
+                          { key: '1000', label: '1,000 ر.ي', mult: 1000 },
+                          { key: '500', label: '500 ر.ي', mult: 500 },
+                          { key: '250', label: '250 ر.ي', mult: 250 },
+                          { key: '100', label: '100 ر.ي', mult: 100 },
+                          { key: '50', label: '50 ر.ي', mult: 50 },
+                        ].map((d) => {
+                          const count = denominations[d.key];
+                          const total = (Number(count) || 0) * d.mult;
+                          return (
+                            <div key={d.key} className="grid grid-cols-12 gap-2 items-center text-xs font-mono">
+                              <span className="col-span-4 text-slate-300 font-bold">{d.label}</span>
+                              <input
+                                type="number"
+                                min="0"
+                                placeholder="0"
+                                value={count}
+                                onChange={(e) => handleDenominationChange(d.key, e.target.value)}
+                                className="col-span-4 min-h-[36px] px-2.5 rounded-lg bg-slate-900 border border-white/15 text-white font-black text-center focus:outline-none focus:border-amber-400"
+                              />
+                              <span className="col-span-4 text-left font-black text-amber-400">
+                                {total.toLocaleString()}
+                              </span>
+                            </div>
+                          );
+                        })}
+                        <div className="grid grid-cols-12 gap-2 items-center text-xs font-mono pt-1 border-t border-white/10">
+                          <span className="col-span-4 text-slate-400">فكة / أخرى</span>
+                          <input
+                            type="number"
+                            min="0"
+                            placeholder="0"
+                            value={denominations.coins}
+                            onChange={(e) => handleDenominationChange('coins', e.target.value)}
+                            className="col-span-4 min-h-[36px] px-2.5 rounded-lg bg-slate-900 border border-white/15 text-white font-black text-center focus:outline-none focus:border-amber-400"
+                          />
+                          <span className="col-span-4 text-left font-black text-amber-400">
+                            {(Number(denominations.coins) || 0).toLocaleString()}
+                          </span>
+                        </div>
+                      </div>
+                    ) : (
+                      /* Direct Total Amount Input */
+                      <input
+                        type="number"
+                        step="any"
+                        value={actualCash}
+                        onChange={(e) => setActualCash(e.target.value)}
+                        className="w-full min-h-[48px] px-4 rounded-xl bg-slate-950 border border-amber-500/50 text-amber-400 font-mono text-2xl font-black text-center focus:outline-none focus:border-amber-400"
+                        required
+                      />
+                    )}
+
+                    {/* Quick Stepper Chips (Only in direct mode) */}
+                    {!useDenominations && (
+                      <div className="flex items-center gap-1.5 pt-1">
+                        <button
+                          type="button"
+                          onClick={setExactExpected}
+                          className="flex-1 py-1 px-2 rounded-lg bg-white/10 hover:bg-white/20 text-white font-bold text-[11px] transition active:scale-95"
+                        >
+                          مطابق بالضبط
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => addCashStep(500)}
+                          className="py-1 px-2.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 font-mono font-bold text-[11px] transition active:scale-95"
+                        >
+                          +500
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => addCashStep(1000)}
+                          className="py-1 px-2.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 font-mono font-bold text-[11px] transition active:scale-95"
+                        >
+                          +1,000
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => addCashStep(5000)}
+                          className="py-1 px-2.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 font-mono font-bold text-[11px] transition active:scale-95"
+                        >
+                          +5,000
+                        </button>
+                      </div>
+                    )}
+
+                    {/* Verbal Tafqeet */}
+                    {actualNum > 0 && (
+                      <div className="text-[11px] text-slate-300 font-medium px-1">
+                        المبلغ كتابة: <span className="text-amber-300 font-bold">{tafqeet(actualNum)} ريال يمني</span>
+                      </div>
+                    )}
 
                     {/* Real-time Variance Badge */}
                     <div

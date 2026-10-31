@@ -21,6 +21,7 @@ const accountingRoutes = require('./routes/accountingRoutes');
 const shiftRoutes = require('./routes/shiftRoutes');
 const systemRoutes = require('./routes/systemRoutes');
 const vehicleController = require('./controllers/vehicleController');
+const voucherController = require('./controllers/voucherController');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -100,6 +101,7 @@ app.use('/api/purchase-returns', purchaseReturnRoutes);
 app.use('/api/suppliers', supplierRoutes);
 app.use('/api/vouchers', voucherRoutes);
 app.use('/api/expense-categories', expenseCategoryRoutes);
+app.get('/api/expenses', voucherController.getExpenses);
 app.use('/api/accounting', accountingRoutes);
 app.use('/api/shifts', shiftRoutes);
 app.use('/api/system', systemRoutes);

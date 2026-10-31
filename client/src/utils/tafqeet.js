@@ -81,11 +81,7 @@ function convertBelowThousand(n) {
   return str;
 }
 
-export function tafqeet(amount, currency = 'ريال يمني') {
-  const num = Math.round(Number(amount) || 0);
-  if (num === 0) return `صفر ${currency} فقط لا غير`;
-  if (num < 0) return `سالب ${tafqeet(Math.abs(num), currency)}`;
-
+function convertNumberToWords(num) {
   const millions = Math.floor(num / 1000000);
   const thousands = Math.floor((num % 1000000) / 1000);
   const remainder = num % 1000;
@@ -110,5 +106,26 @@ export function tafqeet(amount, currency = 'ريال يمني') {
     parts.push(convertBelowThousand(remainder));
   }
 
-  return `فقط وقدره ${parts.join(' و')} ${currency} لا غير`;
+  return parts.join(' و');
+}
+
+export function tafqeet(amount, currency = 'ريال يمني') {
+  const rawNum = Number(amount);
+  if (isNaN(rawNum) || rawNum === 0) return `فقط صفر ${currency} لا غير`;
+
+  const isNegative = rawNum < 0;
+  const absNum = Math.abs(rawNum);
+  const intPart = Math.floor(absNum);
+  const fracPart = Math.round((absNum - intPart) * 100);
+
+  let words = convertNumberToWords(intPart) || 'صفر';
+  if (fracPart > 0) {
+    words += ` و${convertBelowThousand(fracPart)} فلس`;
+  }
+
+  if (isNegative) {
+    return `فقط وقدره مبلغ سالب قدره ${words} ${currency} لا غير`;
+  }
+
+  return `فقط وقدره ${words} ${currency} لا غير`;
 }

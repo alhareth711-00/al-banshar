@@ -76,7 +76,7 @@ function seedChartOfAccounts(db) {
 }
 
 /**
- * Returns account code for a given payment method.
+ * Returns account code for a given payment method in sales/receipts context.
  */
 function getPaymentMethodAccountCode(paymentMethod) {
   switch (paymentMethod) {
@@ -87,6 +87,22 @@ function getPaymentMethodAccountCode(paymentMethod) {
     case 'credit':  return '1201'; // Customer Receivable
     case 'cash':
     default:        return '1101'; // Cash Drawer
+  }
+}
+
+/**
+ * Returns disbursement account code for purchases (cannot be 1201 Customer Receivable).
+ */
+function getPurchasePaymentAccountCode(paymentMethod) {
+  switch (paymentMethod) {
+    case 'kuraimi': return '1102';
+    case 'jeeb':    return '1103';
+    case 'jawali':  return '1104';
+    case 'onecash': return '1105';
+    case 'bank':    return '1102';
+    case 'credit':  return '1101'; // Any downpayment on credit purchase is disbursed cash
+    case 'cash':
+    default:        return '1101';
   }
 }
 
@@ -242,13 +258,39 @@ function postInvoice(db, { invoice, items }) {
 
   // 1. Debit Payments
   if (paidAmount > 0) {
-    const paymentAccount = getPaymentMethodAccountCode(invoice.payment_method);
-    lines.push({
-      account_code: paymentAccount,
-      debit: paidAmount,
-      credit: 0,
-      description: `مقبوضات فاتورة بيع رقم (${invoice.invoice_number}) طريقة: ${invoice.payment_method}`,
-    });
+    if (invoice.payment_method === 'split' && invoice.split_payments && typeof invoice.split_payments === 'object') {
+      let allocatedTotal = 0;
+      for (const [method, amount] of Object.entries(invoice.split_payments)) {
+        const amt = roundMoney(safeNum(amount, 0));
+        if (amt > 0) {
+          allocatedTotal = roundMoney(allocatedTotal + amt);
+          const paymentAccount = getPaymentMethodAccountCode(method);
+          lines.push({
+            account_code: paymentAccount,
+            debit: amt,
+            credit: 0,
+            description: `مقبوضات فاتورة بيع رقم (${invoice.invoice_number}) مجزأ: ${method}`,
+          });
+        }
+      }
+      const unallocated = roundMoney(paidAmount - allocatedTotal);
+      if (unallocated > 0) {
+        lines.push({
+          account_code: '1101', // Cash Drawer fallback
+          debit: unallocated,
+          credit: 0,
+          description: `مقبوضات نقدية تكميلية فاتورة بيع (${invoice.invoice_number})`,
+        });
+      }
+    } else {
+      const paymentAccount = getPaymentMethodAccountCode(invoice.payment_method);
+      lines.push({
+        account_code: paymentAccount,
+        debit: paidAmount,
+        credit: 0,
+        description: `مقبوضات فاتورة بيع رقم (${invoice.invoice_number}) طريقة: ${invoice.payment_method}`,
+      });
+    }
   }
 
   // 2. Debit Customer Debt (Receivable)
@@ -450,7 +492,7 @@ function postPurchase(db, { purchase, items }) {
 
   // 2. Credit Payment (Cash / Bank)
   if (paidAmount > 0) {
-    const paymentAcc = getPaymentMethodAccountCode(paymentMethod);
+    const paymentAcc = getPurchasePaymentAccountCode(paymentMethod);
     lines.push({
       account_code: paymentAcc,
       debit: 0,

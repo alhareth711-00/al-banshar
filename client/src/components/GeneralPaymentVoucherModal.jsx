@@ -56,6 +56,16 @@ export default function GeneralPaymentVoucherModal({
     }
   }, [initialData, isOpen]);
 
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape' && isOpen) {
+        onClose();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, onClose]);
+
   if (!isOpen) return null;
 
   const verbalAmount = tafqeet(Number(amount) || 0);
@@ -120,8 +130,13 @@ export default function GeneralPaymentVoucherModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-5 bg-black/85 backdrop-blur-md overflow-y-auto">
-      <div className="apple-glass border border-white/20 rounded-3xl w-full max-w-2xl overflow-hidden shadow-2xl animate-in fade-in zoom-in-95 my-4 text-right">
+    <div
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
+      className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-5 bg-black/85 backdrop-blur-md overflow-y-auto cursor-pointer"
+    >
+      <div className="apple-glass border border-white/20 rounded-3xl w-full max-w-2xl overflow-hidden shadow-2xl animate-in fade-in zoom-in-95 my-4 text-right cursor-default">
         {/* Header (Screen only) */}
         <div className="px-6 py-4 border-b border-white/10 flex items-center justify-between bg-amber-500/10 print:hidden">
           <div className="flex items-center gap-2.5">
@@ -445,7 +460,7 @@ export default function GeneralPaymentVoucherModal({
                   <option value="">-- اختر الفني / العامل المستلم للسلفة --</option>
                   {workers.map((w) => (
                     <option key={w.id} value={w.id}>
-                      {w.name} ({w.role_title || 'فني'})
+                      {w.name} ({w.role || 'فني'})
                     </option>
                   ))}
                 </select>

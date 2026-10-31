@@ -24,9 +24,11 @@ const transactionController = {
   }),
 
   create: asyncHandler(async (req, res) => {
-    const { tx_type, amount, description, worker_id, vehicle_id } = req.body;
+    const { tx_type, amount, description } = req.body;
+    const worker_id = req.body.worker_id || req.body.workerId || (req.body.worker && req.body.worker.id);
+    const vehicle_id = req.body.vehicle_id || req.body.vehicleId || (req.body.vehicle && req.body.vehicle.id);
 
-    const validTypes = ['expense', 'worker_advance', 'debt_collection'];
+    const validTypes = ['expense', 'worker_advance', 'debt_collection', 'owner_drawing'];
     if (!tx_type || !validTypes.includes(tx_type)) {
       throw new AppError(`نوع المعاملة يجب أن يكون واحداً من: ${validTypes.join(', ')}`, 400);
     }
@@ -47,7 +49,11 @@ const transactionController = {
       throw new AppError('معرف سيارة العميل (vehicle_id) مطلوب عند تسجيل سند قبض دين', 400);
     }
 
-    const newTx = transactionModel.create(req.body);
+    const newTx = transactionModel.create({
+      ...req.body,
+      worker_id: worker_id ? Number(worker_id) : null,
+      vehicle_id: vehicle_id ? Number(vehicle_id) : null,
+    });
 
     let message = 'تم تسجيل المعاملة بنجاح';
     if (tx_type === 'expense') message = 'تم تسجيل المصروف التشغيلي بنجاح';

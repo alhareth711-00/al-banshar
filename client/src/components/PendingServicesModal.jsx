@@ -11,7 +11,6 @@ import {
   Printer,
   Sparkles,
   AlertTriangle,
-  UserCheck,
   Wrench,
   Gauge,
   Tag,
@@ -53,7 +52,6 @@ export default function PendingServicesModal({
   const [pendingServices, setPendingServices] = useState([]);
   const [loading, setLoading] = useState(false);
   const [selectedInvoice, setSelectedInvoice] = useState(null);
-  const [selectedWorkerId, setSelectedWorkerId] = useState(null);
   const [safetyPoints, setSafetyPoints] = useState(DEFAULT_SAFETY_POINTS);
   const [notes, setNotes] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -106,7 +104,6 @@ export default function PendingServicesModal({
 
   const handleSelectInvoice = (inv) => {
     setSelectedInvoice(inv);
-    setSelectedWorkerId(inv.worker_id || (workers.length > 0 ? workers[0].id : null));
     setSafetyPoints(inv.safety_points || DEFAULT_SAFETY_POINTS);
     setNotes(inv.notes || '');
   };
@@ -135,13 +132,12 @@ export default function PendingServicesModal({
     try {
       setSubmitting(true);
       const pointsToSave = quickAllPass ? DEFAULT_SAFETY_POINTS : safetyPoints;
-      const workerIdToSave = selectedWorkerId || (workers.length > 0 ? workers[0].id : null);
 
       const res = await fetch(`/api/invoices/${selectedInvoice.id}/complete-service`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          worker_id: workerIdToSave,
+          worker_id: null,
           safety_points: pointsToSave,
           inspection_notes: notes,
         }),
@@ -164,9 +160,6 @@ export default function PendingServicesModal({
       const oilText = oilItems.length > 0 ? oilItems.map((o) => `${o.description} (×${o.qty})`).join(' + ') : '---';
       const filterText = filterItems.length > 0 ? filterItems.map((f) => f.description).join(' + ') : 'بدون استبدال فلتر';
 
-      const workerObj = workers.find((w) => w.id === workerIdToSave);
-      const workerName = workerObj ? workerObj.name : 'فني المركز المعتمد';
-
       const failedPoints = Object.entries(pointsToSave)
         .filter(([_, pass]) => !pass)
         .map(([id]) => SAFETY_POINT_LABELS.find((l) => l.id === id)?.label)
@@ -187,7 +180,6 @@ export default function PendingServicesModal({
 🔹 الموعد المقترح للتغيير القادم: ${Number(updatedInv.next_odometer).toLocaleString()} كم أو بتاريخ ${updatedInv.next_service_date}.
 🛡️ تقرير فحص السلامة المجاني:
 ${safetyReportText}
-👨‍🔧 الفني المسؤول: ${workerName}.
 💰 الإجمالي: ${Number(updatedInv.net_total).toLocaleString()} ر.ي.
 شاكرين ثقتكم الغالية ويسعدنا دائماً خدمتكم بكل اهتمام!`;
 
@@ -433,42 +425,7 @@ ${safetyReportText}
                   </div>
                 </div>
 
-                {/* 1. Technician Selector (Touch-friendly buttons, Salaried workers - No commissions) */}
-                <div className="p-3.5 rounded-2xl bg-slate-900/80 border border-white/10 space-y-2">
-                  <div className="flex items-center justify-between text-xs font-bold text-slate-300">
-                    <span className="flex items-center gap-1.5 text-amber-300 font-black">
-                      <UserCheck className="w-4 h-4 text-amber-400" />
-                      <span>الفني المسؤول عن تنفيذ الخدمة في الحفرة:</span>
-                    </span>
-                    <span className="text-[10px] text-slate-400">انقر لتحديد الفني</span>
-                  </div>
-
-                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                    {workers.map((w) => {
-                      const isSelected = selectedWorkerId === w.id;
-                      return (
-                        <button
-                          key={w.id}
-                          type="button"
-                          onClick={() => setSelectedWorkerId(w.id)}
-                          className={`min-h-[46px] px-3 py-1.5 rounded-xl border text-right transition flex items-center justify-between active:scale-95 ${
-                            isSelected
-                              ? 'bg-amber-500/20 border-amber-400 text-white font-black shadow-md shadow-amber-500/10 ring-1 ring-amber-400/50'
-                              : 'bg-slate-950/60 border-white/10 text-slate-400 hover:text-slate-200 hover:bg-slate-800'
-                          }`}
-                        >
-                          <div className="truncate">
-                            <div className="text-xs font-extrabold truncate">{w.name}</div>
-                            <div className="text-[10px] text-slate-400 truncate">{w.role}</div>
-                          </div>
-                          {isSelected && <Check className="w-4 h-4 text-amber-400 stroke-[3] shrink-0" />}
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-
-                {/* 2. Free Safety Inspection (8 Points - Default All Green / One click toggle) */}
+                {/* Free Safety Inspection (8 Points - Default All Green / One click toggle) */}
                 <div className="p-3.5 rounded-2xl bg-slate-900/80 border border-white/10 space-y-2.5">
                   <div className="flex items-center justify-between text-xs font-bold">
                     <div className="flex items-center gap-1.5 text-emerald-400 font-black">

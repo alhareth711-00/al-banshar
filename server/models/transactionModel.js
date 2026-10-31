@@ -18,8 +18,9 @@ const transactionModel = {
     const params = [];
 
     if (filters.date) {
+      const targetDate = filters.date === 'today' ? new Date().toISOString().split('T')[0] : filters.date;
       query += ' AND date(dt.created_at) = date(?)';
-      params.push(filters.date);
+      params.push(targetDate);
     }
 
     if (filters.tx_type) {
@@ -32,7 +33,8 @@ const transactionModel = {
       params.push(filters.worker_id);
     }
 
-    query += ' ORDER BY dt.id DESC LIMIT 100';
+    const limit = filters.limit ? Number(filters.limit) : (filters.date ? 500 : 100);
+    query += ` ORDER BY dt.id DESC LIMIT ${limit}`;
     return db.prepare(query).all(...params);
   },
 
@@ -78,13 +80,35 @@ const transactionModel = {
 
       const txId = result.lastInsertRowid;
 
-      // If debt collection, reduce customer vehicle balance_due
+      // If debt collection, reduce customer vehicle balance_due and settle invoices FIFO
       if (data.tx_type === 'debt_collection' && data.vehicle_id) {
         db.prepare(`
           UPDATE customers_vehicles 
           SET balance_due = MAX(0, balance_due - ?) 
           WHERE id = ?
         `).run(amount, data.vehicle_id);
+
+        const unpaidInvoices = db.prepare(`
+          SELECT id, invoice_number, remaining_debt, paid_amount
+          FROM invoices
+          WHERE vehicle_id = ? AND remaining_debt > 0
+          ORDER BY id ASC
+        `).all(data.vehicle_id);
+
+        let remainingToSettle = amount;
+        for (const inv of unpaidInvoices) {
+          if (remainingToSettle <= 0) break;
+          const billDebt = Number(inv.remaining_debt) || 0;
+          const settleAmt = Math.min(billDebt, remainingToSettle);
+          db.prepare(`
+            UPDATE invoices
+            SET 
+              paid_amount = paid_amount + ?,
+              remaining_debt = MAX(0, remaining_debt - ?)
+            WHERE id = ?
+          `).run(settleAmt, settleAmt, inv.id);
+          remainingToSettle = remainingToSettle - settleAmt;
+        }
       }
 
       // Auto-post to Central Accounting General Ledger

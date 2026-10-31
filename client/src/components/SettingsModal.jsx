@@ -20,8 +20,19 @@ import {
   Calendar,
   Clock,
   Layers,
+  Droplets,
 } from 'lucide-react';
-import { getShopSettings, saveShopSettings, recordBackupDownloaded } from '../utils/settings';
+import {
+  getShopSettings,
+  saveShopSettings,
+  recordBackupDownloaded,
+  getCustomOilBrands,
+  saveCustomOilBrands,
+  getOilVolumePresets,
+  saveOilVolumePresets,
+  getCustomViscosities,
+  saveCustomViscosities,
+} from '../utils/settings';
 
 export default function SettingsModal({ isOpen, onClose, onSettingsUpdated }) {
   const [formData, setFormData] = useState(getShopSettings());
@@ -41,6 +52,64 @@ export default function SettingsModal({ isOpen, onClose, onSettingsUpdated }) {
   const [resetError, setResetError] = useState('');
   const [resetSuccessNotice, setResetSuccessNotice] = useState('');
 
+  // Dynamic Oil Brands, Viscosities, and Volume Presets State
+  const [brandsList, setBrandsList] = useState(getCustomOilBrands());
+  const [newBrandName, setNewBrandName] = useState('');
+  const [newBrandColor, setNewBrandColor] = useState('#f59e0b');
+
+  const [viscsList, setViscsList] = useState(getCustomViscosities());
+  const [newViscName, setNewViscName] = useState('');
+
+  const [volPresets, setVolPresets] = useState(getOilVolumePresets());
+  const [newVolPreset, setNewVolPreset] = useState('');
+
+  const handleAddBrand = () => {
+    if (!newBrandName.trim()) return;
+    const name = newBrandName.trim();
+    if (brandsList.some((b) => b.id.toLowerCase() === name.toLowerCase())) return;
+    const updated = [...brandsList, { id: name, name, color: newBrandColor || '#f59e0b' }];
+    setBrandsList(updated);
+    saveCustomOilBrands(updated);
+    setNewBrandName('');
+  };
+
+  const handleRemoveBrand = (brandId) => {
+    const updated = brandsList.filter((b) => b.id !== brandId);
+    setBrandsList(updated);
+    saveCustomOilBrands(updated);
+  };
+
+  const handleAddViscosity = () => {
+    if (!newViscName.trim()) return;
+    const v = newViscName.trim();
+    if (viscsList.includes(v)) return;
+    const updated = [...viscsList, v];
+    setViscsList(updated);
+    saveCustomViscosities(updated);
+    setNewViscName('');
+  };
+
+  const handleRemoveViscosity = (v) => {
+    const updated = viscsList.filter((item) => item !== v);
+    setViscsList(updated);
+    saveCustomViscosities(updated);
+  };
+
+  const handleAddVolPreset = () => {
+    const val = parseFloat(newVolPreset);
+    if (isNaN(val) || val <= 0 || volPresets.includes(val)) return;
+    const updated = [...volPresets, val].sort((a, b) => a - b);
+    setVolPresets(updated);
+    saveOilVolumePresets(updated);
+    setNewVolPreset('');
+  };
+
+  const handleRemoveVolPreset = (val) => {
+    const updated = volPresets.filter((v) => v !== val);
+    setVolPresets(updated);
+    saveOilVolumePresets(updated);
+  };
+
   const fetchBackupStatus = async () => {
     try {
       const res = await fetch('/api/backup/status');
@@ -56,6 +125,9 @@ export default function SettingsModal({ isOpen, onClose, onSettingsUpdated }) {
   useEffect(() => {
     if (isOpen) {
       setFormData(getShopSettings());
+      setBrandsList(getCustomOilBrands());
+      setViscsList(getCustomViscosities());
+      setVolPresets(getOilVolumePresets());
       setSavedSuccess(false);
       fetchBackupStatus();
     }
@@ -394,7 +466,153 @@ export default function SettingsModal({ isOpen, onClose, onSettingsUpdated }) {
               </label>
             </div>
 
-            {/* 6. DATABASE BACKUP SENTINEL (درع الأمان وتنبيه 7 أيام) */}
+            {/* 6. DYNAMIC OIL BRANDS, VISCOSITIES & VOLUME PRESETS */}
+            <div className="p-4 rounded-2xl bg-slate-900/90 border-2 border-amber-500/40 space-y-4 shadow-lg">
+              <div className="flex items-center justify-between border-b border-white/10 pb-2">
+                <div className="flex items-center gap-1.5 text-xs font-black text-amber-300">
+                  <Droplets className="w-4 h-4 text-amber-400" />
+                  <span>6. إدارة ماركات الزيوت ودرجات اللزوجة وكميات البيع السريعة:</span>
+                </div>
+                <span className="text-[10px] text-amber-300 bg-amber-500/20 px-2 py-0.5 rounded-full font-mono">
+                  تحديث لحظي
+                </span>
+              </div>
+
+              {/* A. Oil Brands */}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between text-[11px] font-bold text-slate-300">
+                  <span>🛢️ ماركات الزيوت المعتمدة في النظام ({brandsList.length} ماركة):</span>
+                </div>
+                <div className="flex flex-wrap gap-1.5 max-h-36 overflow-y-auto custom-scrollbar p-1.5 bg-slate-950 rounded-xl border border-white/5">
+                  {brandsList.map((b) => (
+                    <span
+                      key={b.id}
+                      className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-slate-900 border border-white/10 text-xs font-bold text-slate-200"
+                    >
+                      <span className="w-2 h-2 rounded-full" style={{ backgroundColor: b.color || '#f59e0b' }} />
+                      <span>{b.name}</span>
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveBrand(b.id)}
+                        className="text-slate-500 hover:text-rose-400 mr-1 text-xs"
+                        title="حذف الماركة"
+                      >
+                        ✕
+                      </button>
+                    </span>
+                  ))}
+                </div>
+                <div className="flex items-center gap-2 pt-1">
+                  <input
+                    type="text"
+                    placeholder="اسم ماركة زيت جديدة (مثلاً: مانول، موبيل)..."
+                    value={newBrandName}
+                    onChange={(e) => setNewBrandName(e.target.value)}
+                    className="flex-1 min-h-[38px] px-3 rounded-xl bg-slate-950 border border-white/15 text-white text-xs font-bold focus:outline-none focus:border-amber-400"
+                  />
+                  <input
+                    type="color"
+                    value={newBrandColor}
+                    onChange={(e) => setNewBrandColor(e.target.value)}
+                    className="w-10 h-[38px] rounded-xl bg-slate-950 border border-white/15 cursor-pointer p-0.5"
+                    title="لون شارة الماركة"
+                  />
+                  <button
+                    type="button"
+                    onClick={handleAddBrand}
+                    className="min-h-[38px] px-3 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs transition active:scale-95"
+                  >
+                    ➕ إضافة ماركة
+                  </button>
+                </div>
+              </div>
+
+              {/* B. Dynamic Viscosities */}
+              <div className="space-y-2 pt-2 border-t border-white/10">
+                <div className="flex items-center justify-between text-[11px] font-bold text-slate-300">
+                  <span>درجات اللزوجة المعتمدة في النظام ({viscsList.length} لزوجة):</span>
+                  <span className="text-[10px] text-teal-400 font-mono">تتضمن زيوت الصباحة</span>
+                </div>
+                <div className="flex flex-wrap gap-1.5 max-h-28 overflow-y-auto custom-scrollbar p-1.5 bg-slate-950 rounded-xl border border-white/5">
+                  {viscsList.map((v) => (
+                    <span
+                      key={v}
+                      className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-900 border border-teal-500/30 text-xs font-mono font-bold text-teal-300"
+                    >
+                      <span>{v}</span>
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveViscosity(v)}
+                        className="text-slate-500 hover:text-rose-400 mr-1 text-xs"
+                        title="حذف اللزوجة"
+                      >
+                        ✕
+                      </button>
+                    </span>
+                  ))}
+                </div>
+                <div className="flex items-center gap-2 pt-1">
+                  <input
+                    type="text"
+                    placeholder="أدخل درجة لزوجة جديدة (مثلاً: 5W-40 أو 15W-50)..."
+                    value={newViscName}
+                    onChange={(e) => setNewViscName(e.target.value)}
+                    className="flex-1 min-h-[38px] px-3 rounded-xl bg-slate-950 border border-white/15 text-white font-mono text-xs font-bold focus:outline-none focus:border-teal-400"
+                  />
+                  <button
+                    type="button"
+                    onClick={handleAddViscosity}
+                    className="min-h-[38px] px-3 rounded-xl bg-teal-500 hover:bg-teal-400 text-slate-950 font-black text-xs transition active:scale-95"
+                  >
+                    ➕ إضافة لزوجة
+                  </button>
+                </div>
+              </div>
+
+              {/* C. General Volume Presets */}
+              <div className="space-y-2 pt-2 border-t border-white/10">
+                <div className="flex items-center justify-between text-[11px] font-bold text-slate-300">
+                  <span>اختصارات كميات الزيوت العامة بالكاشير (باللتر):</span>
+                </div>
+                <div className="flex flex-wrap gap-1.5 p-1.5 bg-slate-950 rounded-xl border border-white/5">
+                  {volPresets.map((qty) => (
+                    <span
+                      key={qty}
+                      className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg bg-slate-900 border border-amber-500/40 text-xs font-mono font-black text-amber-300"
+                    >
+                      <span>{qty}L</span>
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveVolPreset(qty)}
+                        className="text-slate-500 hover:text-rose-400 mr-1 text-xs"
+                        title="حذف الاختصار"
+                      >
+                        ✕
+                      </button>
+                    </span>
+                  ))}
+                </div>
+                <div className="flex items-center gap-2 pt-1">
+                  <input
+                    type="number"
+                    step="0.5"
+                    placeholder="أدخل كمية باللتر (مثلاً: 7 أو 2.5)..."
+                    value={newVolPreset}
+                    onChange={(e) => setNewVolPreset(e.target.value)}
+                    className="flex-1 min-h-[38px] px-3 rounded-xl bg-slate-950 border border-white/15 text-white font-mono text-xs font-bold focus:outline-none focus:border-amber-400"
+                  />
+                  <button
+                    type="button"
+                    onClick={handleAddVolPreset}
+                    className="min-h-[38px] px-3 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs transition active:scale-95"
+                  >
+                    ➕ إضافة كمية
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* 7. DATABASE BACKUP SENTINEL (درع الأمان وتنبيه 7 أيام) */}
             <div className="p-4 rounded-2xl bg-slate-900/90 border-2 border-blue-500/30 space-y-3 shadow-lg">
               <div className="flex items-center justify-between border-b border-white/10 pb-2">
                 <div className="flex items-center gap-1.5 text-xs font-extrabold text-blue-300">

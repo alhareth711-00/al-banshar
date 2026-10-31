@@ -20,6 +20,7 @@ server/backups/*.sqlite
 # Operating System & Editors
 .DS_Store
 Thumbs.db
+~$*
 .vscode/
 .idea/
 .impeccable/

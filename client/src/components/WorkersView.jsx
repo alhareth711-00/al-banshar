@@ -42,6 +42,7 @@ export default function WorkersView({ workers = [], onRefreshData, onOpenCustome
   const [expenseCategory, setExpenseCategory] = useState('');
   const [expenseDescription, setExpenseDescription] = useState('');
   const [expensePaymentMethod, setExpensePaymentMethod] = useState('cash');
+  const [expensePaperBill, setExpensePaperBill] = useState('');
 
   const [showDebtPayModal, setShowDebtPayModal] = useState(false);
   const [selectedVehicleForDebt, setSelectedVehicleForDebt] = useState(null);
@@ -81,10 +82,11 @@ export default function WorkersView({ workers = [], onRefreshData, onOpenCustome
     }
   };
 
-  // 3. Fetch Transactions
+  // 3. Fetch Transactions (حصرها بحركات اليوم الفعلي لضبط كروت اليومية)
   const fetchTransactions = async () => {
     try {
-      const res = await fetch('/api/transactions');
+      const todayStr = new Date().toISOString().split('T')[0];
+      const res = await fetch(`/api/transactions?date=${todayStr}`);
       const data = await res.json();
       if (data.success) {
         setTransactions(data.data || []);
@@ -94,14 +96,13 @@ export default function WorkersView({ workers = [], onRefreshData, onOpenCustome
     }
   };
 
-  // 4. Fetch Debt Vehicles
+  // 4. Fetch Debt Vehicles (استعلام شامل لجميع ديون الزبائن دون تقييد LIMIT 25)
   const fetchDebtVehicles = async () => {
     try {
-      const res = await fetch('/api/vehicles');
+      const res = await fetch('/api/vouchers/customer-debts');
       const data = await res.json();
       if (data.success) {
-        const debtors = (data.data || []).filter((v) => Number(v.balance_due) > 0);
-        setDebtVehicles(debtors);
+        setDebtVehicles(data.data || []);
       }
     } catch (e) {
       console.error('Error fetching debt vehicles:', e);
@@ -123,9 +124,27 @@ export default function WorkersView({ workers = [], onRefreshData, onOpenCustome
     loadAllData();
   }, []);
 
+  // Close open modals on ESC key
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape') {
+        setShowAdvanceModal(false);
+        setShowExpenseModal(false);
+        setShowDebtPayModal(false);
+        setCompletedDebtReceipt(null);
+        setShowCategoryModal(false);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
+
   // Summary Metrics
   const totalAdvancesToday = useMemo(() => {
-    return workerStats.reduce((acc, w) => acc + (Number(w.advances_taken_today) || 0), 0);
+    return workerStats.reduce((acc, w) => {
+      const adv = Number(w.advances_today ?? w.advances_taken_today ?? 0);
+      return acc + (isNaN(adv) ? 0 : adv);
+    }, 0);
   }, [workerStats]);
 
   const totalDailyWages = useMemo(() => {
@@ -148,12 +167,24 @@ export default function WorkersView({ workers = [], onRefreshData, onOpenCustome
     return todayExpensesList.reduce((acc, t) => acc + (Number(t.amount) || 0), 0);
   }, [todayExpensesList]);
 
-  // Handle Record Worker Advance
+  // Handle Record Worker Advance (مع التحقق الرقابي من رصيد العامل وتمرير id الصحيح)
   const handleRecordAdvance = async (e) => {
     e.preventDefault();
     if (!selectedWorkerForAdvance || !advanceAmount || Number(advanceAmount) <= 0) {
       alert('يرجى تحديد المبلغ بشكل صحيح');
       return;
+    }
+
+    const advVal = Number(advanceAmount);
+    const workerId = selectedWorkerForAdvance.id;
+    const currentNet = Number(selectedWorkerForAdvance.net_due_today || 0);
+
+    // تنبيه رقابي إذا كانت السلفة أكبر من صافي مستحقات اليوم
+    if (advVal > currentNet) {
+      const confirmExceed = window.confirm(
+        `⚠️ تنبيه رقابي مالي:\nمبلغ السلفة المطلوب (${advVal.toLocaleString()} ر.ي) أكبر من صافي أجر الفني المتبقي اليوم (${currentNet.toLocaleString()} ر.ي).\n\nهل ترغب في صرف السلفة واعتماد الفارق كذمة مدينة على الفني؟`
+      );
+      if (!confirmExceed) return;
     }
 
     try {
@@ -163,9 +194,9 @@ export default function WorkersView({ workers = [], onRefreshData, onOpenCustome
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           tx_type: 'worker_advance',
-          amount: Number(advanceAmount),
+          amount: advVal,
           description: advanceNotes.trim() || `سلفة يومية للفني: ${selectedWorkerForAdvance.name}`,
-          worker_id: selectedWorkerForAdvance.worker_id,
+          worker_id: workerId,
           payment_method: 'cash',
         }),
       });
@@ -201,13 +232,14 @@ export default function WorkersView({ workers = [], onRefreshData, onOpenCustome
     try {
       setIsSubmitting(true);
       const categoryTag = expenseCategory ? `[${expenseCategory}] ` : '';
+      const paperTag = expensePaperBill.trim() ? ` [دفتر:${expensePaperBill.trim()}]` : '';
       const res = await fetch('/api/transactions', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           tx_type: 'expense',
           amount: Number(expenseAmount),
-          description: `${categoryTag}${expenseDescription.trim()}`,
+          description: `${categoryTag}${expenseDescription.trim()}${paperTag}`,
           payment_method: expensePaymentMethod,
         }),
       });
@@ -218,6 +250,7 @@ export default function WorkersView({ workers = [], onRefreshData, onOpenCustome
       setShowExpenseModal(false);
       setExpenseAmount('');
       setExpenseDescription('');
+      setExpensePaperBill('');
       await loadAllData();
       if (onRefreshData) onRefreshData();
     } catch (err) {
@@ -420,6 +453,50 @@ export default function WorkersView({ workers = [], onRefreshData, onOpenCustome
               {todayExpensesList.length}
             </span>
           </button>
+
+          <button
+            type="button"
+            onClick={() => setActiveTab('debts')}
+            className={`min-h-[44px] px-4 rounded-xl text-xs sm:text-sm font-black transition-all flex items-center gap-2.5 ${
+              activeTab === 'debts'
+                ? 'bg-emerald-500 text-slate-950 shadow-md shadow-emerald-950/30'
+                : 'text-slate-400 hover:text-white hover:bg-white/5'
+            }`}
+          >
+            <Receipt className="w-4 h-4 stroke-[2.3]" />
+            <span>3. دفتر الديون وسندات القبض</span>
+            <span
+              className={`font-mono text-[11px] px-2 py-0.5 rounded-lg ${
+                activeTab === 'debts'
+                  ? 'bg-slate-950 text-emerald-400 font-bold'
+                  : 'bg-slate-800 text-slate-300'
+              }`}
+            >
+              {debtVehicles.length}
+            </span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setActiveTab('transactions')}
+            className={`min-h-[44px] px-4 rounded-xl text-xs sm:text-sm font-black transition-all flex items-center gap-2.5 ${
+              activeTab === 'transactions'
+                ? 'bg-blue-600 text-white shadow-md shadow-blue-950/30'
+                : 'text-slate-400 hover:text-white hover:bg-white/5'
+            }`}
+          >
+            <FileText className="w-4 h-4 stroke-[2.3]" />
+            <span>4. سجل عمليات اليوم</span>
+            <span
+              className={`font-mono text-[11px] px-2 py-0.5 rounded-lg ${
+                activeTab === 'transactions'
+                  ? 'bg-blue-950 text-blue-200 font-bold border border-blue-400/30'
+                  : 'bg-slate-800 text-slate-300'
+              }`}
+            >
+              {transactions.length}
+            </span>
+          </button>
         </div>
       </div>
 
@@ -431,7 +508,7 @@ export default function WorkersView({ workers = [], onRefreshData, onOpenCustome
 
             return (
               <div
-                key={w.worker_id}
+                key={w.id}
                 className="p-3.5 rounded-2xl bg-slate-900/90 border border-white/10 hover:border-amber-400/40 transition-all flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-3 shadow-lg"
               >
                 {/* Worker Identity */}
@@ -455,7 +532,7 @@ export default function WorkersView({ workers = [], onRefreshData, onOpenCustome
                   <div className="px-3 py-1 rounded-xl bg-slate-950/70 border border-white/5 flex items-center gap-1.5">
                     <Car className="w-3.5 h-3.5 text-emerald-400" />
                     <span className="text-slate-400">إنجاز اليوم:</span>
-                    <span className="font-mono font-black text-emerald-400">{w.cars_served_today} سيارة</span>
+                    <span className="font-mono font-black text-emerald-400">{w.cars_served_today || 0} سيارة</span>
                   </div>
 
                   <div className="px-3 py-1 rounded-xl bg-slate-950/70 border border-white/5 flex items-center gap-1.5">
@@ -468,7 +545,7 @@ export default function WorkersView({ workers = [], onRefreshData, onOpenCustome
                   <div className="px-3 py-1 rounded-xl bg-slate-950/70 border border-white/5 flex items-center gap-1.5">
                     <span className="text-slate-400">السلف:</span>
                     <span className="font-mono font-bold text-amber-400">
-                      -{Number(w.advances_taken_today).toLocaleString()} ر.ي
+                      -{Number(w.advances_today ?? w.advances_taken_today ?? 0).toLocaleString()} ر.ي
                     </span>
                   </div>
 
@@ -485,7 +562,7 @@ export default function WorkersView({ workers = [], onRefreshData, onOpenCustome
                   {onOpenWorkerStatement && (
                     <button
                       type="button"
-                      onClick={() => onOpenWorkerStatement(w.worker_id)}
+                      onClick={() => onOpenWorkerStatement(w.id)}
                       className="px-3.5 min-h-[42px] rounded-xl bg-white/5 hover:bg-white/10 text-slate-300 hover:text-white border border-white/10 font-bold text-xs flex items-center justify-center gap-1 transition active:scale-95"
                       title="كشف حساب وسلف الفني"
                     >
@@ -737,8 +814,13 @@ export default function WorkersView({ workers = [], onRefreshData, onOpenCustome
 
       {/* Modal 1: Worker Advance */}
       {showAdvanceModal && selectedWorkerForAdvance && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
-          <div className="apple-glass border border-white/20 rounded-3xl w-full max-w-md overflow-hidden shadow-2xl animate-in fade-in zoom-in-95">
+        <div
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setShowAdvanceModal(false);
+          }}
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md cursor-pointer"
+        >
+          <div className="apple-glass border border-white/20 rounded-3xl w-full max-w-md overflow-hidden shadow-2xl animate-in fade-in zoom-in-95 cursor-default">
             <div className="px-6 py-4 border-b border-white/10 flex items-center justify-between bg-white/5">
               <h3 className="font-extrabold text-white text-base">تسجيل سلفة / مسحوب لعامل</h3>
               <button onClick={() => setShowAdvanceModal(false)} className="text-slate-400 hover:text-white">
@@ -828,8 +910,13 @@ export default function WorkersView({ workers = [], onRefreshData, onOpenCustome
 
       {/* Modal 2: Record Operating Expense */}
       {showExpenseModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
-          <div className="apple-glass border border-white/20 rounded-3xl w-full max-w-md overflow-hidden shadow-2xl animate-in fade-in zoom-in-95">
+        <div
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setShowExpenseModal(false);
+          }}
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md cursor-pointer"
+        >
+          <div className="apple-glass border border-white/20 rounded-3xl w-full max-w-md overflow-hidden shadow-2xl animate-in fade-in zoom-in-95 cursor-default">
             <div className="px-6 py-4 border-b border-white/10 flex items-center justify-between bg-white/5">
               <h3 className="font-extrabold text-white text-base">تسجيل مصروف تشغيلي جديد</h3>
               <button onClick={() => setShowExpenseModal(false)} className="text-slate-400 hover:text-white">
@@ -892,31 +979,57 @@ export default function WorkersView({ workers = [], onRefreshData, onOpenCustome
                 />
               </div>
 
+              {/* Paper Booklet Number */}
+              <div>
+                <label className="block text-slate-300 font-bold mb-1.5">رقم السند اليدوي / الدفتر الورقي (اختياري):</label>
+                <input
+                  type="text"
+                  placeholder="مثال: 1045"
+                  value={expensePaperBill}
+                  onChange={(e) => setExpensePaperBill(e.target.value)}
+                  className="w-full min-h-[44px] px-3.5 rounded-xl bg-slate-900 border border-white/15 text-white font-mono text-xs"
+                />
+              </div>
+
               {/* Payment Method */}
               <div>
-                <label className="block text-slate-300 font-bold mb-1.5">طريقة الدفع:</label>
-                <div className="grid grid-cols-2 gap-2">
+                <label className="block text-slate-300 font-bold mb-1.5">وسيلة وطريقة الدفع:</label>
+                <div className="grid grid-cols-3 gap-2">
                   <button
                     type="button"
                     onClick={() => setExpensePaymentMethod('cash')}
-                    className={`py-2.5 px-3 rounded-xl font-bold text-xs transition border ${
+                    className={`py-2 px-2 rounded-xl font-bold text-xs transition border flex flex-col items-center justify-center gap-1 ${
                       expensePaymentMethod === 'cash'
                         ? 'bg-rose-500 text-white border-rose-400 shadow-md shadow-rose-500/20'
                         : 'bg-slate-900 text-slate-400 border-white/10 hover:text-white'
                     }`}
                   >
-                    💵 كاش من الصندوق
+                    <span>💵 كاش</span>
+                    <span className="text-[10px] font-mono opacity-80">(الدرج 1101)</span>
                   </button>
                   <button
                     type="button"
-                    onClick={() => setExpensePaymentMethod('bank')}
-                    className={`py-2.5 px-3 rounded-xl font-bold text-xs transition border ${
-                      expensePaymentMethod === 'bank'
+                    onClick={() => setExpensePaymentMethod('kuraimi')}
+                    className={`py-2 px-2 rounded-xl font-bold text-xs transition border flex flex-col items-center justify-center gap-1 ${
+                      expensePaymentMethod === 'kuraimi'
                         ? 'bg-purple-500 text-white border-purple-400 shadow-md shadow-purple-500/20'
                         : 'bg-slate-900 text-slate-400 border-white/10 hover:text-white'
                     }`}
                   >
-                    🏦 تحويل بنكي / حساب خاص
+                    <span>🏦 الكريمي</span>
+                    <span className="text-[10px] font-mono opacity-80">(1102)</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setExpensePaymentMethod('jeeb')}
+                    className={`py-2 px-2 rounded-xl font-bold text-xs transition border flex flex-col items-center justify-center gap-1 ${
+                      expensePaymentMethod === 'jeeb'
+                        ? 'bg-emerald-500 text-white border-emerald-400 shadow-md shadow-emerald-500/20'
+                        : 'bg-slate-900 text-slate-400 border-white/10 hover:text-white'
+                    }`}
+                  >
+                    <span>📱 جيب</span>
+                    <span className="text-[10px] font-mono opacity-80">(1103)</span>
                   </button>
                 </div>
               </div>
@@ -944,8 +1057,16 @@ export default function WorkersView({ workers = [], onRefreshData, onOpenCustome
 
       {/* Modal 3: Debt Payment Modal + Instant WhatsApp Receipt Generator */}
       {showDebtPayModal && selectedVehicleForDebt && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
-          <div className="apple-glass border border-white/20 rounded-3xl w-full max-w-md overflow-hidden shadow-2xl animate-in fade-in zoom-in-95">
+        <div
+          onClick={(e) => {
+            if (e.target === e.currentTarget) {
+              setShowDebtPayModal(false);
+              setCompletedDebtReceipt(null);
+            }
+          }}
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md cursor-pointer"
+        >
+          <div className="apple-glass border border-white/20 rounded-3xl w-full max-w-md overflow-hidden shadow-2xl animate-in fade-in zoom-in-95 cursor-default">
             <div className="px-6 py-4 border-b border-white/10 flex items-center justify-between bg-white/5">
               <h3 className="font-extrabold text-white text-base">سند قبض دفعة دين للعميل</h3>
               <button

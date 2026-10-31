@@ -66,7 +66,7 @@ export default function FinancialPulseBar({
   const { liquid, inventory, debts, today } = pulse;
 
   return (
-    <div className="w-full mb-3 flex-shrink-0 select-none">
+    <div className="w-full mb-3 flex-shrink-0 select-none print:hidden">
       {/* Top Header Bar with Quick Navigation Actions */}
       <div className="apple-glass rounded-2xl p-2.5 border border-white/10 flex items-center justify-between gap-3 shadow-lg">
         {/* Left / Title area */}

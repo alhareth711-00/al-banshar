@@ -25,7 +25,7 @@ const workerModel = {
       role: data.role.trim(),
       phone: data.phone ? data.phone.trim() : null,
       daily_base_wage: Number(data.daily_base_wage) || 0,
-      commission_rate: Number(data.commission_rate) || 0,
+      commission_rate: 0,
       active: data.active !== undefined ? (data.active ? 1 : 0) : 1,
     });
 
@@ -53,7 +53,7 @@ const workerModel = {
       role: data.role ? data.role.trim() : existing.role,
       phone: data.phone !== undefined ? (data.phone ? data.phone.trim() : null) : existing.phone,
       daily_base_wage: data.daily_base_wage !== undefined ? Number(data.daily_base_wage) : existing.daily_base_wage,
-      commission_rate: data.commission_rate !== undefined ? Number(data.commission_rate) : existing.commission_rate,
+      commission_rate: 0,
       active: data.active !== undefined ? (data.active ? 1 : 0) : existing.active,
     });
 
@@ -80,12 +80,13 @@ const workerModel = {
       `).get(w.id, targetDate).total;
 
       const dailyWage = w.daily_base_wage || 0;
-      const netPayable = Math.max(0, dailyWage - advancesSum);
+      const netPayable = dailyWage - advancesSum;
 
       return {
         ...w,
         cars_served_today: jobsCount,
         advances_today: advancesSum,
+        advances_taken_today: advancesSum,
         net_due_today: netPayable,
       };
     });

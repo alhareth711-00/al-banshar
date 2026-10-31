@@ -5,7 +5,8 @@ const { validateYemeniPhone } = require('../utils/helpers');
 const vehicleController = {
   searchVehicles: asyncHandler(async (req, res) => {
     const query = req.query.q || '';
-    const results = vehicleModel.search(query);
+    const limit = req.query.limit ? Number(req.query.limit) : (query ? 25 : null);
+    const results = vehicleModel.getAll({ q: query, limit });
     res.json({
       success: true,
       count: results.length,

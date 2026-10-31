@@ -13,6 +13,8 @@ import {
   Landmark,
   BookOpen,
   Lock,
+  Search,
+  Receipt,
 } from 'lucide-react';
 
 export default function Sidebar({
@@ -22,6 +24,7 @@ export default function Sidebar({
   lowStockCount = 0,
   onOpenSettings,
   onOpenUserGuide,
+  onOpenCommandPalette,
   isOwnerMode = false,
 }) {
   const [shopSettings, setShopSettings] = useState(getShopSettings());
@@ -67,11 +70,19 @@ export default function Sidebar({
       badge: null,
     },
     {
+      id: 'vouchers',
+      label: 'سندات القبض والصرف',
+      shortLabel: 'سندات القبض والصرف',
+      icon: Receipt,
+      accent: 'from-emerald-500 to-amber-500',
+      badge: null,
+    },
+    {
       id: 'vault',
-      label: 'الخزينة والمحاسبة وسندات القبض',
-      shortLabel: 'الخزينة والمحاسبة',
+      label: 'الخزينة والمحاسبة والسيولة',
+      shortLabel: 'الخزينة والسيولة',
       icon: Landmark,
-      accent: 'from-emerald-500 to-teal-600',
+      accent: 'from-teal-500 to-cyan-600',
       badge: null,
     },
     {
@@ -93,7 +104,7 @@ export default function Sidebar({
   ];
 
   return (
-    <aside className="w-20 lg:w-64 flex-shrink-0 bg-slate-950/95 border-l border-slate-800/80 flex flex-col justify-between p-3 lg:p-4 z-40 select-none">
+    <aside className="w-20 lg:w-64 flex-shrink-0 bg-slate-950/95 border-l border-slate-800/80 flex flex-col justify-between p-3 lg:p-4 z-40 select-none print:hidden">
       <div>
         {/* Brand Header - Calm Industrial Standard (الخيار 1 المعتمد) */}
         <div className="flex items-center gap-3 px-3 py-2.5 mb-4 rounded-xl bg-slate-900/90 border border-amber-500/30 shadow-md">
@@ -197,6 +208,21 @@ export default function Sidebar({
 
       {/* Footer - Calm & Clear */}
       <div className="pt-3 border-t border-slate-800 hidden lg:block space-y-2">
+        <button
+          type="button"
+          onClick={onOpenCommandPalette}
+          className="w-full px-3 py-2 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 hover:text-amber-200 flex items-center justify-between text-xs font-bold tap-bounce border border-amber-500/25"
+          title="البحث الشامل السريع في الأصناف والموردين والمركبات (Ctrl + K)"
+        >
+          <div className="flex items-center gap-2">
+            <Search className="w-4 h-4 text-amber-400" />
+            <span>البحث السريع</span>
+          </div>
+          <span className="text-[10px] text-amber-400 font-mono bg-amber-400/20 px-1.5 py-0.5 rounded border border-amber-400/30">
+            Ctrl+K
+          </span>
+        </button>
+
         <button
           type="button"
           onClick={onOpenUserGuide}

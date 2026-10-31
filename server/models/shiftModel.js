@@ -89,7 +89,8 @@ const shiftModel = {
         COALESCE(SUM(amount), 0) AS total_pv_cash,
         COALESCE(SUM(CASE WHEN party_type = 'owner' THEN amount ELSE 0 END), 0) AS owner_drawings_cash,
         COALESCE(SUM(CASE WHEN party_type = 'expense' THEN amount ELSE 0 END), 0) AS expenses_cash,
-        COALESCE(SUM(CASE WHEN party_type = 'supplier' THEN amount ELSE 0 END), 0) AS supplier_payments_cash
+        COALESCE(SUM(CASE WHEN party_type = 'supplier' THEN amount ELSE 0 END), 0) AS supplier_payments_cash,
+        COALESCE(SUM(CASE WHEN party_type = 'worker' THEN amount ELSE 0 END), 0) AS worker_advances_cash
       FROM official_vouchers
       WHERE voucher_type = 'payment' AND payment_method = 'cash' AND created_at >= ?
     `).get(shift.opened_at);
@@ -131,6 +132,7 @@ const shiftModel = {
           owner_drawings: pvStats.owner_drawings_cash || 0,
           expenses: pvStats.expenses_cash || 0,
           supplier_payments: pvStats.supplier_payments_cash || 0,
+          worker_advances: pvStats.worker_advances_cash || 0,
           purchases_cash: purStats.purchases_cash || 0,
           shipping_cash: purStats.shipping_cash || 0,
           shift_inflow: shiftCashInflow,
@@ -186,57 +188,137 @@ const shiftModel = {
   },
 
   closeShift(data = {}) {
-    const shiftId = data.shift_id ? Number(data.shift_id) : null;
-    let shift = null;
+    const execute = db.transaction(() => {
+      const shiftId = data.shift_id ? Number(data.shift_id) : null;
+      let shift = null;
 
-    if (shiftId) {
-      shift = db.prepare('SELECT * FROM cash_shifts WHERE id = ?').get(shiftId);
-    } else {
-      shift = db.prepare("SELECT * FROM cash_shifts WHERE status = 'open' ORDER BY id DESC LIMIT 1").get();
-    }
+      if (shiftId) {
+        shift = db.prepare('SELECT * FROM cash_shifts WHERE id = ?').get(shiftId);
+      } else {
+        shift = db.prepare("SELECT * FROM cash_shifts WHERE status = 'open' ORDER BY id DESC LIMIT 1").get();
+      }
 
-    if (!shift) {
-      throw new Error('لا توجد وردية مفتوحة لإغلاقها.');
-    }
-    if (shift.status === 'closed') {
-      throw new Error(`الوردية (${shift.shift_code}) مغلقة مسبقاً.`);
-    }
+      if (!shift) {
+        throw new Error('لا توجد وردية مفتوحة لإغلاقها.');
+      }
+      if (shift.status === 'closed') {
+        throw new Error(`الوردية (${shift.shift_code}) مغلقة مسبقاً.`);
+      }
 
-    // Compute live shift stats
-    const currentShiftData = this.getCurrentShift();
-    const metrics = currentShiftData.shift?.metrics || {};
-    const expectedCash = metrics.expected_cash !== undefined ? metrics.expected_cash : shift.opening_cash;
-    const actualCash = roundMoney(safeNum(data.actual_cash, expectedCash));
-    const difference = roundMoney(actualCash - expectedCash);
+      // Compute live shift stats
+      const currentShiftData = this.getCurrentShift();
+      const metrics = currentShiftData.shift?.metrics || {};
+      const expectedCash = metrics.expected_cash !== undefined ? metrics.expected_cash : shift.opening_cash;
+      const actualCash = roundMoney(safeNum(data.actual_cash, expectedCash));
+      const difference = roundMoney(actualCash - expectedCash);
 
-    const handedOverTo = (data.handed_over_to || 'المناوب القادم').trim();
-    const notes = data.notes ? data.notes.trim() : shift.notes;
+      const handedOverTo = (data.handed_over_to || 'المناوب القادم').trim();
+      const notes = data.notes ? data.notes.trim() : shift.notes;
 
-    db.prepare(`
-      UPDATE cash_shifts
-      SET 
-        closed_at = datetime('now', 'localtime'),
-        expected_cash = ?,
-        actual_cash = ?,
-        difference = ?,
-        total_inflow = ?,
-        total_outflow = ?,
-        handed_over_to = ?,
-        status = 'closed',
-        notes = ?
-      WHERE id = ?
-    `).run(
-      expectedCash,
-      actualCash,
-      difference,
-      metrics.shift_inflow || 0,
-      metrics.shift_outflow || 0,
-      handedOverTo,
-      notes,
-      shift.id
-    );
+      // 1. Update Shift Status
+      db.prepare(`
+        UPDATE cash_shifts
+        SET 
+          closed_at = datetime('now', 'localtime'),
+          expected_cash = ?,
+          actual_cash = ?,
+          difference = ?,
+          total_inflow = ?,
+          total_outflow = ?,
+          handed_over_to = ?,
+          status = 'closed',
+          notes = ?
+        WHERE id = ?
+      `).run(
+        expectedCash,
+        actualCash,
+        difference,
+        metrics.shift_inflow || 0,
+        metrics.shift_outflow || 0,
+        handedOverTo,
+        notes,
+        shift.id
+      );
 
-    return this.getShiftById(shift.id);
+      // 2. Generate Automated Accounting Settlement Journal Entry if difference != 0
+      let settlementJv = null;
+      if (difference !== 0) {
+        const absDiff = Math.abs(difference);
+        const today = formatDate();
+        const { createJournalEntry } = require('../utils/accountingEngine');
+
+        if (difference < 0) {
+          // Deficit (عجز عهدة الصندوق): Debit 6109 (تسوية عجز صندوق), Credit 1101 (الصندوق النقدي)
+          settlementJv = createJournalEntry(db, {
+            entry_date: today,
+            ref_type: 'expense',
+            ref_id: shift.id,
+            ref_number: `ADJ-SHF-${shift.shift_code}`,
+            description: `قيد تسوية عجز الصندوق النقدي لوردية (${shift.shift_code}) - الكاشير: ${shift.cashier_name || 'الكاشير'}`,
+            lines: [
+              {
+                account_code: '6109',
+                debit: absDiff,
+                credit: 0,
+                description: `عجز عهدة نقدية وردية (${shift.shift_code})`,
+              },
+              {
+                account_code: '1101',
+                debit: 0,
+                credit: absDiff,
+                description: `خصم وتسوية عجز الصندوق وردية (${shift.shift_code})`,
+              },
+            ],
+          });
+        } else {
+          // Surplus (فائض نقدي في الصندوق): Debit 1101 (الصندوق النقدي), Credit 4201 (إيرادات نقدية متنوعة)
+          settlementJv = createJournalEntry(db, {
+            entry_date: today,
+            ref_type: 'closing_entry',
+            ref_id: shift.id,
+            ref_number: `ADJ-SHF-${shift.shift_code}`,
+            description: `قيد تسوية زيادة وفائض الصندوق النقدي لوردية (${shift.shift_code}) - الكاشير: ${shift.cashier_name || 'الكاشير'}`,
+            lines: [
+              {
+                account_code: '1101',
+                debit: absDiff,
+                credit: 0,
+                description: `توريد زيادة نقدية فعلية بالصندوق وردية (${shift.shift_code})`,
+              },
+              {
+                account_code: '4201',
+                debit: 0,
+                credit: absDiff,
+                description: `إيراد زيادة نقدية عهدة وردية (${shift.shift_code})`,
+              },
+            ],
+          });
+        }
+
+        // Financial Audit Log
+        try {
+          db.prepare(`
+            INSERT INTO financial_audit_logs (
+              action, entity_type, entity_id, old_data, new_data, performed_by, created_at
+            ) VALUES (?, 'cash_shift', ?, ?, ?, ?, datetime('now', 'localtime'))
+          `).run(
+            'SHIFT_CLOSED_SETTLEMENT',
+            shift.id,
+            JSON.stringify({ expected: expectedCash, actual: actualCash }),
+            JSON.stringify({ difference, jv_number: settlementJv?.entry_number }),
+            shift.cashier_name || 'cashier'
+          );
+        } catch (auditErr) {}
+      }
+
+      const closedShift = this.getShiftById(shift.id);
+      return {
+        ...closedShift,
+        settlement_jv: settlementJv?.entry_number || null,
+      };
+    });
+
+    return execute();
   },
 
   getShiftById(id) {

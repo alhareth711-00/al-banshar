@@ -136,7 +136,7 @@ export default function ClosingReport({ onOpenBayProfitability }) {
     gross_profit: 0,
     net_profit: 0,
     net_margin_pct: 0,
-    expense_coverage_ratio: 100,
+    expense_coverage_ratio: null,
     category_breakdown: { oil: 0, filter: 0, tire: 0, battery: 0, service: 0 },
   };
 
@@ -179,9 +179,13 @@ export default function ClosingReport({ onOpenBayProfitability }) {
 
   const maxTimelineCars = Math.max(...filteredTimeline.map((t) => t.cars_count), 1);
 
-  // Executive Owner Brief Message 3.0 (الجزء الرابع: مدمج مع النبض المالي وصافي الأرباح التقديري)
+  const closingTimeStr = new Date().toLocaleTimeString('ar-YE', { hour: '2-digit', minute: '2-digit' });
+  const cashierLabel = currentShiftData?.shift?.cashier_name || 'كاشير المركز';
+
+  // Executive Owner Brief Message 3.0 (الجزء الرابع: مدمج مع النبض المالي وصافي الأرباح التقديري وتوقيت الإغلاق واسم الكاشير)
   const ownerBriefMessage =
-`📊 إغلاق مالي لمركز ${settings.shopName} - ${reportDate}
+`📊 إغلاق مالي لمركز ${settings.shopName} - ${reportDate} (${closingTimeStr})
+👤 الكاشير المسؤول: ${cashierLabel}
 🚗 حركة العمليات والخدمة:
 - السيارات المخدومة: ${summary.total_cars_served} سيارة (${summary.total_invoices} فاتورة)
 - مبيعات الزيوت والقطع: ${goodsRev.toLocaleString()} ر.ي
@@ -194,7 +198,7 @@ export default function ClosingReport({ onOpenBayProfitability }) {
 - تكلفة البضاعة المباعة (COGS): ${execPulse.total_cogs.toLocaleString()} ر.ي
 - الربح التشغيلي الإجمالي: ${execPulse.gross_profit.toLocaleString()} ر.ي
 - 💰 صافي الربح اليومي التقديري: ${execPulse.net_profit.toLocaleString()} ر.ي (${execPulse.net_margin_pct}%)
-- 🛡️ معدل تغطية المصروفات: ${execPulse.expense_coverage_ratio}%
+- 🛡️ معدل تغطية المصروفات: ${execPulse.expense_coverage_ratio === null ? 'لا توجد مصاريف' : `${execPulse.expense_coverage_ratio}%`}
 
 💵 حركة الصندوق النقدي (1101):
 - إجمالي الكاش المقبوض من المبيعات: ${cash_register.inflow_cash_invoices.toLocaleString()} ر.ي
@@ -218,10 +222,39 @@ export default function ClosingReport({ onOpenBayProfitability }) {
     ? formatYemeniWhatsAppLink(settings.supervisorPhone, ownerBriefMessage)
     : null;
 
+  const fallbackCopy = (text) => {
+    try {
+      const textarea = document.createElement('textarea');
+      textarea.value = text;
+      textarea.style.position = 'fixed';
+      textarea.style.opacity = '0';
+      document.body.appendChild(textarea);
+      textarea.focus();
+      textarea.select();
+      document.execCommand('copy');
+      document.body.removeChild(textarea);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch (err) {
+      console.warn('Fallback copy failed:', err);
+    }
+  };
+
   const handleCopy = () => {
-    navigator.clipboard.writeText(ownerBriefMessage);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+    try {
+      if (navigator?.clipboard?.writeText) {
+        navigator.clipboard.writeText(ownerBriefMessage)
+          .then(() => {
+            setCopied(true);
+            setTimeout(() => setCopied(false), 2000);
+          })
+          .catch(() => fallbackCopy(ownerBriefMessage));
+      } else {
+        fallbackCopy(ownerBriefMessage);
+      }
+    } catch (e) {
+      fallbackCopy(ownerBriefMessage);
+    }
   };
 
   const setDateToday = () => {
@@ -525,15 +558,21 @@ export default function ClosingReport({ onOpenBayProfitability }) {
                       <span>تغطية المصروفات:</span>
                     </span>
                     <span className={`text-[10px] px-1.5 py-0.2 rounded font-mono font-bold ${
-                      execPulse.expense_coverage_ratio >= 100
+                      execPulse.expense_coverage_ratio === null
+                        ? 'bg-slate-800 text-slate-400 border border-white/10'
+                        : execPulse.expense_coverage_ratio >= 100
                         ? 'bg-blue-500/20 text-blue-300 border border-blue-500/30'
                         : 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
                     }`}>
-                      {execPulse.expense_coverage_ratio >= 100 ? 'تغطية آمنة' : 'دون التغطية'}
+                      {execPulse.expense_coverage_ratio === null
+                        ? 'لا توجد مصاريف'
+                        : execPulse.expense_coverage_ratio >= 100
+                        ? 'تغطية آمنة'
+                        : 'دون التغطية'}
                     </span>
                   </div>
                   <div className="font-mono text-xl font-black text-blue-400">
-                    {execPulse.expense_coverage_ratio}%
+                    {execPulse.expense_coverage_ratio === null ? 'N/A' : `${execPulse.expense_coverage_ratio}%`}
                   </div>
                   <div className="text-[11px] text-slate-400 pt-1 border-t border-white/5 flex justify-between">
                     <span>المصاريف المنصرفة:</span>

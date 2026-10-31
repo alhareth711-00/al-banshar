@@ -1,8 +1,11 @@
 const db = require('../db/database');
 
 const expenseCategoryModel = {
-  getAll() {
-    return db.prepare('SELECT * FROM expense_categories ORDER BY id ASC').all();
+  getAll(includeInactive = false) {
+    if (includeInactive) {
+      return db.prepare('SELECT * FROM expense_categories ORDER BY id ASC').all();
+    }
+    return db.prepare('SELECT * FROM expense_categories WHERE is_active = 1 ORDER BY id ASC').all();
   },
 
   getById(id) {
@@ -16,8 +19,8 @@ const expenseCategoryModel = {
     }
 
     const stmt = db.prepare(`
-      INSERT INTO expense_categories (name, icon, is_system)
-      VALUES (?, ?, 0)
+      INSERT INTO expense_categories (name, icon, is_system, is_active)
+      VALUES (?, ?, 0, 1)
     `);
 
     const result = stmt.run(name, data.icon || 'FileText');
@@ -48,7 +51,8 @@ const expenseCategoryModel = {
     const existing = this.getById(id);
     if (!existing) return false;
 
-    db.prepare('DELETE FROM expense_categories WHERE id = ?').run(id);
+    // Soft-delete to preserve referential integrity of historical records
+    db.prepare('UPDATE expense_categories SET is_active = 0 WHERE id = ?').run(id);
     return true;
   },
 };

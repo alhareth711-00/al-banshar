@@ -1,0 +1,476 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <title>دليل درجات ولزوجات زيوت المحركات في صنعاء - اليمن</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800;900&display=swap');
+
+    @page {
+      size: A4;
+      margin: 14mm 12mm 14mm 12mm;
+      @bottom-right {
+        content: "مركز خدمات السيارات السريعة | صنعاء";
+        font-family: 'Cairo', sans-serif;
+        font-size: 8pt;
+        color: #718096;
+      }
+      @bottom-left {
+        content: counter(page) " / " counter(pages);
+        font-family: 'Cairo', sans-serif;
+        font-size: 8pt;
+        color: #718096;
+      }
+    }
+
+    * {
+      box-sizing: border-box;
+      -webkit-print-color-adjust: exact !important;
+      print-color-adjust: exact !important;
+    }
+
+    body {
+      font-family: 'Cairo', 'Segoe UI', Tahoma, Arial, sans-serif;
+      background-color: #ffffff;
+      color: #1a202c;
+      margin: 0;
+      padding: 0;
+      line-height: 1.5;
+      font-size: 10pt;
+    }
+
+    /* Header */
+    .header {
+      background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+      color: #ffffff;
+      padding: 20px 24px;
+      border-radius: 12px;
+      margin-bottom: 16px;
+      border-bottom: 4px solid #f59e0b;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .header-text h1 {
+      margin: 0 0 6px 0;
+      font-size: 18pt;
+      font-weight: 900;
+      color: #fbbf24;
+    }
+
+    .header-text p {
+      margin: 0;
+      font-size: 9.5pt;
+      color: #cbd5e1;
+    }
+
+    .header-badge {
+      background: rgba(245, 158, 11, 0.15);
+      border: 1px solid #f59e0b;
+      padding: 8px 14px;
+      border-radius: 8px;
+      text-align: center;
+    }
+
+    .header-badge span {
+      display: block;
+      color: #fbbf24;
+      font-weight: 800;
+      font-size: 10pt;
+    }
+
+    .header-badge small {
+      color: #cbd5e1;
+      font-size: 8pt;
+    }
+
+    /* Callout Note */
+    .intro-box {
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      border-right: 4px solid #3b82f6;
+      padding: 10px 14px;
+      border-radius: 8px;
+      margin-bottom: 16px;
+      font-size: 9pt;
+      color: #334155;
+    }
+
+    /* Section Styling */
+    .section-title {
+      font-size: 12pt;
+      font-weight: 800;
+      color: #0f172a;
+      margin: 16px 0 10px 0;
+      padding-bottom: 4px;
+      border-bottom: 2px solid #e2e8f0;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .section-title span.icon {
+      color: #f59e0b;
+    }
+
+    /* Cards Grid */
+    .oil-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      margin-bottom: 14px;
+    }
+
+    .oil-card {
+      background: #ffffff;
+      border: 1px solid #cbd5e1;
+      border-radius: 8px;
+      padding: 10px 12px;
+      box-shadow: 0 1px 2px rgba(0,0,0,0.04);
+      break-inside: avoid;
+    }
+
+    .oil-card-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 6px;
+      padding-bottom: 5px;
+      border-bottom: 1px dashed #e2e8f0;
+    }
+
+    .oil-name {
+      font-size: 11.5pt;
+      font-weight: 900;
+      color: #0f172a;
+      font-family: monospace, sans-serif;
+      direction: ltr;
+      display: inline-block;
+    }
+
+    .oil-tag {
+      font-size: 7.5pt;
+      font-weight: 700;
+      padding: 2px 7px;
+      border-radius: 12px;
+    }
+
+    .tag-heavy { background: #fee2e2; color: #991b1b; border: 1px solid #f87171; }
+    .tag-synth { background: #dbeafe; color: #1e40af; border: 1px solid #60a5fa; }
+    .tag-hybrid { background: #dcfce7; color: #166534; border: 1px solid #4ade80; }
+    .tag-diesel { background: #fef3c7; color: #92400e; border: 1px solid #fbbf24; }
+    .tag-special { background: #f1f5f9; color: #475569; border: 1px solid #cbd5e1; }
+
+    .oil-detail {
+      font-size: 8.5pt;
+      margin-bottom: 3px;
+      color: #475569;
+    }
+
+    .oil-detail strong {
+      color: #1e293b;
+    }
+
+    .brand-list {
+      font-size: 8pt;
+      color: #0284c7;
+      margin-top: 4px;
+      background: #f0f9ff;
+      padding: 3px 6px;
+      border-radius: 4px;
+    }
+
+    /* Comparison Table */
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 12px 0 16px 0;
+      font-size: 8.5pt;
+      background: #ffffff;
+      border: 1px solid #cbd5e1;
+      border-radius: 8px;
+      overflow: hidden;
+      break-inside: avoid;
+    }
+
+    thead {
+      background: #0f172a;
+      color: #ffffff;
+    }
+
+    th {
+      padding: 7px 8px;
+      font-weight: 800;
+      text-align: right;
+      font-size: 8.5pt;
+    }
+
+    th:first-child { text-align: center; }
+
+    td {
+      padding: 6px 8px;
+      border-bottom: 1px solid #e2e8f0;
+      color: #334155;
+    }
+
+    td:first-child {
+      font-family: monospace, sans-serif;
+      font-weight: 900;
+      text-align: center;
+      direction: ltr;
+      font-size: 9.5pt;
+      color: #0f172a;
+    }
+
+    tbody tr:nth-child(even) {
+      background-color: #f8fafc;
+    }
+
+    /* Important Alert Box */
+    .alert-box {
+      background: #fffbeb;
+      border: 1.5px solid #f59e0b;
+      border-radius: 8px;
+      padding: 10px 14px;
+      margin: 12px 0;
+      break-inside: avoid;
+    }
+
+    .alert-title {
+      color: #b45309;
+      font-weight: 800;
+      font-size: 9.5pt;
+      margin-bottom: 4px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .alert-content {
+      font-size: 8.5pt;
+      color: #78350f;
+      line-height: 1.5;
+    }
+
+    /* Footer Brands Bar */
+    .footer-brands {
+      background: #f1f5f9;
+      border: 1px solid #cbd5e1;
+      border-radius: 8px;
+      padding: 8px 12px;
+      font-size: 8.5pt;
+      color: #334155;
+      margin-top: 10px;
+      break-inside: avoid;
+    }
+
+    .footer-brands strong {
+      color: #0f172a;
+    }
+
+    .page-break {
+      page-break-before: always;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Header -->
+  <div class="header">
+    <div class="header-text">
+      <h1>دليل درجات ولزوجات زيوت المحركات</h1>
+      <p>الدليل الفني الشامل لمراكز البنشر وتغيير الزيوت وخدمة المركبات (صنعاء - اليمن)</p>
+    </div>
+    <div class="header-badge">
+      <span>سوق صنعاء</span>
+      <small>مناخ مرتفع وبارد</small>
+    </div>
+  </div>
+
+  <!-- Climate / High Altitude Notice -->
+  <div class="intro-box">
+    <strong>📍 خصوصية تضاريس ومناخ صنعاء:</strong> 
+    تقع مدينة صنعاء على ارتفاع يتجاوز <strong>2,250 متر</strong> عن سطح البحر وتتميز بأجواء جافة وصباحيات شتوية باردة تنخفض فيها الحرارة إلى ما دون 5 درجات مئوية. هذه الطبيعة تتطلب اختيار لزوجة مناسبة تضمن تدفق الزيت السريع لحظة التشغيل البارد صباحاً لتفادي تآكل البلوف والسبايك.
+  </div>
+
+  <!-- Section 1: Detailed Oil Categories -->
+  <div class="section-title">
+    <span class="icon">🛢️</span>
+    <span>تصنيف درجات اللزوجة (SAE) ومواصفاتها الميدانية</span>
+  </div>
+
+  <div class="oil-grid">
+    <!-- 20W-50 -->
+    <div class="oil-card">
+      <div class="oil-card-header">
+        <span class="oil-name">20W-50</span>
+        <span class="oil-tag tag-heavy">معدني ثقيل (Mineral)</span>
+      </div>
+      <div class="oil-detail"><strong>الاستخدام الشائع:</strong> سيارات التاكسي (كورولا، كيا)، المحركات القديمة التي قطعت مسافات تزيد عن 180,000 كم، المحركات التي تعاني من تبخير أو نقص.</div>
+      <div class="oil-detail"><strong>المميزات:</strong> ثبات ممتاز في حرارة التشغيل العالية وسماكة فيلم التزييت لحماية الخلوصات المتآكلة.</div>
+      <div class="brand-list"><strong>أشهر الماركات:</strong> فوكس سوبر GT (حديد/بلاستيك)، كاسترول GTX، بترومين Ultra 7، تويوتا الأصلي.</div>
+    </div>
+
+    <!-- 10W-30 -->
+    <div class="oil-card">
+      <div class="oil-card-header">
+        <span class="oil-name">10W-30</span>
+        <span class="oil-tag tag-heavy">معدني / خليط</span>
+      </div>
+      <div class="oil-detail"><strong>الاستخدام الشائع:</strong> سيارات النقل والبيك آب التويوتا (شاص، هايلوكس بنزين)، البرادو والمحركات التي توصي بها وكالة تويوتا لموديلات 2000-2015.</div>
+      <div class="oil-detail"><strong>المميزات:</strong> أخف من 20W-50 في الصباح ويوفر عزماً أسرع للمحرك واستهلاكاً أقل للوقود.</div>
+      <div class="brand-list"><strong>أشهر الماركات:</strong> تويوتا موتورز الأصلي 10W-30، بترومين، كاسترول GTX.</div>
+    </div>
+
+    <!-- 5W-30 -->
+    <div class="oil-card">
+      <div class="oil-card-header">
+        <span class="oil-name">5W-30</span>
+        <span class="oil-tag tag-synth">تخليقي كامل (Synthetic)</span>
+      </div>
+      <div class="oil-detail"><strong>الاستخدام الشائع:</strong> المعيار الذهبي لسيارات الركاب الحديثة (هيونداي، كيا، تويوتا، نيسان، صيني) ما دون 150,000 كم.</div>
+      <div class="oil-detail"><strong>المميزات:</strong> تدفق فائق في صباحيات صنعاء الباردة (5W)، يحمي التوربو والمحركات بنظام VVT-i من طقطقة الصباح.</div>
+      <div class="brand-list"><strong>أشهر الماركات:</strong> تويوتا التخليقي (الذهبي/الفضي)، كاسترول Magnatec/Edge، بترومين A1، شل Helix Ultra.</div>
+    </div>
+
+    <!-- 10W-40 -->
+    <div class="oil-card">
+      <div class="oil-card-header">
+        <span class="oil-name">10W-40</span>
+        <span class="oil-tag tag-synth">نصف تخليقي (Semi-Synth)</span>
+      </div>
+      <div class="oil-detail"><strong>الاستخدام الشائع:</strong> سيارات المشي المتوسط (100,000 إلى 200,000 كم)، سيارات هيونداي وكيا والسيارات الأوروبية والأمريكية.</div>
+      <div class="oil-detail"><strong>المميزات:</strong> خيار متوازن ومثالي لمن يشتكي من خفة 5W-30 وثقل 20W-50، يتحمل الإجهاد وعزم الطلوع.</div>
+      <div class="brand-list"><strong>أشهر الماركات:</strong> كاسترول ماجناتيك 10W-40، فوكس Titan Syn، شل Helix HX7.</div>
+    </div>
+
+    <!-- 0W-20 & 5W-20 -->
+    <div class="oil-card">
+      <div class="oil-card-header">
+        <span class="oil-name">0W-20 / 5W-20</span>
+        <span class="oil-tag tag-hybrid">هايبرد وفائق السيولة</span>
+      </div>
+      <div class="oil-detail"><strong>الاستخدام الشائع:</strong> سيارات الهايبرد المنتشرة في صنعاء (تويوتا بريوس Prius، كامري هايبرد، راف فور هايبرد، لكزس CT/ES) والسيارات الحديثة 2018+.</div>
+      <div class="oil-detail"><strong>المميزات:</strong> أعلى درجات توفير البنزين، حماية لحظية فائقة لمحركات الهايبرد التي تنطفئ وتعمل باستمرار أثناء القيادة.</div>
+      <div class="brand-list"><strong>أشهر الماركات:</strong> تويوتا 0W-20 الأصلي، لكزس، موبيل 1 Advanced Fuel Economy.</div>
+    </div>
+
+    <!-- 15W-40 Diesel -->
+    <div class="oil-card">
+      <div class="oil-card-header">
+        <span class="oil-name">15W-40</span>
+        <span class="oil-tag tag-diesel">محركات ديزل ثقيل (Diesel)</span>
+      </div>
+      <div class="oil-detail"><strong>الاستخدام الشائع:</strong> دينات نقل البضائع (Isuzu)، باصات الهايس الديزل (HiAce)، شاحنات النقل، والهايلوكس والشاص الديزل (محركات D-4D و 1HZ).</div>
+      <div class="oil-detail"><strong>المميزات:</strong> احتواء عالٍ على إضافات معالجة الكبريت والسخام ومقاومة الإجهاد العالي على مرتفعات نقيل يسلح ومناخة.</div>
+      <div class="brand-list"><strong>أشهر الماركات:</strong> شل Rimula R4، بترومين سوبر ديزل، فوكس ريمولا، تويوتا ديزل.</div>
+    </div>
+  </div>
+
+  <!-- Page Break for Clean Printing -->
+  <div class="page-break"></div>
+
+  <!-- Section 2: Summary Matrix Table -->
+  <div class="section-title">
+    <span class="icon">📊</span>
+    <span>جدول المقارنة الفنية والتشغيلية في السوق المحلي</span>
+  </div>
+
+  <table>
+    <thead>
+      <tr>
+        <th style="width: 12%;">اللزوجة SAE</th>
+        <th style="width: 15%;">نوع التركيبة</th>
+        <th style="width: 33%;">الفئة المستهدفة في صنعاء</th>
+        <th style="width: 22%;">أبرز السيارات المتوافقة</th>
+        <th style="width: 18%;">عمر التغيير الموصى به</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>0W-20</td>
+        <td>تخليقي كامل 100%</td>
+        <td>محركات الهايبرد والمحركات فائقة الكفاءة</td>
+        <td>بريوس، كامري هايبرد، راف فور، لكزس CT</td>
+        <td>8,000 - 10,000 كم</td>
+      </tr>
+      <tr>
+        <td>5W-20</td>
+        <td>تخليقي كامل / شبه تخليقي</td>
+        <td>السيارات الأمريكية الحديثة والوارد</td>
+        <td>فورد فيوجن، تورس، دودج، جيب رانجلر</td>
+        <td>7,000 - 9,000 كم</td>
+      </tr>
+      <tr>
+        <td>5W-30</td>
+        <td>تخليقي كامل بالكامل</td>
+        <td>الموديلات الحديثة (2012 فما فوق) تحت 150 ألف كم</td>
+        <td>توسان، إلنترا، سبورتاج، كامري، كورولا حديثة</td>
+        <td>7,000 - 10,000 كم</td>
+      </tr>
+      <tr>
+        <td>10W-40</td>
+        <td>نصف تخليقي (Semi-Synthetic)</td>
+        <td>السيارات الماشية بين 100 إلى 200 ألف كم</td>
+        <td>سوناتا، أوبتيما، أكسنت، دايو، نيسان صني</td>
+        <td>5,000 - 7,000 كم</td>
+      </tr>
+      <tr>
+        <td>10W-30</td>
+        <td>معدني عالي الجودة / خليط</td>
+        <td>سيارات البيك آب والدفع الرباعي البنزين</td>
+        <td>هايلوكس بنزين، لاندكروزر، برادو، شاص بنزين</td>
+        <td>4,000 - 5,000 كم</td>
+      </tr>
+      <tr>
+        <td>20W-50</td>
+        <td>معدني ثقيل (Mineral)</td>
+        <td>التكاسي، المحركات الماشية فوق 180 ألف كم</td>
+        <td>كورولا وباصات الدباب، التكاسي الشعبية القديمة</td>
+        <td>3,000 - 4,000 كم</td>
+      </tr>
+      <tr>
+        <td>15W-40</td>
+        <td>ديزل عالي الإجهاد (Heavy Duty)</td>
+        <td>سيارات النقل، الدينات، باصات الهايس الديزل</td>
+        <td>دينا إيسوزو، باص هايس، شاص ديزل، هينو</td>
+        <td>4,000 - 5,000 كم</td>
+      </tr>
+      <tr>
+        <td>SAE 40 / 50</td>
+        <td>أحادي اللزوجة (Monograde)</td>
+        <td>المواطير والمولدات ومضخات الهواء الثابتة</td>
+        <td>ماطور البنشر، مولدات الكهرباء، الحراثات</td>
+        <td>بحسب ساعات التشغيل (100-150 ساعة)</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <!-- Section 3: Technical Advice for Sana'a Workshops -->
+  <div class="alert-box">
+    <div class="alert-title">
+      <span>⚠️</span>
+      <span>تنبيهات فنية جوهرية لمسؤولي الصيانة والبناشر في صنعاء:</span>
+    </div>
+    <div class="alert-content">
+      <ul style="margin: 0; padding-right: 18px;">
+        <li><strong>خطر استخدام 20W-50 على المحركات الحديثة:</strong> بسبب تدني درجات الحرارة في صنعاء فجراً وشتاءً، يتجمد زيت 20W-50 جزئياً ويكون ثقيلاً للغاية، مما يتطلب أكثر من 15 ثانية للوصول إلى رأس المحرك، متسبباً في صوت "طقطقة البلوف" وتآكل عمود الكامات (Camshaft). يجب إقناع الزبون بالانتقال إلى <strong>5W-30</strong> أو <strong>10W-40</strong>.</li>
+        <li><strong>سيارات الهايبرد خط أحمر:</strong> يُمنع منعاً باتاً صب زيت 20W-50 في سيارات الهايبرد (بريوس وكامري)؛ لأن مجاري التزييت دقيقة جداً، والزيت الثقيل يؤدي إلى إضاءة لمبة فحص المحرك (Check Engine) وارتفاع استهلاك البنزين وتلف منظومة VVT.</li>
+        <li><strong>تأثير الارتفاع ونقص الأكسجين:</strong> الارتفاع الشاهق لصنعاء يجعل الاحتراق ينتج كربوناً أكثر، لذا يُفضل الالتزام التام بفترات تغيير فلتر الزيت مع كل غيار، وفلتر الهواء بانتظام.</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- Brands Available in Sana'a -->
+  <div class="footer-brands">
+    <strong>🏢 أشهر الوكالات والماركات المعتمدة في صنعاء:</strong> 
+    وكالة بازرعة (تويوتا الأصلي، لكزس، فوكس Titan/Super GT) &bull; وكالة كاسترول اليمن &bull; بترومين السعودية (A1، ألترا 7، سوبر ديزل) &bull; شل العالمية (Helix، Rimula) &bull; موبيل 1 &bull; أوتولوب &bull; مانول الألمانية.
+  </div>
+
+  <div style="margin-top: 16px; text-align: center; font-size: 8pt; color: #64748b;">
+    تم إعداد وتنسيق هذا الدليل آلياً عبر نظام إدارة مراكز صيانة وبنشر السيارات &bull; تاريخ الإصدار: 2026
+  </div>
+
+</body>
+</html>

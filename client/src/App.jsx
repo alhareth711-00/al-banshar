@@ -12,8 +12,10 @@ import FinancialPulseBar from './components/FinancialPulseBar';
 import StatementOfAccountModal from './components/StatementOfAccountModal';
 import BayProfitabilityModal from './components/BayProfitabilityModal';
 import FinancialVaultHub from './components/FinancialVaultHub';
+import VouchersManagementView from './components/VouchersManagementView';
 import UserGuideModal from './components/UserGuideModal';
 import OwnerPinModal from './components/OwnerPinModal';
+import GlobalCommandPalette from './components/GlobalCommandPalette';
 import ErrorBoundary from './components/ErrorBoundary';
 import { getAutoLockMinutes } from './utils/settings';
 
@@ -29,6 +31,7 @@ export default function App() {
   const [statementInitialParty, setStatementInitialParty] = useState({ type: 'customer', id: null });
   const [showBayModal, setShowBayModal] = useState(false);
   const [showUserGuideModal, setShowUserGuideModal] = useState(false);
+  const [showCommandPalette, setShowCommandPalette] = useState(false);
   const [pulseRefreshTrigger, setPulseRefreshTrigger] = useState(0);
 
   // Smart Authority State (الجزء الأول: وضع الكاشير الآمن افتراضياً)
@@ -104,6 +107,17 @@ export default function App() {
   };
 
   const handleTabSelect = (tabId) => {
+    // Clear active focus and dismiss any browser popups or focused controls
+    if (document.activeElement && typeof document.activeElement.blur === 'function') {
+      document.activeElement.blur();
+    }
+
+    // Dismiss all active modals to prevent any overlay hanging or leaking between views
+    setShowStatementModal(false);
+    setShowBayModal(false);
+    setShowUserGuideModal(false);
+    setShowSettingsModal(false);
+
     if (tabId === 'vault' && !isOwnerMode) {
       requireOwnerAuth(
         () => setActiveTab('vault'),
@@ -190,12 +204,15 @@ export default function App() {
     fetchData();
   }, [fetchData]);
 
-  // Press F1 anywhere to toggle User Guide
+  // Press F1 anywhere to toggle User Guide, Ctrl+K for Global Command Search
   useEffect(() => {
     const handleKeyDown = (e) => {
       if (e.key === 'F1') {
         e.preventDefault();
         setShowUserGuideModal((prev) => !prev);
+      } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault();
+        setShowCommandPalette((prev) => !prev);
       }
     };
     window.addEventListener('keydown', handleKeyDown);
@@ -228,6 +245,7 @@ export default function App() {
         lowStockCount={lowStockCount}
         onOpenSettings={handleOpenSettingsGuarded}
         onOpenUserGuide={() => setShowUserGuideModal(true)}
+        onOpenCommandPalette={() => setShowCommandPalette(true)}
         isOwnerMode={isOwnerMode}
       />
 
@@ -235,7 +253,7 @@ export default function App() {
 
 
 
-        <main className="flex-1 flex flex-col p-3 lg:px-6 lg:py-4 overflow-y-auto overflow-x-hidden min-w-0 min-h-0 bg-[#070b14] space-y-3">
+        <main className="flex-1 flex flex-col p-3 lg:px-6 lg:py-4 overflow-y-auto overflow-x-hidden min-w-0 min-h-0 bg-[#070b14] space-y-3 print:p-0 print:m-0 print:bg-white print:overflow-visible">
       {/* Real-time Financial Pulse Bar (Upgrade 2 & Action Center) */}
       <FinancialPulseBar
         onOpenStatement={() => handleOpenStatementGuarded('customer', null)}
@@ -282,10 +300,19 @@ export default function App() {
         />
       )}
 
+      {activeTab === 'vouchers' && (
+        <VouchersManagementView
+          onRefreshData={handleDataRefreshed}
+          isOwnerMode={isOwnerMode}
+          onRequireOwnerAuth={requireOwnerAuth}
+        />
+      )}
+
       {activeTab === 'vault' && (
         <FinancialVaultHub
           onRefreshData={handleDataRefreshed}
           onOpenStatement={handleOpenStatement}
+          onNavigateToVouchers={() => handleTabSelect('vouchers')}
         />
       )}
 
@@ -333,6 +360,19 @@ export default function App() {
       <UserGuideModal
         isOpen={showUserGuideModal}
         onClose={() => setShowUserGuideModal(false)}
+      />
+
+      {/* Global Command Palette (Ctrl + K / Cmd + K) */}
+      <GlobalCommandPalette
+        isOpen={showCommandPalette}
+        onClose={() => setShowCommandPalette(false)}
+        inventory={inventory}
+        onNavigateTab={handleTabSelect}
+        onSelectVehicle={handleSelectVehicleForPos}
+        onOpenStatement={handleOpenStatementGuarded}
+        onOpenSettings={handleOpenSettingsGuarded}
+        onOpenUserGuide={() => setShowUserGuideModal(true)}
+        onToggleOwnerMode={handleToggleOwnerMode}
       />
 
       {/* Owner PIN Verification Modal (حماية صلاحيات المالك) */}

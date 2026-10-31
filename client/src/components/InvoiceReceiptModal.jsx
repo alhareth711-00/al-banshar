@@ -314,10 +314,6 @@ export default function InvoiceReceiptModal({ isOpen, onClose, invoice, onNewInv
                   <span>السيارة واللوحة:</span>
                   <span className="font-bold">{invoice.plate_number}</span>
                 </div>
-                <div className="flex justify-between">
-                  <span>الفني المنفذ:</span>
-                  <span>{invoice.worker_name || 'فني المركز'}</span>
-                </div>
               </div>
 
               {/* Odometer Section */}

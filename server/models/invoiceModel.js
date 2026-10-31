@@ -133,6 +133,8 @@ const invoiceModel = {
 
       // Generate invoice number
       const invoiceNumber = data.invoice_number || generateInvoiceNumber(db);
+      const activeShift = db.prepare("SELECT id FROM cash_shifts WHERE status = 'open' LIMIT 1").get();
+      const shiftId = data.shift_id ? Number(data.shift_id) : (activeShift?.id || null);
 
       // 3. Insert invoice header
       const insertInvoiceStmt = db.prepare(`
@@ -141,13 +143,13 @@ const invoiceModel = {
           next_odometer, next_service_date, items_total, labor_total,
           scrap_battery_deduction, discount, net_total, payment_method,
           wallet_ref_number, paid_amount, remaining_debt, notes,
-          service_status, safety_inspection_data, inspection_completed_at, created_at
+          service_status, safety_inspection_data, inspection_completed_at, shift_id, created_at
         ) VALUES (
           @invoice_number, @vehicle_id, @worker_id, @current_odometer,
           @next_odometer, @next_service_date, @items_total, @labor_total,
           @scrap_battery_deduction, @discount, @net_total, @payment_method,
           @wallet_ref_number, @paid_amount, @remaining_debt, @notes,
-          @service_status, @safety_inspection_data, @inspection_completed_at,
+          @service_status, @safety_inspection_data, @inspection_completed_at, @shift_id,
           COALESCE(@created_at, datetime('now', 'localtime'))
         )
       `);
@@ -176,6 +178,7 @@ const invoiceModel = {
             : JSON.stringify(data.safety_inspection_data)
           : null,
         inspection_completed_at: data.inspection_completed_at || null,
+        shift_id: shiftId,
         created_at: data.created_at || null,
       });
 
@@ -211,22 +214,33 @@ const invoiceModel = {
         );
 
         if (item.inventory_id) {
-          const invItem = db.prepare('SELECT item_type, category FROM inventory WHERE id = ?').get(item.inventory_id);
+          const invItem = db.prepare('SELECT id, name, item_type, category, stock_qty FROM inventory WHERE id = ?').get(item.inventory_id);
           if (invItem && invItem.item_type !== 'service' && invItem.category !== 'service') {
+            if (data.prevent_negative_stock !== false && invItem.stock_qty < item._qty) {
+              throw new Error(`نفد المخزون أو لا يكفي للصنف "${invItem.name}". الرصيد المتوفر بالمخزن: (${invItem.stock_qty})، الكمية المطلوبة: (${item._qty}). تم منع البيع بالسالب.`);
+            }
             decrementStockStmt.run(item._qty, item.inventory_id);
           }
         }
       }
 
-      // 5. Update vehicle odometer and next due visit
-      db.prepare(`
-        UPDATE customers_vehicles SET
-          last_odometer = ?,
-          next_due_odometer = ?,
-          next_due_date = ?,
-          balance_due = balance_due + ?
-        WHERE id = ?
-      `).run(currentOdo, nextOdo, nextServiceDate, remainingDebt, data.vehicle_id);
+      // 5. Update vehicle odometer and next due visit (with Odometer Rollback protection)
+      if (currentOdo > 0) {
+        db.prepare(`
+          UPDATE customers_vehicles SET
+            last_odometer = MAX(COALESCE(last_odometer, 0), ?),
+            next_due_odometer = ?,
+            next_due_date = ?,
+            balance_due = balance_due + ?
+          WHERE id = ?
+        `).run(currentOdo, nextOdo, nextServiceDate, remainingDebt, data.vehicle_id);
+      } else {
+        db.prepare(`
+          UPDATE customers_vehicles SET
+            balance_due = balance_due + ?
+          WHERE id = ?
+        `).run(remainingDebt, data.vehicle_id);
+      }
 
       // 6. Central Automated Accounting Posting
       const invoiceDataForPosting = {
@@ -242,6 +256,7 @@ const invoiceModel = {
         discount: discount,
         net_total: netTotal,
         payment_method: data.payment_method || 'cash',
+        split_payments: data.split_payments || null,
         created_at: data.created_at || null,
       };
 
@@ -284,6 +299,14 @@ const invoiceModel = {
       const invoice = this.getById(id);
       if (!invoice) {
         throw new Error(`الفاتورة رقم ${id} غير موجودة`);
+      }
+
+      // Shift Freezing Check: Prevent voiding invoices belonging to closed shifts to ensure audit integrity
+      if (invoice.shift_id) {
+        const shift = db.prepare('SELECT status, shift_code FROM cash_shifts WHERE id = ?').get(invoice.shift_id);
+        if (shift && shift.status === 'closed') {
+          throw new Error(`لا يمكن إلغاء أو حذف الفاتورة (${invoice.invoice_number}) لأنها تتبع وردية تم إغلاقها وترحيلها (${shift.shift_code})، وذلك لضمان النزاهة والمطابقة المحاسبية.`);
+        }
       }
 
       // 1. Restock items back to inventory

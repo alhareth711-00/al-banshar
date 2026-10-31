@@ -15,6 +15,12 @@ import {
   ChevronDown,
   Info,
 } from 'lucide-react';
+import {
+  getCustomViscosities,
+  registerNewViscosity,
+  getCustomOilBrands,
+  registerNewOilBrand,
+} from '../utils/settings';
 
 export function calculateDotAge(dotCode) {
   if (!dotCode || String(dotCode).trim().length < 4) return null;
@@ -106,11 +112,18 @@ export default function AddInventoryModal({ isOpen, onClose, onCreated, itemToEd
   const [showAdvancedSection, setShowAdvancedSection] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState('');
+  const [viscositiesList, setViscositiesList] = useState(getCustomViscosities());
+  const [knownBrands, setKnownBrands] = useState(getCustomOilBrands());
+  const [isCustomVisc, setIsCustomVisc] = useState(false);
   const nameInputRef = useRef(null);
 
   // Close on Escape & Autofocus on open
   useEffect(() => {
     if (!isOpen) return;
+
+    setViscositiesList(getCustomViscosities());
+    setKnownBrands(getCustomOilBrands());
+    setIsCustomVisc(false);
 
     const timer = setTimeout(() => {
       if (nameInputRef.current) {
@@ -312,6 +325,16 @@ export default function AddInventoryModal({ isOpen, onClose, onCreated, itemToEd
         throw new Error(data.message || 'حدث خطأ أثناء حفظ الصنف');
       }
 
+      // Auto-sync brand and viscosity to quick shortcuts when category is oil
+      if (formData.category === 'oil') {
+        if (formData.brand && formData.brand.trim()) {
+          registerNewOilBrand(formData.brand.trim());
+        }
+        if (formData.viscosity && formData.viscosity.trim()) {
+          registerNewViscosity(formData.viscosity.trim());
+        }
+      }
+
       if (onCreated) onCreated(data.data);
       onClose();
     } catch (err) {
@@ -415,21 +438,45 @@ export default function AddInventoryModal({ isOpen, onClose, onCreated, itemToEd
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
                 <div>
-                  <label className="block text-slate-300 mb-1 text-[11px] font-bold">درجة اللزوجة:</label>
-                  <select
-                    value={formData.viscosity}
-                    onChange={(e) => setFormData({ ...formData, viscosity: e.target.value })}
-                    className="w-full min-h-[40px] px-2.5 rounded-xl bg-slate-950 border border-white/15 text-white font-mono text-xs font-bold"
-                  >
-                    <option value="20W-50">20W-50</option>
-                    <option value="10W-40">10W-40</option>
-                    <option value="5W-30">5W-30</option>
-                    <option value="5W-40">5W-40</option>
-                    <option value="0W-20">0W-20</option>
-                    <option value="15W-40">15W-40</option>
-                    <option value="80W-90">80W-90 (تروس/دفرنش)</option>
-                    <option value="ATF-WS">ATF-WS (قير)</option>
-                  </select>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="block text-slate-300 text-[11px] font-bold">درجة اللزوجة:</label>
+                    <button
+                      type="button"
+                      onClick={() => setIsCustomVisc(!isCustomVisc)}
+                      className="text-[10px] text-amber-400 hover:text-amber-300 font-bold"
+                    >
+                      {isCustomVisc ? 'قائمة اللزوجات' : '➕ لزوجة مخصصة'}
+                    </button>
+                  </div>
+                  {isCustomVisc ? (
+                    <input
+                      type="text"
+                      placeholder="مثال: 5W-40 أو سي 50 ديزل"
+                      value={formData.viscosity}
+                      onChange={(e) => setFormData({ ...formData, viscosity: e.target.value })}
+                      className="w-full min-h-[40px] px-2.5 rounded-xl bg-slate-950 border border-amber-500/50 text-amber-300 font-mono text-xs font-bold focus:outline-none focus:border-amber-400"
+                    />
+                  ) : (
+                    <select
+                      value={formData.viscosity}
+                      onChange={(e) => {
+                        if (e.target.value === '__new__') {
+                          setIsCustomVisc(true);
+                          setFormData({ ...formData, viscosity: '' });
+                        } else {
+                          setFormData({ ...formData, viscosity: e.target.value });
+                        }
+                      }}
+                      className="w-full min-h-[40px] px-2.5 rounded-xl bg-slate-950 border border-white/15 text-white font-mono text-xs font-bold"
+                    >
+                      {viscositiesList.map((v) => (
+                        <option key={v} value={v}>
+                          {v}
+                        </option>
+                      ))}
+                      <option value="__new__">➕ إضافة لزوجة أخرى...</option>
+                    </select>
+                  )}
                 </div>
 
                 <div>
@@ -455,7 +502,6 @@ export default function AddInventoryModal({ isOpen, onClose, onCreated, itemToEd
                     <option value="1L">1 لتر (علبة)</option>
                     <option value="4L">4 لتر (دبة)</option>
                     <option value="5L">5 لتر</option>
-                    <option value="bulk_liter">لتر فلت برميل</option>
                   </select>
                 </div>
               </div>
@@ -774,11 +820,17 @@ export default function AddInventoryModal({ isOpen, onClose, onCreated, itemToEd
                     <label className="block text-slate-300 font-bold mb-1">الماركة / الشركة المصنعة:</label>
                     <input
                       type="text"
+                      list="known-oil-brands"
                       placeholder="تويوتا، شل، كاسترول، بترومين..."
                       value={formData.brand}
                       onChange={(e) => setFormData({ ...formData, brand: e.target.value })}
                       className="w-full min-h-[42px] px-3.5 rounded-xl bg-slate-900 border border-white/15 text-white text-xs"
                     />
+                    <datalist id="known-oil-brands">
+                      {knownBrands.map((b) => (
+                        <option key={b.id} value={b.name || b.id} />
+                      ))}
+                    </datalist>
                   </div>
 
                   <div>

@@ -14,6 +14,7 @@ import {
   Calendar,
   Info,
 } from 'lucide-react';
+import SearchableCombobox from './SearchableCombobox';
 
 export default function PurchaseInvoiceModal({
   isOpen,
@@ -83,6 +84,49 @@ export default function PurchaseInvoiceModal({
 
   // Selected supplier details
   const selectedSupplier = suppliers.find((s) => String(s.id) === String(supplierId));
+
+  // Top suppliers for rapid 1-click chip selection
+  const topSuppliers = useMemo(() => {
+    return suppliers.slice(0, 6);
+  }, [suppliers]);
+
+  // Active items for line items combobox (excluding services)
+  const eligibleInventory = useMemo(() => {
+    return inventory.filter((i) => i.is_active === 1 && i.category !== 'service' && i.item_type !== 'service');
+  }, [inventory]);
+
+  // Handle supplier selection from Combobox or Chip
+  const handleSelectSupplier = (supp) => {
+    if (supp) {
+      setSupplierId(String(supp.id));
+      setSupplierName(supp.name);
+      if (supp.credit_days) {
+        const d = new Date();
+        d.setDate(d.getDate() + Number(supp.credit_days));
+        setDueDate(d.toISOString().split('T')[0]);
+      }
+    } else {
+      setSupplierId('');
+      setSupplierName('');
+      setDueDate('');
+    }
+  };
+
+  // Keyboard shortcut listener for Ctrl+Enter submit
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleGlobalKeyDown = (e) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+        e.preventDefault();
+        const submitBtn = document.getElementById('purchase-modal-submit-btn');
+        if (submitBtn && !submitBtn.disabled) {
+          submitBtn.click();
+        }
+      }
+    };
+    window.addEventListener('keydown', handleGlobalKeyDown);
+    return () => window.removeEventListener('keydown', handleGlobalKeyDown);
+  }, [isOpen]);
 
   // When supplier is selected from dropdown
   const handleSupplierChange = (e) => {
@@ -196,6 +240,16 @@ export default function PurchaseInvoiceModal({
         unit_sell: '',
       },
     ]);
+  };
+
+  const handleAddLineAndFocusNext = (currentIdx) => {
+    handleAddLine();
+    setTimeout(() => {
+      const nextInput = document.getElementById(`line-item-input-${currentIdx + 1}`);
+      if (nextInput) {
+        nextInput.focus();
+      }
+    }, 100);
   };
 
   const handleRemoveLine = (index) => {
@@ -368,34 +422,101 @@ export default function PurchaseInvoiceModal({
                   </span>
                 )}
               </label>
-              <select
-                autoFocus
-                value={supplierId}
-                onChange={handleSupplierChange}
-                className="w-full min-h-[42px] px-3 rounded-xl bg-slate-950 border border-white/15 text-white text-xs cursor-pointer font-bold"
-              >
-                <option value="">-- اختر مورد مسجل أو اكتب بالأسفل --</option>
-                {suppliers.map((s) => (
-                  <option key={s.id} value={s.id}>
-                    {s.name} ({s.company_name || s.phone || 'وكيل معتمد'})
-                  </option>
-                ))}
-              </select>
 
-              {!supplierId && (
-                <input
-                  type="text"
-                  placeholder="أو اكتب اسم المورد يدوياً..."
-                  value={supplierName}
-                  onChange={(e) => setSupplierName(e.target.value)}
-                  className="w-full min-h-[38px] px-3 rounded-xl bg-slate-950 border border-white/15 text-white text-xs mt-2"
-                />
+              {/* Fast Keyboard-first SearchableCombobox */}
+              <SearchableCombobox
+                id="purchase-supplier-combobox"
+                options={suppliers}
+                value={supplierId}
+                onChange={(val) => {
+                  const s = suppliers.find((x) => String(x.id) === String(val));
+                  handleSelectSupplier(s || null);
+                }}
+                onSelectOption={(supp) => {
+                  handleSelectSupplier(supp);
+                  if (supp) {
+                    setTimeout(() => {
+                      document.getElementById('purchase-invoice-ref')?.focus();
+                    }, 60);
+                  }
+                }}
+                placeholder="ابحث باسم المورد، الشركة، التوكيل أو الهاتف..."
+                searchKeys={['name', 'company_name', 'phone', 'agency_brand']}
+                autoFocus={true}
+                onAddNew={(newName) => {
+                  setSupplierId('');
+                  setSupplierName(newName);
+                }}
+                addNewLabel="+ اعتماد مورد جديد باسم"
+                renderOption={(supp) => (
+                  <div className="flex items-center justify-between w-full gap-2">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <div className="w-7 h-7 rounded-lg bg-amber-500/20 text-amber-400 flex items-center justify-center shrink-0">
+                        <Building2 className="w-4 h-4" />
+                      </div>
+                      <div className="truncate text-right">
+                        <div className="font-bold text-white text-xs truncate flex items-center gap-1.5">
+                          <span>{supp.name}</span>
+                          {supp.company_name && (
+                            <span className="text-[11px] text-slate-400 truncate">({supp.company_name})</span>
+                          )}
+                        </div>
+                        <div className="text-[11px] text-slate-400 flex items-center gap-2">
+                          {supp.phone && <span className="font-mono">{supp.phone}</span>}
+                          {supp.agency_brand && (
+                            <span className="px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-300 text-[10px]">
+                              وكيل {supp.agency_brand}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                    <div className="text-left shrink-0 font-mono">
+                      {Number(supp.balance_due) > 0 ? (
+                        <span className="px-2 py-0.5 rounded-lg bg-rose-500/20 text-rose-300 font-bold text-[11px]">
+                          دين: {Number(supp.balance_due).toLocaleString()} ر.ي
+                        </span>
+                      ) : (
+                        <span className="text-[11px] text-emerald-400">حساب خالص</span>
+                      )}
+                    </div>
+                  </div>
+                )}
+              />
+
+              {/* Quick Supplier Chips */}
+              {topSuppliers.length > 0 && (
+                <div className="flex items-center gap-1.5 mt-2 overflow-x-auto pb-1 scrollbar-none">
+                  <span className="text-[10px] text-slate-400 shrink-0 font-bold">الأكثر تعاملاً:</span>
+                  {topSuppliers.map((s) => (
+                    <button
+                      key={s.id}
+                      type="button"
+                      onClick={() => handleSelectSupplier(s)}
+                      className={`px-2 py-0.5 rounded-lg text-[10px] font-bold border transition shrink-0 ${
+                        String(supplierId) === String(s.id)
+                          ? 'bg-amber-400 text-slate-950 border-amber-300 shadow-sm'
+                          : 'bg-white/5 text-slate-300 border-white/10 hover:border-amber-400/40 hover:text-white'
+                      }`}
+                    >
+                      {s.name}
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              {!supplierId && supplierName && (
+                <div className="mt-2 text-[11px] text-amber-300 bg-amber-500/10 px-2.5 py-1 rounded-lg border border-amber-500/20 flex items-center justify-between">
+                  <span>سيتم قيد الفاتورة باسم المورد: <strong>{supplierName}</strong></span>
+                  <button type="button" onClick={() => setSupplierName('')} className="text-slate-400 hover:text-white">✕</button>
+                </div>
               )}
             </div>
 
             <div>
               <label className="block text-slate-300 font-bold mb-1.5">رقم فاتورة المورد الورقية:</label>
               <input
+                id="purchase-invoice-ref"
                 type="text"
                 placeholder="مثال: INV-88412"
                 value={invoiceRef}
@@ -427,6 +548,24 @@ export default function PurchaseInvoiceModal({
             </div>
           </div>
 
+          {/* Quick Keyboard Shortcuts Hint Bar */}
+          <div className="flex flex-wrap items-center justify-between gap-2 px-3 py-1.5 rounded-xl bg-slate-900/90 border border-white/10 text-[11px] text-slate-400">
+            <div className="flex items-center gap-3">
+              <span className="flex items-center gap-1">
+                <kbd className="px-1.5 py-0.5 rounded bg-white/10 text-amber-300 font-mono text-[10px] border border-white/15">Enter ↵</kbd>
+                <span>تنقل تلقائي وسطر جديد</span>
+              </span>
+              <span className="flex items-center gap-1">
+                <kbd className="px-1.5 py-0.5 rounded bg-white/10 text-emerald-300 font-mono text-[10px] border border-white/15">Ctrl + Enter</kbd>
+                <span>حفظ وتوريد الفاتورة فورياً</span>
+              </span>
+            </div>
+            <span className="flex items-center gap-1 text-slate-500">
+              <kbd className="px-1.5 py-0.5 rounded bg-white/10 text-slate-400 font-mono text-[10px] border border-white/15">Esc</kbd>
+              <span>إغلاق القوائم</span>
+            </span>
+          </div>
+
           {/* Items Inbound Table with Carton Options */}
           <div className="space-y-2">
             <div className="flex items-center justify-between">
@@ -444,9 +583,9 @@ export default function PurchaseInvoiceModal({
               </button>
             </div>
 
-            <div className="rounded-2xl border border-white/10 overflow-hidden bg-slate-900/60 divide-y divide-white/5">
+            <div className="rounded-2xl border border-white/10 overflow-visible bg-slate-900/60 divide-y divide-white/5">
               <div className="grid grid-cols-12 gap-2 p-3 bg-white/5 text-[11px] font-bold text-slate-400">
-                <div className="col-span-4">الصنف المراد توريده</div>
+                <div className="col-span-4">الصنف المراد توريده (بحث بالكيبورد / باركود)</div>
                 <div className="col-span-2 text-center">نوع الشراء</div>
                 <div className="col-span-2 text-center">الكمية</div>
                 <div className="col-span-2 text-center">سعر الشراء والتكلفة</div>
@@ -462,23 +601,62 @@ export default function PurchaseInvoiceModal({
                 return (
                   <div key={idx} className="p-3 hover:bg-white/5 transition space-y-2">
                     <div className="grid grid-cols-12 gap-2 items-center">
-                      {/* Product Selector */}
+                      {/* Product Selector with SearchableCombobox */}
                       <div className="col-span-4">
-                        <select
+                        <SearchableCombobox
+                          id={`line-item-input-${idx}`}
+                          options={eligibleInventory}
                           value={line.inventory_id}
-                          onChange={(e) => handleItemSelect(idx, e.target.value)}
-                          className="w-full min-h-[38px] px-2.5 rounded-lg bg-slate-950 border border-white/15 text-white text-xs cursor-pointer font-bold"
-                          required
-                        >
-                          <option value="">-- حدد الصنف من المخزن --</option>
-                          {inventory
-                            .filter((i) => i.is_active === 1 && i.category !== 'service' && i.item_type !== 'service')
-                            .map((inv) => (
-                              <option key={inv.id} value={inv.id}>
-                                {inv.name} &bull; {inv.brand} ({inv.pack_size || inv.viscosity || 'قطعة'})
-                              </option>
-                            ))}
-                        </select>
+                          onChange={(val) => handleItemSelect(idx, val)}
+                          onSelectOption={(inv) => {
+                            if (inv) {
+                              // Chained focus: Jump directly to Quantity input
+                              setTimeout(() => {
+                                const qtyInput = document.getElementById(
+                                  line.is_carton ? `line-carton-qty-${idx}` : `line-qty-${idx}`
+                                );
+                                if (qtyInput) {
+                                  qtyInput.focus();
+                                  qtyInput.select();
+                                }
+                              }, 60);
+                            }
+                          }}
+                          placeholder="ابحث بالاسم، الماركة، اللزوجة، أو الباركود..."
+                          searchKeys={['name', 'brand', 'viscosity', 'pack_size', 'sku', 'barcode', 'tire_battery_spec']}
+                          renderOption={(inv) => (
+                            <div className="flex items-center justify-between w-full gap-2">
+                              <div className="flex items-center gap-2 min-w-0">
+                                <div className="w-6 h-6 rounded-md bg-amber-500/20 text-amber-400 flex items-center justify-center shrink-0">
+                                  <Package className="w-3.5 h-3.5" />
+                                </div>
+                                <div className="truncate text-right">
+                                  <div className="font-bold text-white text-xs truncate flex items-center gap-1.5">
+                                    <span>{inv.name}</span>
+                                    {inv.viscosity && (
+                                      <span className="px-1.5 py-0.5 rounded text-[10px] bg-sky-500/20 text-sky-300 font-mono">
+                                        {inv.viscosity}
+                                      </span>
+                                    )}
+                                  </div>
+                                  <div className="text-[10px] text-slate-400 flex items-center gap-2">
+                                    {inv.brand && <span>{inv.brand}</span>}
+                                    {inv.pack_size && <span>• {inv.pack_size}</span>}
+                                    {inv.barcode && <span className="font-mono">[{inv.barcode}]</span>}
+                                  </div>
+                                </div>
+                              </div>
+                              <div className="text-left shrink-0 font-mono text-[11px]">
+                                <div className={`${inv.stock_qty <= (inv.min_stock_alert || 5) ? 'text-rose-400' : 'text-emerald-400'} font-bold`}>
+                                  متوفر: {inv.stock_qty}
+                                </div>
+                                <div className="text-[10px] text-slate-400">
+                                  {Number(inv.cost_price || 0).toLocaleString()} ر.ي
+                                </div>
+                              </div>
+                            </div>
+                          )}
+                        />
                       </div>
 
                       {/* Mode Toggle: Unit vs Carton */}
@@ -511,12 +689,23 @@ export default function PurchaseInvoiceModal({
                         {line.is_carton ? (
                           <div className="space-y-1">
                             <input
+                              id={`line-carton-qty-${idx}`}
                               type="number"
                               min="1"
                               step="any"
                               placeholder="عدد الكراتين"
                               value={line.carton_qty}
                               onChange={(e) => handleUpdateLine(idx, 'carton_qty', e.target.value)}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter') {
+                                  e.preventDefault();
+                                  const costEl = document.getElementById(`line-carton-cost-${idx}`);
+                                  if (costEl) {
+                                    costEl.focus();
+                                    costEl.select();
+                                  }
+                                }
+                              }}
                               className="w-full min-h-[36px] px-2 text-center rounded-lg bg-slate-950 border border-white/15 text-white font-mono text-xs font-bold"
                               required
                             />
@@ -525,12 +714,23 @@ export default function PurchaseInvoiceModal({
                         ) : (
                           <div className="space-y-1">
                             <input
+                              id={`line-qty-${idx}`}
                               type="number"
                               min="1"
                               step="any"
                               placeholder="الكمية"
                               value={line.qty}
                               onChange={(e) => handleUpdateLine(idx, 'qty', e.target.value)}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter') {
+                                  e.preventDefault();
+                                  const costEl = document.getElementById(`line-cost-${idx}`);
+                                  if (costEl) {
+                                    costEl.focus();
+                                    costEl.select();
+                                  }
+                                }
+                              }}
                               className="w-full min-h-[36px] px-2 text-center rounded-lg bg-slate-950 border border-white/15 text-white font-mono text-xs font-bold"
                               required
                             />
@@ -544,10 +744,21 @@ export default function PurchaseInvoiceModal({
                         {line.is_carton ? (
                           <div className="space-y-1">
                             <input
+                              id={`line-carton-cost-${idx}`}
                               type="number"
                               placeholder="سعر الكرتون"
                               value={line.carton_cost}
                               onChange={(e) => handleUpdateLine(idx, 'carton_cost', e.target.value)}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter') {
+                                  e.preventDefault();
+                                  const sellEl = document.getElementById(`line-sell-${idx}`);
+                                  if (sellEl) {
+                                    sellEl.focus();
+                                    sellEl.select();
+                                  }
+                                }
+                              }}
                               className="w-full min-h-[36px] px-2 text-center rounded-lg bg-slate-950 border border-white/15 text-amber-300 font-mono text-xs font-bold"
                               required
                             />
@@ -556,10 +767,21 @@ export default function PurchaseInvoiceModal({
                         ) : (
                           <div className="space-y-1">
                             <input
+                              id={`line-cost-${idx}`}
                               type="number"
                               placeholder="سعر التكلفة"
                               value={line.unit_cost}
                               onChange={(e) => handleUpdateLine(idx, 'unit_cost', e.target.value)}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter') {
+                                  e.preventDefault();
+                                  const sellEl = document.getElementById(`line-sell-${idx}`);
+                                  if (sellEl) {
+                                    sellEl.focus();
+                                    sellEl.select();
+                                  }
+                                }
+                              }}
                               className="w-full min-h-[36px] px-2 text-center rounded-lg bg-slate-950 border border-white/15 text-amber-300 font-mono text-xs font-bold"
                               required
                             />
@@ -571,10 +793,22 @@ export default function PurchaseInvoiceModal({
                       {/* Sell Price Input */}
                       <div className="col-span-1">
                         <input
+                          id={`line-sell-${idx}`}
                           type="number"
                           placeholder="سعر البيع"
                           value={line.unit_sell}
                           onChange={(e) => handleUpdateLine(idx, 'unit_sell', e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') {
+                              e.preventDefault();
+                              if (idx === billItems.length - 1) {
+                                handleAddLineAndFocusNext(idx);
+                              } else {
+                                const nextItem = document.getElementById(`line-item-input-${idx + 1}`);
+                                if (nextItem) nextItem.focus();
+                              }
+                            }
+                          }}
                           className="w-full min-h-[36px] px-1.5 text-center rounded-lg bg-slate-950 border border-white/15 text-white font-mono text-xs font-bold"
                         />
                       </div>
@@ -851,6 +1085,7 @@ export default function PurchaseInvoiceModal({
             </button>
 
             <button
+              id="purchase-modal-submit-btn"
               type="submit"
               disabled={isSubmitting || totalBillAmount <= 0}
               className={`flex-1 min-h-[46px] rounded-2xl font-black text-xs shadow-xl flex items-center justify-center gap-2 transition active:scale-95 ${
@@ -861,6 +1096,7 @@ export default function PurchaseInvoiceModal({
             >
               <Check className="w-4 h-4 stroke-[2.5]" />
               <span>{isSubmitting ? 'جاري ترحيل الفاتورة والمخزون...' : 'اعتماد فاتورة الشراء وتوريد المخزن 📦'}</span>
+              <kbd className="px-1.5 py-0.5 rounded bg-black/20 text-[10px] font-mono border border-black/10">Ctrl+↵</kbd>
             </button>
           </div>
         </form>

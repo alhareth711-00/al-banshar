@@ -39,12 +39,19 @@ export default function RetentionRadar({ onSelectVehicleForPos }) {
 
   const settings = getShopSettings();
 
-  // Load reminded vehicles log from localStorage as backup
+  // Load reminded vehicles log from localStorage as backup (validated for today's date)
   useEffect(() => {
     try {
+      const todayStr = new Date().toISOString().split('T')[0];
       const saved = localStorage.getItem('quick_lube_reminded_vehicles');
       if (saved) {
-        setRemindedVehicles(JSON.parse(saved));
+        const parsed = JSON.parse(saved);
+        if (parsed && parsed.date === todayStr && parsed.log) {
+          setRemindedVehicles(parsed.log);
+        } else if (parsed && !parsed.date && typeof parsed === 'object') {
+          // Legacy format fallback
+          setRemindedVehicles(parsed);
+        }
       }
     } catch (e) {
       console.error(e);
@@ -68,7 +75,7 @@ export default function RetentionRadar({ onSelectVehicleForPos }) {
         setCorporateAccounts(corpData.data || []);
       }
 
-      // 3. Fetch All Vehicles
+      // 3. Fetch All Vehicles (Full database directory without arbitrary limit)
       const vehRes = await fetch('/api/vehicles');
       const vehData = await vehRes.json();
       if (vehData.success) {
@@ -88,10 +95,11 @@ export default function RetentionRadar({ onSelectVehicleForPos }) {
   // Mark vehicle as reminded and persist to database (Upgrade 4)
   const handleSendReminder = async (item) => {
     const timeStr = new Date().toLocaleTimeString('ar-YE', { hour: '2-digit', minute: '2-digit' });
+    const todayStr = new Date().toISOString().split('T')[0];
     const updated = { ...remindedVehicles, [item.vehicle_id]: timeStr };
     setRemindedVehicles(updated);
     try {
-      localStorage.setItem('quick_lube_reminded_vehicles', JSON.stringify(updated));
+      localStorage.setItem('quick_lube_reminded_vehicles', JSON.stringify({ date: todayStr, log: updated }));
       await fetch(`/api/vehicles/${item.vehicle_id}/log-reminder`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -119,20 +127,29 @@ export default function RetentionRadar({ onSelectVehicleForPos }) {
     }
   };
 
-  // Top KPIs calculations
+  // Top KPIs calculations - Dynamically computed based on real database records
   const criticalCount = radarItems.filter((i) => i.urgency_level === 'critical' || (i.days_diff !== null && i.days_diff < 0)).length;
   const dueNowCount = radarItems.filter((i) => i.status === 'due_soon').length;
   const corporateVehiclesCount = radarItems.filter((i) => i.customer_type !== 'individual').length;
-  const expectedRecoverableRevenue = (criticalCount + dueNowCount) * 28000; // Average ticket ~28,000 YER
+  const expectedRecoverableRevenue = useMemo(() => {
+    return radarItems
+      .filter((i) => i.status === 'overdue' || i.urgency_level === 'critical' || i.status === 'due_soon')
+      .reduce((sum, item) => sum + (Number(item.estimated_ticket) || 28000), 0);
+  }, [radarItems]);
 
   // Filtered radar items with urgency and search
   const filteredRadar = useMemo(() => {
+    const todayStr = new Date().toISOString().split('T')[0];
     return radarItems.filter((item) => {
       // Urgency filter
       if (urgencyFilter === 'critical' && item.urgency_level !== 'critical' && !(item.days_diff !== null && item.days_diff < 0)) return false;
       if (urgencyFilter === 'due_now' && item.status !== 'due_soon') return false;
       if (urgencyFilter === 'fleets' && item.customer_type === 'individual') return false;
-      if (urgencyFilter === 'reminded_today' && !remindedVehicles[item.vehicle_id] && !item.last_reminded_at) return false;
+      if (urgencyFilter === 'reminded_today') {
+        const isRemindedLocal = remindedVehicles[item.vehicle_id];
+        const isRemindedDb = item.last_reminded_at && String(item.last_reminded_at).startsWith(todayStr);
+        if (!isRemindedLocal && !isRemindedDb) return false;
+      }
 
       // Search term
       if (!searchTerm) return true;
@@ -192,9 +209,25 @@ export default function RetentionRadar({ onSelectVehicleForPos }) {
   };
 
   return (
-    <div className="space-y-4 max-w-7xl mx-auto p-4 sm:p-6 pb-12 animate-in fade-in duration-200">
+    <div className="space-y-4 max-w-7xl mx-auto p-4 sm:p-6 pb-12 animate-in fade-in duration-200 print:p-0 print:m-0 print:space-y-3">
+      {/* Print-Only Official Workshop Dispatch Header */}
+      <div className="hidden print:block text-black pb-3 mb-3 border-b-2 border-slate-900">
+        <div className="flex justify-between items-center">
+          <div>
+            <h1 className="text-2xl font-black">{settings.shopName || 'مركز خدمة السيارات السريعة'}</h1>
+            <p className="text-xs text-slate-700 font-bold mt-0.5">كشف رادار المتابعة والتذكير التلقائي الدوري (3,000 كم) - PRO DISPATCHER</p>
+            <p className="text-[11px] text-slate-500 font-mono mt-0.5">هاتف المركز: {settings.shopPhone || '---'}</p>
+          </div>
+          <div className="text-left text-xs font-mono font-bold space-y-0.5">
+            <div>تاريخ الاستخراج: {new Date().toLocaleDateString('ar-YE')}</div>
+            <div>الوقت: {new Date().toLocaleTimeString('ar-YE', { hour: '2-digit', minute: '2-digit' })}</div>
+            <div className="text-rose-700 font-black">الحالات الحرجة: {criticalCount} سيارة</div>
+          </div>
+        </div>
+      </div>
+
       {/* 1. Header & Pro Badges */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-white/10 pb-4">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-white/10 pb-4 print:hidden">
         <div>
           <div className="flex items-center gap-2.5">
             <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-rose-500 to-amber-500 text-white flex items-center justify-center shadow-lg shadow-rose-500/20">
@@ -237,58 +270,58 @@ export default function RetentionRadar({ onSelectVehicleForPos }) {
       </div>
 
       {/* 2. Top Diagnostic KPI Cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 print:grid-cols-4 print:gap-2">
         {/* Card 1: Critical Overdue */}
-        <div className="apple-glass-card rounded-2xl p-4 border border-rose-500/30 bg-rose-950/20">
-          <div className="flex items-center justify-between text-rose-300 text-xs font-bold mb-1">
+        <div className="apple-glass-card rounded-2xl p-4 border border-rose-500/30 bg-rose-950/20 print:bg-white print:border-rose-400 print:text-black print:shadow-none">
+          <div className="flex items-center justify-between text-rose-300 print:text-rose-700 text-xs font-bold mb-1">
             <span>متأخرة جداً (حرجة):</span>
-            <AlertTriangle className="w-4 h-4 text-rose-400" />
+            <AlertTriangle className="w-4 h-4 text-rose-400 print:text-rose-600" />
           </div>
-          <div className="text-2xl font-black font-mono text-rose-400">
-            {criticalCount} <span className="text-xs font-sans text-rose-300/80">سيارة</span>
+          <div className="text-2xl font-black font-mono text-rose-400 print:text-rose-700">
+            {criticalCount} <span className="text-xs font-sans text-rose-300/80 print:text-rose-800">سيارة</span>
           </div>
-          <div className="text-[11px] text-rose-300/80 mt-1">تجاوزت موعد أو مسافة التغيير</div>
+          <div className="text-[11px] text-rose-300/80 print:text-rose-800 mt-1">تجاوزت موعد أو مسافة التغيير</div>
         </div>
 
         {/* Card 2: Due Soon (Within 7 Days / 3000 km) */}
-        <div className="apple-glass-card rounded-2xl p-4 border border-amber-500/30 bg-amber-950/20">
-          <div className="flex items-center justify-between text-amber-300 text-xs font-bold mb-1">
+        <div className="apple-glass-card rounded-2xl p-4 border border-amber-500/30 bg-amber-950/20 print:bg-white print:border-amber-400 print:text-black print:shadow-none">
+          <div className="flex items-center justify-between text-amber-300 print:text-amber-700 text-xs font-bold mb-1">
             <span>مستحقة هذا الأسبوع:</span>
-            <Clock className="w-4 h-4 text-amber-400" />
+            <Clock className="w-4 h-4 text-amber-400 print:text-amber-600" />
           </div>
-          <div className="text-2xl font-black font-mono text-amber-400">
-            {dueNowCount} <span className="text-xs font-sans text-amber-300/80">سيارة</span>
+          <div className="text-2xl font-black font-mono text-amber-400 print:text-amber-700">
+            {dueNowCount} <span className="text-xs font-sans text-amber-300/80 print:text-amber-800">سيارة</span>
           </div>
-          <div className="text-[11px] text-amber-300/80 mt-1">على وشك إتمام 3,000 كم</div>
+          <div className="text-[11px] text-amber-300/80 print:text-amber-800 mt-1">على وشك إتمام 3,000 كم</div>
         </div>
 
         {/* Card 3: Recoverable Revenue */}
-        <div className="apple-glass-card rounded-2xl p-4 border border-emerald-500/30 bg-emerald-950/20">
-          <div className="flex items-center justify-between text-emerald-300 text-xs font-bold mb-1">
+        <div className="apple-glass-card rounded-2xl p-4 border border-emerald-500/30 bg-emerald-950/20 print:bg-white print:border-emerald-400 print:text-black print:shadow-none">
+          <div className="flex items-center justify-between text-emerald-300 print:text-emerald-700 text-xs font-bold mb-1">
             <span>عائد متوقع استرداده:</span>
-            <DollarSign className="w-4 h-4 text-emerald-400" />
+            <DollarSign className="w-4 h-4 text-emerald-400 print:text-emerald-600" />
           </div>
-          <div className="text-xl sm:text-2xl font-black font-mono text-emerald-400">
-            {expectedRecoverableRevenue.toLocaleString()} <span className="text-xs font-sans text-emerald-300/80">ر.ي</span>
+          <div className="text-xl sm:text-2xl font-black font-mono text-emerald-400 print:text-emerald-700">
+            {expectedRecoverableRevenue.toLocaleString()} <span className="text-xs font-sans text-emerald-300/80 print:text-emerald-800">ر.ي</span>
           </div>
-          <div className="text-[11px] text-emerald-300/80 mt-1">عند عودة السيارات للتغيير</div>
+          <div className="text-[11px] text-emerald-300/80 print:text-emerald-800 mt-1">عند عودة السيارات للتغيير</div>
         </div>
 
         {/* Card 4: Corporate Fleets */}
-        <div className="apple-glass-card rounded-2xl p-4 border border-indigo-500/30 bg-indigo-950/20">
-          <div className="flex items-center justify-between text-indigo-300 text-xs font-bold mb-1">
+        <div className="apple-glass-card rounded-2xl p-4 border border-indigo-500/30 bg-indigo-950/20 print:bg-white print:border-indigo-400 print:text-black print:shadow-none">
+          <div className="flex items-center justify-between text-indigo-300 print:text-indigo-700 text-xs font-bold mb-1">
             <span>أساطيل وشركات مسجلة:</span>
-            <Building2 className="w-4 h-4 text-indigo-400" />
+            <Building2 className="w-4 h-4 text-indigo-400 print:text-indigo-600" />
           </div>
-          <div className="text-2xl font-black font-mono text-indigo-400">
-            {corporateAccounts.length} <span className="text-xs font-sans text-indigo-300/80">جهة</span>
+          <div className="text-2xl font-black font-mono text-indigo-400 print:text-indigo-700">
+            {corporateAccounts.length} <span className="text-xs font-sans text-indigo-300/80 print:text-indigo-800">جهة</span>
           </div>
-          <div className="text-[11px] text-indigo-300/80 mt-1">تضم {allVehicles.filter(v => v.customer_type !== 'individual').length} مركبة بتسعير أسطول</div>
+          <div className="text-[11px] text-indigo-300/80 print:text-indigo-800 mt-1">تضم {allVehicles.filter(v => v.customer_type !== 'individual').length} مركبة بتسعير أسطول</div>
         </div>
       </div>
 
       {/* 3. Navigation Tabs & Search Controls */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 bg-white/5 p-2 rounded-2xl border border-white/10">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 bg-white/5 p-2 rounded-2xl border border-white/10 print:hidden">
         <div className="flex items-center gap-1.5 overflow-x-auto">
           <button
             type="button"
@@ -360,7 +393,7 @@ export default function RetentionRadar({ onSelectVehicleForPos }) {
       {activeTab === 'radar' && (
         <div className="space-y-3">
           {/* Urgency Filter Chips */}
-          <div className="flex items-center gap-1.5 overflow-x-auto text-xs font-bold text-slate-400 pb-1">
+          <div className="flex items-center gap-1.5 overflow-x-auto text-xs font-bold text-slate-400 pb-1 print:hidden">
             <span className="text-[11px] text-slate-500 ml-1">تصفية القائمة:</span>
             {[
               { id: 'all', label: `الكل (${radarItems.length})` },
@@ -385,17 +418,17 @@ export default function RetentionRadar({ onSelectVehicleForPos }) {
           </div>
 
           {filteredRadar.length === 0 ? (
-            <div className="apple-glass rounded-3xl p-12 text-center text-slate-400 border border-white/10">
+            <div className="apple-glass rounded-3xl p-12 text-center text-slate-400 border border-white/10 print:bg-white print:border-slate-300 print:text-black">
               <Check className="w-12 h-12 text-emerald-400 mx-auto mb-3" />
-              <h3 className="font-extrabold text-lg text-white">ممتاز! لا توجد سيارات مطابقة لهذه التصفية</h3>
-              <p className="text-xs text-slate-400 mt-1">جميع المركبات في جدول منتظم وسليم</p>
+              <h3 className="font-extrabold text-lg text-white print:text-black">ممتاز! لا توجد سيارات مطابقة لهذه التصفية</h3>
+              <p className="text-xs text-slate-400 print:text-slate-600 mt-1">جميع المركبات في جدول منتظم وسليم</p>
             </div>
           ) : (
             /* ============================================================
                الشريط التكتيكي السريع (Tactical Workshop Feed)
                قوائم أفقية عالية الكثافة لإنجاز التذكيرات بسرعة فائقة
                ============================================================ */
-            <div className="space-y-2.5">
+            <div className="space-y-2.5 print:space-y-2">
               {filteredRadar.map((item) => {
                 const isOverdue = item.status === 'overdue' || item.urgency_level === 'critical';
                 const wasRemindedToday = remindedVehicles[item.vehicle_id];
@@ -403,7 +436,7 @@ export default function RetentionRadar({ onSelectVehicleForPos }) {
                 return (
                   <div
                     key={item.vehicle_id}
-                    className={`rounded-2xl p-3.5 border transition-all flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-3 ${
+                    className={`rounded-2xl p-3.5 border transition-all flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-3 print:bg-white print:border-slate-300 print:text-black print:shadow-none print-avoid-break ${
                       isOverdue
                         ? 'bg-rose-950/20 border-rose-500/30 hover:border-rose-500/60'
                         : 'bg-slate-900/80 border-white/10 hover:border-amber-500/50'
@@ -411,22 +444,22 @@ export default function RetentionRadar({ onSelectVehicleForPos }) {
                   >
                     {/* Left side (RTL right): Vehicle & Customer Identity */}
                     <div className="flex items-center gap-3 min-w-[260px]">
-                      <span className="font-mono font-black text-sm px-3 py-1.5 rounded-xl bg-slate-950 border border-white/15 text-white tracking-wider shadow-inner">
+                      <span className="font-mono font-black text-sm px-3 py-1.5 rounded-xl bg-slate-950 border border-white/15 text-white tracking-wider shadow-inner print:bg-slate-100 print:border-slate-400 print:text-black">
                         {item.plate_number}
                       </span>
                       <div>
                         <div className="flex items-center gap-2">
-                          <span className="font-extrabold text-sm text-white">{item.customer_name}</span>
+                          <span className="font-extrabold text-sm text-white print:text-black">{item.customer_name}</span>
                           {item.corporate_name && (
-                            <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 font-bold">
+                            <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 font-bold print:bg-slate-100 print:text-indigo-950 print:border-indigo-400">
                               {item.corporate_name}
                             </span>
                           )}
                         </div>
-                        <div className="text-xs text-slate-400 flex items-center gap-2 mt-0.5">
+                        <div className="text-xs text-slate-400 print:text-slate-600 flex items-center gap-2 mt-0.5">
                           <span>{item.car_make_model}</span>
                           <span className="text-slate-600">&bull;</span>
-                          <span className="font-mono text-slate-300">{item.phone}</span>
+                          <span className="font-mono text-slate-300 print:text-slate-900">{item.phone}</span>
                         </div>
                       </div>
                     </div>
@@ -436,35 +469,35 @@ export default function RetentionRadar({ onSelectVehicleForPos }) {
                       <span
                         className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold ${
                           isOverdue
-                            ? 'bg-rose-500/20 text-rose-300 border border-rose-500/30'
-                            : 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
+                            ? 'bg-rose-500/20 text-rose-300 border border-rose-500/30 print:bg-rose-50 print:text-rose-800 print:border-rose-300'
+                            : 'bg-amber-500/20 text-amber-300 border border-amber-500/30 print:bg-amber-50 print:text-amber-800 print:border-amber-300'
                         }`}
                       >
-                        <span className={`w-2 h-2 rounded-full ${isOverdue ? 'bg-rose-400 animate-pulse' : 'bg-amber-400'}`} />
+                        <span className={`w-2 h-2 rounded-full ${isOverdue ? 'bg-rose-400 animate-pulse print:bg-rose-600' : 'bg-amber-400 print:bg-amber-600'}`} />
                         {item.status_label}
                       </span>
 
-                      <div className="px-2.5 py-1 rounded-lg bg-slate-950/60 border border-white/5 text-xs text-slate-300 flex items-center gap-1.5">
-                        <Gauge className="w-3.5 h-3.5 text-blue-400" />
-                        <span className="text-slate-400">العداد:</span>
-                        <span className="font-mono font-bold text-amber-300">{Number(item.next_due_odometer).toLocaleString()} كم</span>
+                      <div className="px-2.5 py-1 rounded-lg bg-slate-950/60 border border-white/5 text-xs text-slate-300 flex items-center gap-1.5 print:bg-slate-50 print:border-slate-300 print:text-black">
+                        <Gauge className="w-3.5 h-3.5 text-blue-400 print:text-blue-700" />
+                        <span className="text-slate-400 print:text-slate-600">العداد:</span>
+                        <span className="font-mono font-bold text-amber-300 print:text-black">{Number(item.next_due_odometer).toLocaleString()} كم</span>
                       </div>
 
-                      <div className="px-2.5 py-1 rounded-lg bg-slate-950/60 border border-white/5 text-xs text-slate-300 flex items-center gap-1.5">
-                        <span className="text-slate-400">الزيت:</span>
-                        <span className="font-bold text-white">{item.preferred_oil_brand} ({item.preferred_viscosity})</span>
+                      <div className="px-2.5 py-1 rounded-lg bg-slate-950/60 border border-white/5 text-xs text-slate-300 flex items-center gap-1.5 print:bg-slate-50 print:border-slate-300 print:text-black">
+                        <span className="text-slate-400 print:text-slate-600">الزيت:</span>
+                        <span className="font-bold text-white print:text-black">{item.preferred_oil_brand} ({item.preferred_viscosity})</span>
                       </div>
 
                       {(wasRemindedToday || item.last_reminded_at) && (
-                        <span className="px-2 py-0.5 rounded-md bg-emerald-500/20 text-emerald-300 text-[11px] font-bold flex items-center gap-1 border border-emerald-500/30">
-                          <CheckCircle2 className="w-3 h-3 text-emerald-400" />
+                        <span className="px-2 py-0.5 rounded-md bg-emerald-500/20 text-emerald-300 text-[11px] font-bold flex items-center gap-1 border border-emerald-500/30 print:bg-emerald-50 print:text-emerald-800 print:border-emerald-300">
+                          <CheckCircle2 className="w-3 h-3 text-emerald-400 print:text-emerald-700" />
                           <span>تم الإرسال</span>
                         </span>
                       )}
                     </div>
 
                     {/* Right side (RTL left): Rapid Actions */}
-                    <div className="flex items-center gap-2 pt-2 lg:pt-0 border-t lg:border-t-0 border-white/5">
+                    <div className="flex items-center gap-2 pt-2 lg:pt-0 border-t lg:border-t-0 border-white/5 print:hidden">
                       <a
                         href={getWhatsAppUrl(item)}
                         target="_blank"
@@ -478,7 +511,7 @@ export default function RetentionRadar({ onSelectVehicleForPos }) {
 
                       <button
                         type="button"
-                        onClick={() => onSelectVehicleForPos(item)}
+                        onClick={() => onSelectVehicleForPos({ ...item, id: item.id || item.vehicle_id })}
                         className="px-3.5 min-h-[42px] rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs flex items-center justify-center gap-1 transition active:scale-95 shadow-md shadow-amber-500/20"
                         title="فتح فاتورة سريعة في الكاشير"
                       >
@@ -622,34 +655,34 @@ export default function RetentionRadar({ onSelectVehicleForPos }) {
                   <th className="p-3.5">السيارة واللوحة</th>
                   <th className="p-3.5">نوع الحساب / الأسطول</th>
                   <th className="p-3.5">مبلغ الدين الآجل</th>
-                  <th className="p-3.5 text-center">إشعار الرصيد عبر واتساب</th>
-                  <th className="p-3.5 text-center">إجراء الخدمة</th>
+                  <th className="p-3.5 text-center print:hidden">إشعار الرصيد عبر واتساب</th>
+                  <th className="p-3.5 text-center print:hidden">إجراء الخدمة</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-white/5 text-slate-200">
+              <tbody className="divide-y divide-white/5 text-slate-200 print:text-black">
                 {debtVehicles.map((v) => (
-                  <tr key={v.id} className="hover:bg-white/5 transition">
+                  <tr key={v.id} className="hover:bg-white/5 transition print:border-b print:border-slate-300">
                     <td className="p-3.5">
-                      <div className="font-extrabold text-white text-sm">{v.customer_name}</div>
-                      <div className="font-mono text-slate-400">{v.phone}</div>
+                      <div className="font-extrabold text-white print:text-black text-sm">{v.customer_name}</div>
+                      <div className="font-mono text-slate-400 print:text-slate-800">{v.phone}</div>
                     </td>
                     <td className="p-3.5">
-                      <div>{v.car_make_model}</div>
-                      <div className="font-mono text-amber-300">{v.plate_number}</div>
+                      <div className="print:text-black">{v.car_make_model}</div>
+                      <div className="font-mono text-amber-300 print:text-amber-900 font-bold">{v.plate_number}</div>
                     </td>
                     <td className="p-3.5">
                       {v.corporate_name ? (
-                        <span className="px-2 py-0.5 rounded-lg bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 font-bold text-[11px]">
+                        <span className="px-2 py-0.5 rounded-lg bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 font-bold text-[11px] print:bg-slate-100 print:text-black">
                           {v.corporate_name}
                         </span>
                       ) : (
-                        <span className="text-slate-400">فردي</span>
+                        <span className="text-slate-400 print:text-slate-600">فردي</span>
                       )}
                     </td>
-                    <td className="p-3.5 font-mono font-black text-rose-400 text-base">
+                    <td className="p-3.5 font-mono font-black text-rose-400 print:text-rose-700 text-base">
                       {Number(v.balance_due).toLocaleString()} ر.ي
                     </td>
-                    <td className="p-3.5 text-center">
+                    <td className="p-3.5 text-center print:hidden">
                       <a
                         href={getDebtWhatsAppUrl(v)}
                         target="_blank"
@@ -660,10 +693,10 @@ export default function RetentionRadar({ onSelectVehicleForPos }) {
                         <span>إرسال إشعار رصيد 📲</span>
                       </a>
                     </td>
-                    <td className="p-3.5 text-center">
+                    <td className="p-3.5 text-center print:hidden">
                       <button
                         type="button"
-                        onClick={() => onSelectVehicleForPos(v)}
+                        onClick={() => onSelectVehicleForPos({ ...v, id: v.id || v.vehicle_id })}
                         className="px-3.5 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-extrabold text-xs transition active:scale-95"
                       >
                         فتح POS
@@ -690,8 +723,8 @@ export default function RetentionRadar({ onSelectVehicleForPos }) {
                   <th className="p-3.5">السيارة والزيت المعتاد</th>
                   <th className="p-3.5 text-center">آخر عداد مسجل</th>
                   <th className="p-3.5 text-center">رصيد الدين</th>
-                  <th className="p-3.5 text-center">سجل الصيانة</th>
-                  <th className="p-3.5 text-center">إجراء</th>
+                  <th className="p-3.5 text-center print:hidden">سجل الصيانة</th>
+                  <th className="p-3.5 text-center print:hidden">إجراء</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-white/5 text-slate-200">
@@ -739,7 +772,7 @@ export default function RetentionRadar({ onSelectVehicleForPos }) {
                         <span className="text-emerald-400">0</span>
                       )}
                     </td>
-                    <td className="p-3.5 text-center">
+                    <td className="p-3.5 text-center print:hidden">
                       <button
                         type="button"
                         onClick={() => handleOpenHistory(v.id)}
@@ -749,10 +782,10 @@ export default function RetentionRadar({ onSelectVehicleForPos }) {
                         <span>سجل الزيارات</span>
                       </button>
                     </td>
-                    <td className="p-3.5 text-center">
+                    <td className="p-3.5 text-center print:hidden">
                       <button
                         type="button"
-                        onClick={() => onSelectVehicleForPos(v)}
+                        onClick={() => onSelectVehicleForPos({ ...v, id: v.id || v.vehicle_id })}
                         className="px-3 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-extrabold text-xs flex items-center justify-center gap-1 mx-auto transition active:scale-95"
                       >
                         <span>فتح POS</span>
@@ -768,7 +801,7 @@ export default function RetentionRadar({ onSelectVehicleForPos }) {
 
       {/* 8. Vehicle Maintenance History Modal */}
       {selectedVehicleHistory && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md print:hidden">
           <div className="apple-glass border border-white/20 rounded-3xl w-full max-w-2xl max-h-[85vh] flex flex-col overflow-hidden shadow-2xl animate-in zoom-in-95">
             <div className="px-6 py-4 border-b border-white/10 flex items-center justify-between bg-white/5">
               <div className="flex items-center gap-3">
@@ -804,7 +837,7 @@ export default function RetentionRadar({ onSelectVehicleForPos }) {
                     </div>
                     <div className="grid grid-cols-2 gap-2 text-slate-300">
                       <div>العداد المسجل: <span className="font-mono font-bold">{Number(inv.current_odometer).toLocaleString()} كم</span></div>
-                      <div>الفني المنفذ: <span className="font-bold text-white">{inv.worker_name || 'المركز'}</span></div>
+                      <div>حالة الخدمة: <span className="font-bold text-emerald-400">مكتملة ومسجلة ✅</span></div>
                     </div>
                     <div className="space-y-1 pt-1">
                       {(inv.items || []).map((it, i) => (

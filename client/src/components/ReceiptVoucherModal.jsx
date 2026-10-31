@@ -52,6 +52,16 @@ export default function ReceiptVoucherModal({
     }
   }, [initialData, isOpen]);
 
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape' && isOpen) {
+        onClose();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, onClose]);
+
   if (!isOpen) return null;
 
   const handleVehicleSelect = (e) => {
@@ -119,8 +129,13 @@ export default function ReceiptVoucherModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-5 bg-black/85 backdrop-blur-md overflow-y-auto">
-      <div className="apple-glass border border-white/20 rounded-3xl w-full max-w-2xl overflow-hidden shadow-2xl animate-in fade-in zoom-in-95 my-4 text-right">
+    <div
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
+      className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-5 bg-black/85 backdrop-blur-md overflow-y-auto cursor-pointer"
+    >
+      <div className="apple-glass border border-white/20 rounded-3xl w-full max-w-2xl overflow-hidden shadow-2xl animate-in fade-in zoom-in-95 my-4 text-right cursor-default">
         {/* Header (Screen only) */}
         <div className="px-6 py-4 border-b border-white/10 flex items-center justify-between bg-emerald-500/10 print:hidden">
           <div className="flex items-center gap-2.5">
@@ -414,6 +429,7 @@ export default function ReceiptVoucherModal({
                   placeholder="مثال: 25000"
                   value={amount}
                   onChange={(e) => setAmount(e.target.value)}
+                  autoFocus
                   className="w-full min-h-[44px] px-3.5 rounded-xl bg-slate-900 border border-white/15 text-white font-mono text-base font-extrabold"
                   required
                 />

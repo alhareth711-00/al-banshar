@@ -98,10 +98,36 @@ function initDb() {
       if (!invCols.includes('inspection_completed_at')) {
         db.exec("ALTER TABLE invoices ADD COLUMN inspection_completed_at TEXT");
       }
-      console.log('[DB] Pre-schema migration applied: upgraded invoices schema.');
+      if (!invCols.includes('shift_id')) {
+        db.exec("ALTER TABLE invoices ADD COLUMN shift_id INTEGER REFERENCES cash_shifts(id)");
+      }
+      console.log('[DB] Pre-schema migration applied: upgraded invoices schema with shift_id.');
     }
   } catch (err) {
     console.warn('[DB] Pre-migration warning on invoices:', err.message);
+  }
+
+  // Pre-schema migration: official_vouchers status, void_reason, voided_at, is_multiline
+  try {
+    const voucherTableCheck = db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='official_vouchers'").get();
+    if (voucherTableCheck) {
+      const vCols = db.prepare("PRAGMA table_info(official_vouchers)").all().map(c => c.name);
+      if (!vCols.includes('status')) {
+        db.exec("ALTER TABLE official_vouchers ADD COLUMN status TEXT NOT NULL DEFAULT 'posted'");
+      }
+      if (!vCols.includes('void_reason')) {
+        db.exec("ALTER TABLE official_vouchers ADD COLUMN void_reason TEXT");
+      }
+      if (!vCols.includes('voided_at')) {
+        db.exec("ALTER TABLE official_vouchers ADD COLUMN voided_at TEXT");
+      }
+      if (!vCols.includes('is_multiline')) {
+        db.exec("ALTER TABLE official_vouchers ADD COLUMN is_multiline INTEGER NOT NULL DEFAULT 0");
+      }
+      console.log('[DB] Pre-schema migration applied: upgraded official_vouchers schema.');
+    }
+  } catch (err) {
+    console.warn('[DB] Pre-migration warning on official_vouchers:', err.message);
   }
 
   const schemaPath = path.join(__dirname, 'schema.sql');
@@ -310,7 +336,34 @@ function initDb() {
       );
 
       CREATE INDEX IF NOT EXISTS idx_audit_date ON cash_drawer_audits(audit_date);
+
+      -- Stage 7 Migration: Enhanced Vouchers, Reversals, Statuses & Multi-line Items
+      CREATE TABLE IF NOT EXISTS voucher_items (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        voucher_id INTEGER NOT NULL REFERENCES official_vouchers(id) ON DELETE CASCADE ON UPDATE CASCADE,
+        account_code TEXT NOT NULL REFERENCES chart_of_accounts(code) ON UPDATE CASCADE,
+        category_name TEXT,
+        amount REAL NOT NULL CHECK(amount > 0),
+        description TEXT
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_voucher_items_vid ON voucher_items(voucher_id);
     `);
+
+    // Ensure status, void_reason, voided_at, is_multiline columns exist in official_vouchers
+    const voucherCols = db.prepare("PRAGMA table_info(official_vouchers)").all().map(c => c.name);
+    if (!voucherCols.includes('status')) {
+      db.prepare("ALTER TABLE official_vouchers ADD COLUMN status TEXT NOT NULL DEFAULT 'posted'").run();
+    }
+    if (!voucherCols.includes('void_reason')) {
+      db.prepare("ALTER TABLE official_vouchers ADD COLUMN void_reason TEXT").run();
+    }
+    if (!voucherCols.includes('voided_at')) {
+      db.prepare("ALTER TABLE official_vouchers ADD COLUMN voided_at TEXT").run();
+    }
+    if (!voucherCols.includes('is_multiline')) {
+      db.prepare("ALTER TABLE official_vouchers ADD COLUMN is_multiline INTEGER NOT NULL DEFAULT 0").run();
+    }
 
     // Stage 6 Migration: Cash shifts enhancements (cashier_name, handed_over_to, total_inflow, total_outflow)
     const shiftCols = db.prepare("PRAGMA table_info(cash_shifts)").all().map(c => c.name);
@@ -390,6 +443,46 @@ function initDb() {
     console.log('[DB] Migration applied: invoices upgraded with service_status and safety_inspection_data.');
   } catch (err) {
     console.warn('[DB] Migration warning on invoices service fields:', err.message);
+  }
+
+  // Migration: expense_categories is_active and technician performance indexes
+  try {
+    const expCols = db.prepare("PRAGMA table_info(expense_categories)").all().map(c => c.name);
+    if (!expCols.includes('is_active')) {
+      db.exec("ALTER TABLE expense_categories ADD COLUMN is_active INTEGER NOT NULL DEFAULT 1");
+    }
+    db.exec(`
+      CREATE INDEX IF NOT EXISTS idx_invoices_worker_date ON invoices(worker_id, created_at);
+      CREATE INDEX IF NOT EXISTS idx_daily_tx_worker_date ON daily_transactions(worker_id, tx_type, created_at);
+      UPDATE workers SET commission_rate = 0 WHERE commission_rate != 0;
+    `);
+    console.log('[DB] Migration applied: expense_categories is_active and technician performance indexes verified.');
+  } catch (err) {
+    console.warn('[DB] Migration warning on expense_categories and indexes:', err.message);
+  }
+
+  // Migration: Treasury & Official Vouchers performance indexes
+  try {
+    db.exec(`
+      CREATE INDEX IF NOT EXISTS idx_vouchers_paper_bill ON official_vouchers(paper_bill_number);
+      CREATE INDEX IF NOT EXISTS idx_vouchers_cash_acc ON official_vouchers(cash_account_code);
+      CREATE INDEX IF NOT EXISTS idx_vouchers_offset_acc ON official_vouchers(offset_account_code);
+    `);
+    console.log('[DB] Migration applied: Treasury and Official Vouchers performance indexes verified.');
+  } catch (err) {
+    console.warn('[DB] Migration warning on vouchers performance indexes:', err.message);
+  }
+
+  // Migration: Radar & Fleet Vehicle Performance Indexes
+  try {
+    db.exec(`
+      CREATE INDEX IF NOT EXISTS idx_vehicles_balance ON customers_vehicles(balance_due);
+      CREATE INDEX IF NOT EXISTS idx_vehicles_corporate ON customers_vehicles(corporate_name);
+      CREATE INDEX IF NOT EXISTS idx_invoices_veh_id_desc ON invoices(vehicle_id, id DESC);
+    `);
+    console.log('[DB] Migration applied: Radar and Vehicle performance indexes verified.');
+  } catch (err) {
+    console.warn('[DB] Migration warning on radar vehicle performance indexes:', err.message);
   }
 
   // Seed standard Chart of Accounts

@@ -383,8 +383,11 @@ export default function FinancialVaultHub({ onRefreshData, onOpenStatement }) {
           <div className="mt-2 text-[11px] text-slate-400 flex items-center justify-between border-t border-white/5 pt-1.5">
             <span>عدد المركبات المدينة: {customerDebts.length}</span>
             <button
-              onClick={() => setActiveTab('debts')}
-              className="text-amber-400 hover:underline flex items-center gap-1"
+              onClick={() => {
+                setSearchQuery('');
+                setActiveTab('debts');
+              }}
+              className="text-amber-400 hover:underline flex items-center gap-1 font-bold"
             >
               عرض التحصيلات ←
             </button>
@@ -1383,8 +1386,13 @@ export default function FinancialVaultHub({ onRefreshData, onOpenStatement }) {
       {/* VOUCHER PREVIEW / PRINT MODAL                           */}
       {/* ======================================================== */}
       {viewingVoucher && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
-          <div className="w-full max-w-lg bg-slate-900 border border-white/20 rounded-3xl overflow-hidden shadow-2xl flex flex-col max-h-[90vh]">
+        <div 
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setViewingVoucher(null);
+          }}
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md cursor-pointer"
+        >
+          <div className="w-full max-w-lg bg-slate-900 border border-white/20 rounded-3xl overflow-hidden shadow-2xl flex flex-col max-h-[90vh] cursor-default">
             {/* Modal Header */}
             <div className="p-4 border-b border-white/10 flex items-center justify-between bg-slate-950/60">
               <h3 className="font-bold text-white text-sm flex items-center gap-2">
@@ -1442,6 +1450,38 @@ export default function FinancialVaultHub({ onRefreshData, onOpenStatement }) {
                     {viewingVoucher.payment_method === 'cash' ? 'نقداً (الصندوق)' : viewingVoucher.payment_method}
                   </span>
                 </div>
+                <div>
+                  <span className="text-slate-500">المستخدم المنفذ: </span>
+                  <span className="font-bold text-slate-800">
+                    {viewingVoucher.created_by || 'أمين الصندوق'}
+                  </span>
+                </div>
+              </div>
+
+              {/* Double-Entry Ledger Impact (الأثر المحاسبي المزدوج) */}
+              <div className="bg-slate-50 p-2.5 rounded-xl border border-slate-200 text-xs space-y-1.5 print:hidden">
+                <div className="font-bold text-slate-700 flex items-center justify-between border-b border-slate-200 pb-1 text-[11px]">
+                  <span>⚖️ القيد المحاسبي المزدوج المرافق:</span>
+                  <span className="font-mono text-[10px] text-emerald-700 font-bold">قيد آلي متوازن</span>
+                </div>
+                <div className="grid grid-cols-2 gap-2 text-[10px]">
+                  <div className="p-1.5 rounded bg-emerald-50 text-emerald-950 border border-emerald-200 font-medium">
+                    <span className="font-bold text-emerald-800">الطرف المدين (+): </span>
+                    <span>
+                      {viewingVoucher.voucher_type === 'receipt'
+                        ? `${viewingVoucher.cash_account_code || '1101'} (${viewingVoucher.cash_account_name || 'حساب النقدية/الدرج'})`
+                        : `${viewingVoucher.offset_account_code || '6109'} (${viewingVoucher.offset_account_name || 'حساب المصروف/الذمة'})`}
+                    </span>
+                  </div>
+                  <div className="p-1.5 rounded bg-rose-50 text-rose-950 border border-rose-200 font-medium">
+                    <span className="font-bold text-rose-800">الطرف الدائن (-): </span>
+                    <span>
+                      {viewingVoucher.voucher_type === 'receipt'
+                        ? `${viewingVoucher.offset_account_code || '1201'} (${viewingVoucher.offset_account_name || 'حساب ذمم العملاء'})`
+                        : `${viewingVoucher.cash_account_code || '1101'} (${viewingVoucher.cash_account_name || 'حساب النقدية/الدرج'})`}
+                    </span>
+                  </div>
+                </div>
               </div>
 
               {/* Amount Box */}
@@ -1451,7 +1491,7 @@ export default function FinancialVaultHub({ onRefreshData, onOpenStatement }) {
                   {Number(viewingVoucher.amount).toLocaleString()} ريال يمني
                 </div>
                 <div className="text-xs text-slate-700 font-semibold mt-1">
-                  فقط {tafqeet(Number(viewingVoucher.amount))} لا غير.
+                  {tafqeet(Number(viewingVoucher.amount))}
                 </div>
               </div>
 

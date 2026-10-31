@@ -42,6 +42,25 @@ export default function StatementOfAccountModal({ isOpen, onClose, initialPartyT
   const printRef = useRef(null);
   const settings = getShopSettings();
 
+  // Sync initial props whenever modal opens or props change
+  useEffect(() => {
+    if (isOpen) {
+      if (initialPartyType) setPartyType(initialPartyType);
+      if (initialPartyId) setPartyId(initialPartyId);
+    }
+  }, [isOpen, initialPartyType, initialPartyId]);
+
+  // Close on ESC
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape' && isOpen) {
+        onClose();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, onClose]);
+
   // Load parties list based on selected party type
   useEffect(() => {
     if (!isOpen) return;
@@ -58,7 +77,7 @@ export default function StatementOfAccountModal({ isOpen, onClose, initialPartyT
           setPartyList(data.data || []);
           // Auto select first or matching
           if (initialPartyId && partyType === initialPartyType) {
-            const match = (data.data || []).find((p) => p.id === Number(initialPartyId));
+            const match = (data.data || []).find((p) => Number(p.id) === Number(initialPartyId));
             if (match) {
               setSelectedParty(match);
               setPartyId(match.id);
@@ -74,7 +93,7 @@ export default function StatementOfAccountModal({ isOpen, onClose, initialPartyT
     };
 
     loadParties();
-  }, [isOpen, partyType]);
+  }, [isOpen, partyType, initialPartyId, initialPartyType]);
 
   // Fetch statement data when party or dates change
   const fetchStatement = async () => {
@@ -192,8 +211,13 @@ ${linesText}
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-black/85 backdrop-blur-md select-none">
-      <div className="apple-glass border border-white/20 rounded-3xl w-full max-w-5xl h-[92vh] flex flex-col overflow-hidden shadow-2xl animate-in zoom-in-95">
+    <div
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
+      className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-black/85 backdrop-blur-md select-none cursor-pointer"
+    >
+      <div className="apple-glass border border-white/20 rounded-3xl w-full max-w-5xl h-[92vh] flex flex-col overflow-hidden shadow-2xl animate-in zoom-in-95 cursor-default">
         {/* 1. Modal Header */}
         <div className="px-5 py-3.5 border-b border-white/10 flex items-center justify-between bg-white/5 flex-shrink-0">
           <div className="flex items-center gap-3">

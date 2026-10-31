@@ -38,6 +38,9 @@ CREATE INDEX IF NOT EXISTS idx_vehicles_plate ON customers_vehicles(plate_number
 CREATE INDEX IF NOT EXISTS idx_vehicles_phone ON customers_vehicles(phone);
 CREATE INDEX IF NOT EXISTS idx_vehicles_name ON customers_vehicles(customer_name);
 CREATE INDEX IF NOT EXISTS idx_vehicles_next_due_date ON customers_vehicles(next_due_date);
+CREATE INDEX IF NOT EXISTS idx_vehicles_balance ON customers_vehicles(balance_due);
+CREATE INDEX IF NOT EXISTS idx_vehicles_corporate ON customers_vehicles(corporate_name);
+CREATE INDEX IF NOT EXISTS idx_vehicles_make_model ON customers_vehicles(car_make_model);
 
 CREATE TABLE IF NOT EXISTS inventory (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -108,12 +111,15 @@ CREATE TABLE IF NOT EXISTS invoices (
     service_status TEXT DEFAULT 'completed' CHECK(service_status IN ('pending_service', 'completed')),
     safety_inspection_data TEXT,
     inspection_completed_at TEXT,
+    shift_id INTEGER REFERENCES cash_shifts(id) ON UPDATE CASCADE,
     created_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime'))
 );
 
 CREATE INDEX IF NOT EXISTS idx_invoices_service_status ON invoices(service_status);
 CREATE INDEX IF NOT EXISTS idx_invoices_vehicle ON invoices(vehicle_id);
+CREATE INDEX IF NOT EXISTS idx_invoices_veh_id_desc ON invoices(vehicle_id, id DESC);
 CREATE INDEX IF NOT EXISTS idx_invoices_worker ON invoices(worker_id);
+CREATE INDEX IF NOT EXISTS idx_invoices_shift ON invoices(shift_id);
 CREATE INDEX IF NOT EXISTS idx_invoices_created ON invoices(created_at);
 CREATE INDEX IF NOT EXISTS idx_invoices_number ON invoices(invoice_number);
 
@@ -233,13 +239,32 @@ CREATE TABLE IF NOT EXISTS official_vouchers (
     notes TEXT,
     prev_balance REAL NOT NULL DEFAULT 0,
     new_balance REAL NOT NULL DEFAULT 0,
+    status TEXT NOT NULL DEFAULT 'posted' CHECK(status IN ('posted', 'voided', 'modified')),
+    void_reason TEXT,
+    voided_at TEXT,
+    is_multiline INTEGER NOT NULL DEFAULT 0 CHECK(is_multiline IN (0, 1)),
     created_by TEXT DEFAULT 'أمين الصندوق',
     created_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime'))
 );
 
+CREATE TABLE IF NOT EXISTS voucher_items (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    voucher_id INTEGER NOT NULL REFERENCES official_vouchers(id) ON DELETE CASCADE ON UPDATE CASCADE,
+    account_code TEXT NOT NULL REFERENCES chart_of_accounts(code) ON UPDATE CASCADE,
+    category_name TEXT,
+    amount REAL NOT NULL CHECK(amount > 0),
+    description TEXT
+);
+
+CREATE INDEX IF NOT EXISTS idx_voucher_items_vid ON voucher_items(voucher_id);
+CREATE INDEX IF NOT EXISTS idx_vouchers_status ON official_vouchers(status);
+
 CREATE INDEX IF NOT EXISTS idx_vouchers_type ON official_vouchers(voucher_type);
 CREATE INDEX IF NOT EXISTS idx_vouchers_party ON official_vouchers(party_type, party_id);
 CREATE INDEX IF NOT EXISTS idx_vouchers_created ON official_vouchers(created_at);
+CREATE INDEX IF NOT EXISTS idx_vouchers_paper_bill ON official_vouchers(paper_bill_number);
+CREATE INDEX IF NOT EXISTS idx_vouchers_cash_acc ON official_vouchers(cash_account_code);
+CREATE INDEX IF NOT EXISTS idx_vouchers_offset_acc ON official_vouchers(offset_account_code);
 
 -- Stage 5 Pro Upgrade 2: Cash Drawer Reconciliation & Variance Audits
 CREATE TABLE IF NOT EXISTS cash_drawer_audits (

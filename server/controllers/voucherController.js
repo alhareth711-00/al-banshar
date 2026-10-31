@@ -112,6 +112,18 @@ const voucherController = {
     });
   }),
 
+  recordOpeningCapital: asyncHandler(async (req, res) => {
+    const { amount, target_account_code, notes, created_by } = req.body;
+    if (!amount || Number(amount) <= 0) {
+      throw new AppError('مبلغ الرصيد الافتتاحي / التمويل يجب أن يكون أكبر من الصفر', 400);
+    }
+    const result = voucherModel.recordOpeningCapital({ amount, target_account_code, notes, created_by });
+    res.status(201).json({
+      success: true,
+      ...result,
+    });
+  }),
+
   // Stage 5 Pro Upgrade 3: Owner Drawings vs Operating Profit
   getOwnerDrawingsSummary: asyncHandler(async (req, res) => {
     const summary = voucherModel.getOwnerDrawingsAnalytics();
@@ -128,6 +140,58 @@ const voucherController = {
     res.json({
       success: true,
       data: analytics,
+    });
+  }),
+
+  getExpenses: asyncHandler(async (req, res) => {
+    const expenses = voucherModel.getOperatingExpenses(req.query);
+    res.json({
+      success: true,
+      count: expenses.length,
+      data: expenses,
+    });
+  }),
+
+  update: asyncHandler(async (req, res) => {
+    const { id } = req.params;
+    const { performed_by } = req.body;
+    const updated = voucherModel.update(id, req.body, performed_by || 'المدير');
+    res.json({
+      success: true,
+      message: 'تم تعديل السند وتسوية الأرصدة وإعادة ترحيل القيد المحاسبي بنجاح تام',
+      data: updated,
+    });
+  }),
+
+  voidVoucher: asyncHandler(async (req, res) => {
+    const { id } = req.params;
+    const { reason, performed_by } = req.body;
+    if (!reason || !reason.trim()) {
+      throw new AppError('يرجى كتابة سبب رسمي واضح لإلغاء السند', 400);
+    }
+    const result = voucherModel.voidVoucher(id, reason.trim(), performed_by || 'المدير');
+    res.json({
+      success: true,
+      message: 'تم إلغاء السند وعكس الأثر المالي وتوليد القيد المحاسبي العكسي بنجاح',
+      data: result,
+    });
+  }),
+
+  getSummaryMetrics: asyncHandler(async (req, res) => {
+    const metrics = voucherModel.getSummaryMetrics();
+    res.json({
+      success: true,
+      data: metrics,
+    });
+  }),
+
+  searchParties: asyncHandler(async (req, res) => {
+    const { q, type } = req.query;
+    const parties = voucherModel.searchParties(q || '', type || 'all');
+    res.json({
+      success: true,
+      count: parties.length,
+      data: parties,
     });
   }),
 };

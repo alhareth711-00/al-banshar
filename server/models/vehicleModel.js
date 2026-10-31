@@ -1,31 +1,47 @@
 const db = require('../db/database');
 
 const vehicleModel = {
-  search(q) {
-    if (!q || !q.trim()) {
-      return db.prepare(`
+  getAll(filter = {}) {
+    const q = filter.q ? String(filter.q).trim() : '';
+    const limit = filter.limit ? Number(filter.limit) : null;
+
+    if (!q) {
+      let sql = `
         SELECT cv.*, 
           (SELECT COUNT(*) FROM customers_vehicles WHERE phone = cv.phone) AS customer_vehicles_count,
           (SELECT MAX(created_at) FROM invoices WHERE vehicle_id = cv.id) AS last_visit_date,
           (SELECT COUNT(*) FROM invoices WHERE vehicle_id = cv.id) AS total_visits
         FROM customers_vehicles cv
-        ORDER BY cv.id DESC
-        LIMIT 25
-      `).all();
+      `;
+      if (filter.has_debt) {
+        sql += ` WHERE cv.balance_due > 0 `;
+      }
+      sql += ` ORDER BY cv.id DESC `;
+      if (limit && limit > 0) {
+        sql += ` LIMIT ${limit} `;
+      }
+      return db.prepare(sql).all();
     }
 
-    const searchTerm = `%${q.trim()}%`;
-    return db.prepare(`
+    const searchTerm = `%${q}%`;
+    let sql = `
       SELECT cv.*, 
         (SELECT COUNT(*) FROM customers_vehicles WHERE phone = cv.phone) AS customer_vehicles_count,
         (SELECT MAX(created_at) FROM invoices WHERE vehicle_id = cv.id) AS last_visit_date,
         (SELECT COUNT(*) FROM invoices WHERE vehicle_id = cv.id) AS total_visits
       FROM customers_vehicles cv
-      WHERE cv.plate_number LIKE ? 
-         OR cv.phone LIKE ? 
-         OR cv.customer_name LIKE ?
-         OR cv.car_make_model LIKE ?
-         OR cv.corporate_name LIKE ?
+      WHERE (
+        cv.plate_number LIKE ? 
+        OR cv.phone LIKE ? 
+        OR cv.customer_name LIKE ?
+        OR cv.car_make_model LIKE ?
+        OR cv.corporate_name LIKE ?
+      )
+    `;
+    if (filter.has_debt) {
+      sql += ` AND cv.balance_due > 0 `;
+    }
+    sql += `
       ORDER BY 
         CASE 
           WHEN cv.plate_number = ? THEN 1
@@ -33,8 +49,15 @@ const vehicleModel = {
           ELSE 3
         END,
         cv.id DESC
-      LIMIT 25
-    `).all(searchTerm, searchTerm, searchTerm, searchTerm, searchTerm, q.trim(), q.trim());
+    `;
+    if (limit && limit > 0) {
+      sql += ` LIMIT ${limit} `;
+    }
+    return db.prepare(sql).all(searchTerm, searchTerm, searchTerm, searchTerm, searchTerm, q, q);
+  },
+
+  search(q, limit = null) {
+    return this.getAll({ q, limit: limit || (q ? 25 : null) });
   },
 
   getById(id) {
@@ -281,7 +304,7 @@ const vehicleModel = {
   },
 
   // Upgrade 4: Advanced Predictive Retention Radar with 3000 km standard
-  getRetentionRadar() {
+  getRetentionRadar(options = {}) {
     const today = new Date().toISOString().split('T')[0];
 
     const vehicles = db.prepare(`
@@ -289,11 +312,12 @@ const vehicleModel = {
         cv.*,
         (SELECT MAX(created_at) FROM invoices WHERE vehicle_id = cv.id) AS last_service_date,
         (SELECT current_odometer FROM invoices WHERE vehicle_id = cv.id ORDER BY id DESC LIMIT 1) AS last_recorded_odometer,
+        (SELECT net_total FROM invoices WHERE vehicle_id = cv.id ORDER BY id DESC LIMIT 1) AS last_invoice_total,
         (SELECT COUNT(*) FROM invoices WHERE vehicle_id = cv.id) AS visit_count,
         (SELECT sent_at FROM service_reminders_log WHERE vehicle_id = cv.id ORDER BY id DESC LIMIT 1) AS last_reminded_at,
         (SELECT COUNT(*) FROM service_reminders_log WHERE vehicle_id = cv.id) AS reminder_sent_count
       FROM customers_vehicles cv
-      WHERE cv.next_due_date IS NOT NULL OR cv.next_due_odometer > 0
+      WHERE cv.next_due_date IS NOT NULL OR cv.next_due_odometer > 0 OR cv.last_odometer > 0
     `).all();
 
     const radarList = [];
@@ -380,8 +404,9 @@ const vehicleModel = {
         statusLabel = 'تذكير استباقي ⏳';
       }
 
-      // Include all overdue, due soon, approaching or those with pending debt
-      if (status !== 'safe' || v.balance_due > 0) {
+      // Include all overdue, due soon, approaching
+      // If caller specifically requested includeSafe, also allow safe
+      if (status !== 'safe' || options.includeSafe) {
         // Pre-formatted Yemeni WhatsApp Reminder Message
         const customerFirstName = v.customer_name ? v.customer_name.split(' ')[0] : 'العميل العزيز';
         const customWhatsAppMessage = `السلام عليكم ورحمة الله وبركاته 🚗
@@ -398,6 +423,7 @@ ${reason ? `⚠️ الحالة: ${reason}` : ''}
 نتمنى لكم دوام السلامة والعافية 🌹`;
 
         radarList.push({
+          id: v.id,
           vehicle_id: v.id,
           plate_number: v.plate_number,
           plate_type: v.plate_type,
@@ -426,6 +452,7 @@ ${reason ? `⚠️ الحالة: ${reason}` : ''}
           credit_limit: v.credit_limit,
           last_reminded_at: v.last_reminded_at,
           reminder_sent_count: v.reminder_sent_count || 0,
+          estimated_ticket: Number(v.last_invoice_total) || 28000,
           custom_whatsapp_message: customWhatsAppMessage,
         });
       }

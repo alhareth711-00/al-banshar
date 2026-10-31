@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import {
   X,
   RotateCcw,
@@ -11,6 +11,7 @@ import {
   DollarSign,
   ShieldAlert,
 } from 'lucide-react';
+import SearchableCombobox from './SearchableCombobox';
 
 export default function PurchaseReturnModal({
   isOpen,
@@ -44,6 +45,42 @@ export default function PurchaseReturnModal({
   });
 
   const selectedSupplier = suppliers.find((s) => String(s.id) === String(supplierId));
+
+  // Top suppliers for quick return chips
+  const topSuppliers = useMemo(() => {
+    return suppliers.slice(0, 5);
+  }, [suppliers]);
+
+  // Eligible inventory for returns
+  const eligibleInventory = useMemo(() => {
+    return inventory.filter((i) => i.is_active === 1 && i.category !== 'service');
+  }, [inventory]);
+
+  // Global Ctrl+Enter shortcut listener
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleGlobalKeyDown = (e) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+        e.preventDefault();
+        const submitBtn = document.getElementById('purchase-return-submit-btn');
+        if (submitBtn && !submitBtn.disabled) {
+          submitBtn.click();
+        }
+      }
+    };
+    window.addEventListener('keydown', handleGlobalKeyDown);
+    return () => window.removeEventListener('keydown', handleGlobalKeyDown);
+  }, [isOpen]);
+
+  const handleSelectSupplier = (supp) => {
+    if (supp) {
+      setSupplierId(String(supp.id));
+      setSupplierName(supp.name);
+    } else {
+      setSupplierId('');
+      setSupplierName('');
+    }
+  };
 
   const handleSupplierChange = (e) => {
     const val = e.target.value;
@@ -83,6 +120,14 @@ export default function PurchaseReturnModal({
       ...prev,
       { inventory_id: '', qty: 1, unit_cost: '', max_stock: 0 },
     ]);
+  };
+
+  const handleAddLineAndFocusNext = (currentIdx) => {
+    handleAddLine();
+    setTimeout(() => {
+      const nextInput = document.getElementById(`return-item-input-${currentIdx + 1}`);
+      if (nextInput) nextInput.focus();
+    }, 100);
   };
 
   const handleRemoveLine = (index) => {
@@ -217,28 +262,82 @@ export default function PurchaseReturnModal({
                   </span>
                 )}
               </label>
-              <select
-                autoFocus
-                value={supplierId}
-                onChange={handleSupplierChange}
-                className="w-full min-h-[40px] px-3 rounded-xl bg-slate-950 border border-white/15 text-white font-bold cursor-pointer"
-              >
-                <option value="">-- اختر مورد مسجل أو اكتب بالأسفل --</option>
-                {suppliers.map((s) => (
-                  <option key={s.id} value={s.id}>
-                    {s.name} ({s.company_name || s.phone})
-                  </option>
-                ))}
-              </select>
 
-              {!supplierId && (
-                <input
-                  type="text"
-                  placeholder="اسم المورد..."
-                  value={supplierName}
-                  onChange={(e) => setSupplierName(e.target.value)}
-                  className="w-full min-h-[38px] px-3 rounded-xl bg-slate-950 border border-white/15 text-white mt-2"
-                />
+              {/* Fast Keyboard-first SearchableCombobox */}
+              <SearchableCombobox
+                id="return-supplier-combobox"
+                options={suppliers}
+                value={supplierId}
+                onChange={(val) => {
+                  const s = suppliers.find((x) => String(x.id) === String(val));
+                  handleSelectSupplier(s || null);
+                }}
+                onSelectOption={(supp) => {
+                  handleSelectSupplier(supp);
+                }}
+                placeholder="ابحث باسم المورد، الشركة، أو الهاتف..."
+                searchKeys={['name', 'company_name', 'phone']}
+                autoFocus={true}
+                onAddNew={(newName) => {
+                  setSupplierId('');
+                  setSupplierName(newName);
+                }}
+                addNewLabel="+ قيد كمرتجع لمورد باسم"
+                renderOption={(supp) => (
+                  <div className="flex items-center justify-between w-full gap-2">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <div className="w-7 h-7 rounded-lg bg-rose-500/20 text-rose-400 flex items-center justify-center shrink-0">
+                        <Building2 className="w-4 h-4" />
+                      </div>
+                      <div className="truncate text-right">
+                        <div className="font-bold text-white text-xs truncate flex items-center gap-1.5">
+                          <span>{supp.name}</span>
+                          {supp.company_name && (
+                            <span className="text-[11px] text-slate-400 truncate">({supp.company_name})</span>
+                          )}
+                        </div>
+                        {supp.phone && <div className="text-[10px] text-slate-400 font-mono">{supp.phone}</div>}
+                      </div>
+                    </div>
+                    <div className="text-left shrink-0 font-mono text-[11px]">
+                      {Number(supp.balance_due) > 0 ? (
+                        <span className="px-2 py-0.5 rounded-lg bg-amber-500/20 text-amber-300 font-bold">
+                          دين: {Number(supp.balance_due).toLocaleString()} ر.ي
+                        </span>
+                      ) : (
+                        <span className="text-emerald-400">حساب خالص</span>
+                      )}
+                    </div>
+                  </div>
+                )}
+              />
+
+              {/* Quick Supplier Chips */}
+              {topSuppliers.length > 0 && (
+                <div className="flex items-center gap-1.5 mt-2 overflow-x-auto pb-1 scrollbar-none">
+                  <span className="text-[10px] text-slate-400 shrink-0 font-bold">الموردين:</span>
+                  {topSuppliers.map((s) => (
+                    <button
+                      key={s.id}
+                      type="button"
+                      onClick={() => handleSelectSupplier(s)}
+                      className={`px-2 py-0.5 rounded-lg text-[10px] font-bold border transition shrink-0 ${
+                        String(supplierId) === String(s.id)
+                          ? 'bg-amber-400 text-slate-950 border-amber-300 shadow-sm'
+                          : 'bg-white/5 text-slate-300 border-white/10 hover:border-amber-400/40 hover:text-white'
+                      }`}
+                    >
+                      {s.name}
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              {!supplierId && supplierName && (
+                <div className="mt-2 text-[11px] text-amber-300 bg-amber-500/10 px-2.5 py-1 rounded-lg border border-amber-500/20 flex items-center justify-between">
+                  <span>اسم المورد للمرتجع: <strong>{supplierName}</strong></span>
+                  <button type="button" onClick={() => setSupplierName('')} className="text-slate-400 hover:text-white">✕</button>
+                </div>
               )}
             </div>
 
@@ -258,12 +357,30 @@ export default function PurchaseReturnModal({
             </div>
           </div>
 
+          {/* Quick Keyboard Shortcuts Hint Bar */}
+          <div className="flex flex-wrap items-center justify-between gap-2 px-3 py-1.5 rounded-xl bg-slate-900/90 border border-white/10 text-[11px] text-slate-400">
+            <div className="flex items-center gap-3">
+              <span className="flex items-center gap-1">
+                <kbd className="px-1.5 py-0.5 rounded bg-white/10 text-amber-300 font-mono text-[10px] border border-white/15">Enter ↵</kbd>
+                <span>تنقل تلقائي وسطر جديد</span>
+              </span>
+              <span className="flex items-center gap-1">
+                <kbd className="px-1.5 py-0.5 rounded bg-white/10 text-rose-300 font-mono text-[10px] border border-white/15">Ctrl + Enter</kbd>
+                <span>حفظ المرتجع فورياً</span>
+              </span>
+            </div>
+            <span className="flex items-center gap-1 text-slate-500">
+              <kbd className="px-1.5 py-0.5 rounded bg-white/10 text-slate-400 font-mono text-[10px] border border-white/15">Esc</kbd>
+              <span>إغلاق</span>
+            </span>
+          </div>
+
           {/* Return Items List */}
           <div className="space-y-2">
             <div className="flex items-center justify-between">
               <span className="font-extrabold text-sm text-white flex items-center gap-1.5">
                 <Package className="w-4 h-4 text-rose-400" />
-                <span>الأصناف والكميات المراد إرجاعها:</span>
+                <span>الأصناف والكميات المراد إرجاعها (بحث بالكيبورد / باركود):</span>
               </span>
               <button
                 type="button"
@@ -275,7 +392,7 @@ export default function PurchaseReturnModal({
               </button>
             </div>
 
-            <div className="rounded-2xl border border-white/10 overflow-hidden bg-slate-900/60 divide-y divide-white/5">
+            <div className="rounded-2xl border border-white/10 overflow-visible bg-slate-900/60 divide-y divide-white/5">
               <div className="grid grid-cols-12 gap-2 p-3 bg-white/5 text-[11px] font-bold text-slate-400">
                 <div className="col-span-5">الصنف المرتجع</div>
                 <div className="col-span-2 text-center">الكمية المرتجعة</div>
@@ -290,25 +407,47 @@ export default function PurchaseReturnModal({
                 return (
                   <div key={idx} className="grid grid-cols-12 gap-2 p-2.5 items-center hover:bg-white/5 transition">
                     <div className="col-span-5">
-                      <select
+                      <SearchableCombobox
+                        id={`return-item-input-${idx}`}
+                        options={eligibleInventory}
                         value={line.inventory_id}
-                        onChange={(e) => handleItemSelect(idx, e.target.value)}
-                        className="w-full min-h-[38px] px-2.5 rounded-lg bg-slate-950 border border-white/15 text-white font-bold cursor-pointer"
-                        required
-                      >
-                        <option value="">-- حدد الصنف --</option>
-                        {inventory
-                          .filter((i) => i.is_active === 1 && i.category !== 'service')
-                          .map((inv) => (
-                            <option key={inv.id} value={inv.id}>
-                              {inv.name} (المتوفر: {inv.stock_qty})
-                            </option>
-                          ))}
-                      </select>
+                        onChange={(val) => handleItemSelect(idx, val)}
+                        onSelectOption={(inv) => {
+                          if (inv) {
+                            setTimeout(() => {
+                              const qtyEl = document.getElementById(`return-line-qty-${idx}`);
+                              if (qtyEl) {
+                                qtyEl.focus();
+                                qtyEl.select();
+                              }
+                            }, 60);
+                          }
+                        }}
+                        placeholder="ابحث بالاسم، الماركة، أو الباركود..."
+                        searchKeys={['name', 'brand', 'viscosity', 'pack_size', 'barcode']}
+                        renderOption={(inv) => (
+                          <div className="flex items-center justify-between w-full gap-2">
+                            <div className="truncate text-right">
+                              <div className="font-bold text-white text-xs truncate">
+                                {inv.name}
+                              </div>
+                              <div className="text-[10px] text-slate-400 flex items-center gap-1.5">
+                                {inv.brand && <span>{inv.brand}</span>}
+                                {inv.viscosity && <span>• {inv.viscosity}</span>}
+                              </div>
+                            </div>
+                            <div className="text-left shrink-0 font-mono text-[11px]">
+                              <div className="text-emerald-400 font-bold">متوفر: {inv.stock_qty}</div>
+                              <div className="text-[10px] text-slate-400">{Number(inv.cost_price || 0).toLocaleString()} ر.ي</div>
+                            </div>
+                          </div>
+                        )}
+                      />
                     </div>
 
                     <div className="col-span-2">
                       <input
+                        id={`return-line-qty-${idx}`}
                         type="number"
                         min="1"
                         max={line.max_stock || 9999}
@@ -316,6 +455,16 @@ export default function PurchaseReturnModal({
                         placeholder="الكمية"
                         value={line.qty}
                         onChange={(e) => handleUpdateLine(idx, 'qty', e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            e.preventDefault();
+                            const costEl = document.getElementById(`return-line-cost-${idx}`);
+                            if (costEl) {
+                              costEl.focus();
+                              costEl.select();
+                            }
+                          }
+                        }}
                         className="w-full min-h-[38px] px-2 text-center rounded-lg bg-slate-950 border border-white/15 text-white font-mono font-bold"
                         required
                       />
@@ -323,10 +472,22 @@ export default function PurchaseReturnModal({
 
                     <div className="col-span-2">
                       <input
+                        id={`return-line-cost-${idx}`}
                         type="number"
                         placeholder="التكلفة"
                         value={line.unit_cost}
                         onChange={(e) => handleUpdateLine(idx, 'unit_cost', e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            e.preventDefault();
+                            if (idx === returnItems.length - 1) {
+                              handleAddLineAndFocusNext(idx);
+                            } else {
+                              const nextItem = document.getElementById(`return-item-input-${idx + 1}`);
+                              if (nextItem) nextItem.focus();
+                            }
+                          }
+                        }}
                         className="w-full min-h-[38px] px-2 text-center rounded-lg bg-slate-950 border border-white/15 text-amber-300 font-mono font-bold"
                         required
                       />
@@ -423,6 +584,7 @@ export default function PurchaseReturnModal({
             </button>
 
             <button
+              id="purchase-return-submit-btn"
               type="submit"
               disabled={isSubmitting || totalReturnAmount <= 0}
               className={`flex-1 min-h-[46px] rounded-2xl font-black text-xs shadow-xl flex items-center justify-center gap-2 transition active:scale-95 ${
@@ -433,6 +595,7 @@ export default function PurchaseReturnModal({
             >
               <Check className="w-4 h-4 stroke-[2.5]" />
               <span>{isSubmitting ? 'جاري قيد المرتجع والمخزون...' : 'اعتماد مرتجع المشتريات وقيد اليومية'}</span>
+              <kbd className="px-1.5 py-0.5 rounded bg-black/20 text-[10px] font-mono border border-black/10">Ctrl+↵</kbd>
             </button>
           </div>
         </form>

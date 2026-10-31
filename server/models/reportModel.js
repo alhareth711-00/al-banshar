@@ -164,6 +164,8 @@ const reportModel = {
     let workerAdvancesCash = 0;
     let debtCollectionsTotal = 0;
     let debtCollectionsCash = 0;
+    let ownerDrawingsTotal = 0;
+    let ownerDrawingsCash = 0;
 
     for (const tx of txBreakdownRows) {
       if (tx.tx_type === 'expense') {
@@ -175,12 +177,15 @@ const reportModel = {
       } else if (tx.tx_type === 'debt_collection') {
         debtCollectionsTotal += tx.total_amount;
         if (tx.payment_method === 'cash') debtCollectionsCash += tx.total_amount;
+      } else if (tx.tx_type === 'owner_drawing') {
+        ownerDrawingsTotal += tx.total_amount;
+        if (tx.payment_method === 'cash') ownerDrawingsCash += tx.total_amount;
       }
     }
 
     // 4. Net Cash Drawer calculation
     const totalCashInflow = paymentMethods.cash + debtCollectionsCash;
-    const totalCashOutflow = expensesCash + workerAdvancesCash;
+    const totalCashOutflow = expensesCash + workerAdvancesCash + ownerDrawingsCash;
     const netDrawerCash = totalCashInflow - totalCashOutflow;
 
     // 5. Official Vouchers for the day (RV & PV)
@@ -259,7 +264,7 @@ const reportModel = {
       // purchases query fallback
     }
 
-    // 7. General Ledger Live Balances
+    // 7. General Ledger Balances (Scoped up to selected date for historical accuracy)
     let liveLedger = {
       cash_drawer_1101: 0,
       bank_kuraimi_1102: 0,
@@ -268,17 +273,23 @@ const reportModel = {
 
     try {
       const row1101 = db.prepare(`
-        SELECT COALESCE(SUM(debit), 0) - COALESCE(SUM(credit), 0) AS bal
-        FROM journal_lines WHERE account_code = '1101'
-      `).get();
+        SELECT COALESCE(SUM(jl.debit), 0) - COALESCE(SUM(jl.credit), 0) AS bal
+        FROM journal_lines jl
+        JOIN journal_entries je ON jl.journal_entry_id = je.id
+        WHERE jl.account_code = '1101' AND date(je.entry_date) <= date(?)
+      `).get(date);
       const row1102 = db.prepare(`
-        SELECT COALESCE(SUM(debit), 0) - COALESCE(SUM(credit), 0) AS bal
-        FROM journal_lines WHERE account_code = '1102'
-      `).get();
+        SELECT COALESCE(SUM(jl.debit), 0) - COALESCE(SUM(jl.credit), 0) AS bal
+        FROM journal_lines jl
+        JOIN journal_entries je ON jl.journal_entry_id = je.id
+        WHERE jl.account_code = '1102' AND date(je.entry_date) <= date(?)
+      `).get(date);
       const row1103 = db.prepare(`
-        SELECT COALESCE(SUM(debit), 0) - COALESCE(SUM(credit), 0) AS bal
-        FROM journal_lines WHERE account_code = '1103'
-      `).get();
+        SELECT COALESCE(SUM(jl.debit), 0) - COALESCE(SUM(jl.credit), 0) AS bal
+        FROM journal_lines jl
+        JOIN journal_entries je ON jl.journal_entry_id = je.id
+        WHERE jl.account_code = '1103' AND date(je.entry_date) <= date(?)
+      `).get(date);
 
       liveLedger = {
         cash_drawer_1101: roundMoney(Number(row1101?.bal) || 0),
@@ -357,7 +368,7 @@ const reportModel = {
 
     const totalFiltersCount = filtersSold.reduce((acc, curr) => acc + curr.qty_sold, 0);
 
-    // 11. Workers performance & commissions
+    // 11. Workers performance & daily base wages (لا عمولات - رواتب أساسية وسلف يومية فقط)
     const workers = db.prepare('SELECT * FROM workers WHERE active = 1 ORDER BY id ASC').all();
     const workerReports = [];
 
@@ -376,33 +387,32 @@ const reportModel = {
         WHERE worker_id = ? AND tx_type = 'worker_advance' AND date(created_at) = date(?)
       `).get(w.id, date);
 
-      const commissionEarned = (workerInvoices.total_labor * (w.commission_rate / 100));
       const dailyBaseWage = w.daily_base_wage || 0;
       const advancesTaken = workerAdvances.advances || 0;
-      const netPayableToday = (dailyBaseWage + commissionEarned) - advancesTaken;
+      const netPayableToday = dailyBaseWage - advancesTaken;
 
       workerReports.push({
         worker_id: w.id,
         worker_name: w.name,
         role: w.role,
         daily_base_wage: dailyBaseWage,
-        commission_rate: w.commission_rate,
         jobs_done: workerInvoices.jobs_done,
         total_labor_generated: workerInvoices.total_labor,
-        commission_earned: commissionEarned,
+        commission_rate: 0,
+        commission_earned: 0,
         advances_taken: advancesTaken,
         net_payable_today: netPayableToday,
       });
     }
 
-    // 12. Low Stock alerts (critical inventory items needing reorder)
+    // 12. Low Stock alerts (critical inventory items needing reorder - products only & active)
     const lowStockAlerts = db.prepare(`
       SELECT 
         id, sku, name, category, brand, viscosity, pack_size,
         stock_qty, min_stock_alert,
         (min_stock_alert - stock_qty) AS deficit
       FROM inventory
-      WHERE stock_qty <= min_stock_alert
+      WHERE is_active = 1 AND item_type = 'product' AND stock_qty <= min_stock_alert
       ORDER BY (min_stock_alert - stock_qty) DESC
     `).all();
 
@@ -467,31 +477,57 @@ const reportModel = {
     hourlyAnalytics.average_ticket_per_invoice = avgTicketPerInvoice;
     hourlyAnalytics.average_services_per_car = avgServicesPerCar;
 
-    // 16. Executive Pulse & Profitability (الجزء الرابع: التقرير التنفيذي الشامل)
+    // 16. Executive Pulse & Profitability (التقرير التنفيذي الدقيق المترابط محاسبياً)
+    // Primary: Ledger recorded COGS from Account 5101
+    const cogsLedger = db.prepare(`
+      SELECT COALESCE(SUM(jl.debit - jl.credit), 0) AS total_cogs
+      FROM journal_lines jl
+      JOIN journal_entries je ON jl.journal_entry_id = je.id
+      WHERE jl.account_code = '5101' AND date(je.entry_date) = date(?)
+    `).get(date);
+
+    // Secondary / Fallback: Item cost from inventory for physical products only (excluding pure labor)
     const cogsRow = db.prepare(`
       SELECT 
         COALESCE(SUM(ii.qty * COALESCE(inv.cost_price, 0)), 0) AS total_cogs
       FROM invoice_items ii
       JOIN invoices i ON ii.invoice_id = i.id
       LEFT JOIN inventory inv ON ii.inventory_id = inv.id
-      WHERE date(i.created_at) = date(?)
+      WHERE date(i.created_at) = date(?) AND (ii.item_type != 'service' AND COALESCE(inv.category, '') != 'service')
     `).get(date);
 
-    const totalCogs = cogsRow ? roundMoney(cogsRow.total_cogs) : 0;
-    const grossProfit = roundMoney(Math.max(0, invoicesSummary.total_net_sales - totalCogs));
-    const netProfit = roundMoney(grossProfit - expensesTotal);
-    const expenseCoverageRatio = expensesTotal > 0 
-      ? roundMoney((invoicesSummary.total_net_sales / expensesTotal) * 100) 
-      : 100;
+    const totalCogs = cogsLedger && Number(cogsLedger.total_cogs) > 0
+      ? roundMoney(Number(cogsLedger.total_cogs))
+      : (cogsRow ? roundMoney(cogsRow.total_cogs) : 0);
 
+    const grossProfit = roundMoney(invoicesSummary.total_net_sales - totalCogs);
+    const netProfit = roundMoney(grossProfit - expensesTotal);
+
+    // Expense Coverage Ratio: Gross Profit / Pure Operating Expenses * 100
+    // Edge case: when expenses = 0, if grossProfit > 0 => 100% (safe). If both = 0 => null (N/A)
+    let expenseCoverageRatio = null;
+    let expenseCoverageStatus = 'none'; // 'none' | 'safe' | 'low' | 'danger'
+    if (expensesTotal > 0) {
+      expenseCoverageRatio = roundMoney((grossProfit / expensesTotal) * 100);
+      expenseCoverageStatus = expenseCoverageRatio >= 100 ? 'safe' : (expenseCoverageRatio >= 50 ? 'low' : 'danger');
+    } else if (grossProfit > 0) {
+      expenseCoverageRatio = 100;
+      expenseCoverageStatus = 'safe';
+    } else {
+      expenseCoverageRatio = null; // No sales and no expenses: N/A
+      expenseCoverageStatus = 'none';
+    }
+
+    // Category Breakdown (5 categories: oil, filter, tire, battery, service)
+    // Products grouped from invoice items, pure labor assigned directly without double-counting
     const categoryBreakdownRows = db.prepare(`
       SELECT 
-        COALESCE(inv.category, 'service') AS category,
+        COALESCE(inv.category, 'other') AS category,
         COALESCE(SUM(ii.subtotal), 0) AS sales_amount
       FROM invoice_items ii
       JOIN invoices i ON ii.invoice_id = i.id
       LEFT JOIN inventory inv ON ii.inventory_id = inv.id
-      WHERE date(i.created_at) = date(?)
+      WHERE date(i.created_at) = date(?) AND ii.item_type != 'service'
       GROUP BY category
     `).all(date);
 
@@ -500,13 +536,11 @@ const reportModel = {
       filter: 0,
       tire: 0,
       battery: 0,
-      service: invoicesSummary.total_labor_amount || 0,
+      service: roundMoney(invoicesSummary.total_labor_amount || 0),
     };
     for (const cb of categoryBreakdownRows) {
-      if (categoryBreakdown[cb.category] !== undefined) {
+      if (categoryBreakdown[cb.category] !== undefined && cb.category !== 'service') {
         categoryBreakdown[cb.category] += roundMoney(cb.sales_amount);
-      } else {
-        categoryBreakdown.service += roundMoney(cb.sales_amount);
       }
     }
 
@@ -520,6 +554,7 @@ const reportModel = {
           ? roundMoney((netProfit / invoicesSummary.total_net_sales) * 100) 
           : 0,
         expense_coverage_ratio: expenseCoverageRatio,
+        expense_coverage_status: expenseCoverageStatus,
         category_breakdown: categoryBreakdown,
       },
       summary: {
