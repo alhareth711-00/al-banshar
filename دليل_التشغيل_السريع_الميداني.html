@@ -1,0 +1,623 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <title>دليل التشغيل السريع الميداني — المركز الذهبي لخدمات السيارات وغيار الزيوت</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800;900&family=IBM+Plex+Sans+Arabic:wght@400;600;700&display=swap');
+
+    @page {
+      size: A4;
+      margin: 12mm 12mm 14mm 12mm;
+      @bottom-right {
+        content: "المركز الذهبي لخدمات السيارات وغيار الزيوت | صنعاء - شارع الزبيري";
+        font-family: 'Cairo', sans-serif;
+        font-size: 8pt;
+        color: #64748b;
+      }
+      @bottom-left {
+        content: "صفحة " counter(page) " من " counter(pages);
+        font-family: 'Cairo', sans-serif;
+        font-size: 8pt;
+        font-weight: bold;
+        color: #d97706;
+      }
+    }
+
+    * {
+      box-sizing: border-box;
+      -webkit-print-color-adjust: exact !important;
+      print-color-adjust: exact !important;
+    }
+
+    body {
+      font-family: 'Cairo', 'IBM Plex Sans Arabic', 'Segoe UI', Tahoma, sans-serif;
+      background-color: #ffffff;
+      color: #0f172a;
+      margin: 0;
+      padding: 0;
+      line-height: 1.55;
+      font-size: 9.5pt;
+    }
+
+    /* Container */
+    .container {
+      max-width: 100%;
+      margin: 0 auto;
+    }
+
+    /* Header Banner */
+    .header-banner {
+      background: linear-gradient(135deg, #0f172a 0%, #1e293b 60%, #334155 100%);
+      color: #ffffff;
+      padding: 22px 26px;
+      border-radius: 14px;
+      margin-bottom: 20px;
+      border-bottom: 5px solid #f59e0b;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      box-shadow: 0 4px 14px rgba(15, 23, 42, 0.15);
+    }
+
+    .header-title h1 {
+      margin: 0 0 6px 0;
+      font-size: 19pt;
+      font-weight: 900;
+      color: #fbbf24;
+      letter-spacing: -0.5px;
+    }
+
+    .header-title .subtitle {
+      margin: 0;
+      font-size: 11pt;
+      color: #cbd5e1;
+      font-weight: 600;
+    }
+
+    .header-badge {
+      background: rgba(245, 158, 11, 0.15);
+      border: 1.5px solid #f59e0b;
+      border-radius: 12px;
+      padding: 10px 16px;
+      text-align: center;
+      min-width: 170px;
+    }
+
+    .header-badge .badge-label {
+      font-size: 8pt;
+      color: #fcd34d;
+      font-weight: 700;
+      text-transform: uppercase;
+    }
+
+    .header-badge .badge-val {
+      font-size: 12pt;
+      font-weight: 900;
+      color: #ffffff;
+      margin-top: 3px;
+    }
+
+    /* Section Styling */
+    .section {
+      background: #ffffff;
+      border: 1px solid #e2e8f0;
+      border-radius: 12px;
+      padding: 16px 20px;
+      margin-bottom: 16px;
+      page-break-inside: avoid;
+    }
+
+    .section-title {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin: 0 0 12px 0;
+      padding-bottom: 8px;
+      border-bottom: 2px solid #f1f5f9;
+      font-size: 13pt;
+      font-weight: 800;
+      color: #0f172a;
+    }
+
+    .section-title .icon-box {
+      width: 28px;
+      height: 28px;
+      border-radius: 8px;
+      background: #f59e0b;
+      color: #0f172a;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 900;
+      font-size: 11pt;
+    }
+
+    /* Steps Grid */
+    .steps-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 12px;
+      margin: 12px 0;
+    }
+
+    .step-card {
+      background: #f8fafc;
+      border: 1px solid #cbd5e1;
+      border-top: 4px solid #f59e0b;
+      border-radius: 10px;
+      padding: 12px;
+      position: relative;
+    }
+
+    .step-card.emerald { border-top-color: #10b981; }
+    .step-card.indigo { border-top-color: #6366f1; }
+    .step-card.purple { border-top-color: #8b5cf6; }
+
+    .step-num {
+      position: absolute;
+      top: -12px;
+      right: 12px;
+      background: #0f172a;
+      color: #fbbf24;
+      font-size: 8pt;
+      font-weight: 900;
+      padding: 2px 8px;
+      border-radius: 12px;
+      border: 1px solid #f59e0b;
+    }
+
+    .step-heading {
+      font-size: 10pt;
+      font-weight: 800;
+      color: #0f172a;
+      margin: 6px 0 4px 0;
+    }
+
+    .step-desc {
+      font-size: 8.5pt;
+      color: #475569;
+      line-height: 1.45;
+      margin: 0;
+    }
+
+    /* Tables */
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 10px 0;
+      font-size: 9pt;
+    }
+
+    th {
+      background: #0f172a;
+      color: #f8fafc;
+      font-weight: 800;
+      text-align: right;
+      padding: 8px 12px;
+      border: 1px solid #1e293b;
+    }
+
+    td {
+      padding: 7px 12px;
+      border: 1px solid #e2e8f0;
+      color: #334155;
+    }
+
+    tr:nth-child(even) td {
+      background-color: #f8fafc;
+    }
+
+    /* Alert / Poka-Yoke Banners */
+    .alert-banner {
+      border-radius: 10px;
+      padding: 12px 16px;
+      margin: 12px 0;
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
+      font-size: 9pt;
+    }
+
+    .alert-danger {
+      background: #fef2f2;
+      border: 1.5px solid #f87171;
+      color: #991b1b;
+    }
+
+    .alert-warning {
+      background: #fffbeb;
+      border: 1.5px solid #fbbf24;
+      color: #92400e;
+    }
+
+    .alert-success {
+      background: #f0fdf4;
+      border: 1.5px solid #4ade80;
+      color: #166534;
+    }
+
+    .alert-info {
+      background: #eff6ff;
+      border: 1.5px solid #60a5fa;
+      color: #1e40af;
+    }
+
+    .alert-icon {
+      font-size: 14pt;
+      line-height: 1;
+    }
+
+    .alert-content strong {
+      display: block;
+      margin-bottom: 2px;
+      font-size: 9.5pt;
+    }
+
+    /* Key-Value Info List */
+    .info-list {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 10px;
+      margin: 10px 0;
+    }
+
+    .info-item {
+      background: #f8fafc;
+      padding: 8px 12px;
+      border-radius: 8px;
+      border-right: 3px solid #f59e0b;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .info-label {
+      font-weight: 700;
+      color: #64748b;
+      font-size: 8.5pt;
+    }
+
+    .info-value {
+      font-weight: 800;
+      color: #0f172a;
+      font-size: 9.5pt;
+    }
+
+    /* Badges */
+    .badge {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 6px;
+      font-size: 8pt;
+      font-weight: 800;
+    }
+    .badge-amber { background: #fef3c7; color: #92400e; }
+    .badge-emerald { background: #d1fae5; color: #065f46; }
+    .badge-blue { background: #dbeafe; color: #1e40af; }
+    .badge-rose { background: #ffe4e6; color: #9f1239; }
+
+    /* Page Break Helper */
+    .page-break {
+      page-break-before: always;
+    }
+
+    /* Footer */
+    .manual-footer {
+      text-align: center;
+      margin-top: 24px;
+      padding-top: 14px;
+      border-top: 2px solid #e2e8f0;
+      color: #64748b;
+      font-size: 8pt;
+      font-weight: 600;
+    }
+  </style>
+</head>
+<body>
+
+<div class="container">
+
+  <!-- HEADER BANNER -->
+  <div class="header-banner">
+    <div class="header-title">
+      <h1>دليل التشغيل الميداني السريع (Quick Field Guide)</h1>
+      <div class="subtitle">نظام سريع وبنشر PRO — نقاط البيع وإدارة البناشر ومراكز خدمة الزيوت</div>
+    </div>
+    <div class="header-badge">
+      <div class="badge-label">الهوية المعتمدة</div>
+      <div class="badge-val">المركز الذهبي</div>
+    </div>
+  </div>
+
+  <!-- SECTION 1: IDENTITY & QUICK LAUNCH -->
+  <div class="section">
+    <div class="section-title">
+      <span class="icon-box">1</span>
+      <span>هوية المركز والتشغيل المكتبي بنقرة واحدة (Desktop Kiosk Launch)</span>
+    </div>
+
+    <div class="info-list">
+      <div class="info-item">
+        <span class="info-label">اسم المركز الرسمي:</span>
+        <span class="info-value">المركز الذهبي لخدمات السيارات وغيار الزيوت</span>
+      </div>
+      <div class="info-item">
+        <span class="info-label">هاتف المركز والخدمة:</span>
+        <span class="info-value font-mono">770834754</span>
+      </div>
+      <div class="info-item">
+        <span class="info-label">موقع المركز:</span>
+        <span class="info-value">اليمن - صنعاء - شارع الزبيري</span>
+      </div>
+      <div class="info-item">
+        <span class="info-label">واتساب المالك المعتمد:</span>
+        <span class="info-value font-mono">770834754 (تقارير الإغلاق)</span>
+      </div>
+    </div>
+
+    <div class="alert-banner alert-success">
+      <span class="alert-icon">🚀</span>
+      <div class="alert-content">
+        <strong>كيفية تشغيل النظام في الصباح:</strong>
+        انقر نقراً مزدوجاً على أيقونة <strong>"سريع وبنشر PRO"</strong> الموجودة على سطح المكتب. يفتح النظام تلقائياً بصمت دون شاشات سوداء بوضع التطبيق المستقل (Kiosk Mode) وبدون أشرطة متصفح، ويصبح جاهزاً لإصدار الفواتير فوراً.
+      </div>
+    </div>
+
+    <div style="font-size: 8.5pt; color: #475569; margin-top: 6px;">
+      💡 <strong>التشغيل التلقائي مع الكهرباء:</strong> لتشغيل النظام تلقائياً بمجرد تشغيل كمبيوتر المحل، قم بتشغيل الملف المرفق: <code>تفعيل-التشغيل-التلقائي-مع-الويندوز.bat</code>.
+    </div>
+  </div>
+
+  <!-- SECTION 2: 30-SECOND CAR SERVICE FLOW -->
+  <div class="section">
+    <div class="section-title">
+      <span class="icon-box">2</span>
+      <span>دورة خدمة السيارة السريعة في أقل من 30 ثانية (Fast Flow)</span>
+    </div>
+
+    <div class="steps-grid">
+      <!-- Step 1 -->
+      <div class="step-card">
+        <span class="step-num">خطوة 1</span>
+        <div class="step-heading">التعرف على السيارة</div>
+        <p class="step-desc">
+          اكتب رقم اللوحة أو رقم هاتف الزبون. تظهر بيانات السيارة والمحرك والزيارة السابقة مباشرة، أو انقر على <strong>"عميل نقدي سريع"</strong> للزبون العابر.
+        </p>
+      </div>
+
+      <!-- Step 2 -->
+      <div class="step-card emerald">
+        <span class="step-num">خطوة 2</span>
+        <div class="step-heading">تكرار أو اختيار الزيت</div>
+        <p class="step-desc">
+          انقر زر <strong>"تكرار الخدمة السابقة"</strong> بنقرة واحدة لاختيار نفس الزيت والفلتر، أو اختر لزوجة الزيت وعدد العلب والدبة من الكتالوج اللمسي السريع.
+        </p>
+      </div>
+
+      <!-- Step 3 -->
+      <div class="step-card indigo">
+        <span class="step-num">خطوة 3</span>
+        <div class="step-heading">فحص الـ 8 نقاط</div>
+        <p class="step-desc">
+          علّم بنقرة واحدة على خدمات السلامة المجانية (ماء الرديتر، زيت الفرامل، ضغط الهواء، فحص التهريب) لتظهر كقيمة مضافة في كرت الفاتورة.
+        </p>
+      </div>
+
+      <!-- Step 4 -->
+      <div class="step-card purple">
+        <span class="step-num">خطوة 4</span>
+        <div class="step-heading">السداد والطباعة والواتساب</div>
+        <p class="step-desc">
+          حدد طريقة الدفع (نقد، كريمي، جيب، جوالي) وانقر <strong>"حفظ وطباعة الفاتورة"</strong> مع إمكانية إرسال كرت التغيير القادم لواتساب الزبون فوراً.
+        </p>
+      </div>
+    </div>
+
+    <!-- POKA YOKE GUARDS TABLE -->
+    <table style="margin-top: 14px;">
+      <thead>
+        <tr>
+          <th style="width: 25%;">صمام الأمان (Poka-Yoke)</th>
+          <th style="width: 45%;">ماذا يمنع ويحمي؟</th>
+          <th style="width: 30%;">كيف يتصرف الكاشير؟</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><strong style="color: #b91c1c;">حظر التراجع في عداد الكيلومتر</strong></td>
+          <td>يمنع إدخال قراءة عداد أقل من القراءة المسجلة في الزيارة السابقة لمنع التلاعب وحماية سجل صيانة العميل.</td>
+          <td>تأكيد قراءة الطبلون الحالية، وإذا كان الخطأ كتابياً يتم إدخال الرقم الصحيح فوراً.</td>
+        </tr>
+        <tr>
+          <td><strong style="color: #b45309;">حظر البيع الآجل للعميل العابر</strong></td>
+          <td>يمنع اختيار "آجل" لحساب العميل العام غير المعروف لحماية المركز من الديون المعدومة.</td>
+          <td>تسجيل اسم الزبون ورقم هاتفه أولاً وفتح ملف عميل لتوثيق الدين، أو استلام المبلغ نقداً/محفظة.</td>
+        </tr>
+        <tr>
+          <td><strong style="color: #4338ca;">صمام تعارض الحفرة (Lane Occupancy)</strong></td>
+          <td>يمنع تسجيل مركبتين على نفس الحفرة في نفس اللحظة لمنع خلط الفواتير بين الفنيين.</td>
+          <td>إتمام وإنهاء فاتورة السيارة الأولى قبل إدخال سيارة جديدة على نفس المسار.</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="page-break"></div>
+
+  <!-- SECTION 3: SCRAP BATTERIES & RECLAMATION -->
+  <div class="section">
+    <div class="section-title">
+      <span class="icon-box">3</span>
+      <span>إدارة سكراب البطاريات القديمة والزيوت التالفة (Scrap & Waste Oil)</span>
+    </div>
+
+    <div class="steps-grid" style="grid-template-columns: repeat(2, 1fr);">
+      <div class="step-card">
+        <span class="step-num">سكراب البطاريات</span>
+        <div class="step-heading">خصم البطارية القديمة (Trade-in)</div>
+        <p class="step-desc">
+          عند شراء العميل لبطارية جديدة مع استبدال قديمة، يتم إدخال قيمة خصم السكراب في خانة "خصم الرجيع". 
+          <br><strong>قاعدة ذهبية:</strong> النظام يمنع تلقائياً أن يتجاوز خصم السكراب قيمة البطاريات الجديدة، وعند إلغاء الفاتورة لا تُصرف أي نقدية من الصندوق.
+        </p>
+      </div>
+
+      <div class="step-card emerald">
+        <span class="step-num">الزيوت التالفة</span>
+        <div class="step-heading">بيع الزيوت التالفة والتدوير (حساب 4302)</div>
+        <p class="step-desc">
+          عند بيع براميل الزيت التالف لسيارات التجميع أو مصانع التدوير، يتم تسجيل الحركة عبر <strong>سند قبض رسمي</strong> واختيار تصنيف <strong>"مبيعات الزيوت التالفة والتدوير"</strong> لتسجيل الإيراد في الصندوق والأرباح دون تلويث مبيعات المحل.
+        </p>
+      </div>
+    </div>
+  </div>
+
+  <!-- SECTION 4: PURCHASES & FREIGHT COST -->
+  <div class="section">
+    <div class="section-title">
+      <span class="icon-box">4</span>
+      <span>توريد البضاعة وتوزيع تكاليف الشحن (Purchases & Landed Cost)</span>
+    </div>
+
+    <div class="alert-banner alert-info">
+      <span class="alert-icon">📦</span>
+      <div class="alert-content">
+        <strong>حاسبة تفكيك الكراتين التلقائية:</strong>
+        عند شراء كرتون زيوت (24 علبة) أو كرتون دبات (4 دبات)، يقوم النظام تلقائياً بضرب الكمية واحتساب تكلفة العلبة الفردية. وإذا تم دفع أجور شحن ونقل (دينا/حمالة)، يقوم النظام بتوزيع تكلفة الشحن على العلب تلقائياً لزيادة دقة متوسط التكلفة المرجح (WAC).
+      </div>
+    </div>
+
+    <div class="info-list">
+      <div class="info-item">
+        <span class="info-label">سداد المشتريات نقداً:</span>
+        <span class="info-value">يُخصم المبلغ مباشرة من رصيد الصندوق الدفتري</span>
+      </div>
+      <div class="info-item">
+        <span class="info-label">شراء آجل من شركة الزيوت:</span>
+        <span class="info-value">يُرحل المبلغ لحساب ذمم الموردين (2101)</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- SECTION 5: DAILY CLOSING & FINANCIAL PULSE -->
+  <div class="section">
+    <div class="section-title">
+      <span class="icon-box">5</span>
+      <span>الإغلاق المالي اليومي والنبض الحي (Daily Closing & WhatsApp Report)</span>
+    </div>
+
+    <div class="steps-grid" style="grid-template-columns: repeat(3, 1fr);">
+      <div class="step-card">
+        <span class="step-num">1</span>
+        <div class="step-heading">جرد نقدية الدرج</div>
+        <p class="step-desc">
+          عد النقدية الفعلية الموجودة في الدرج والفلوس الفكة في نهاية اليوم، وفتح نافذة <strong>"الإغلاق المالي"</strong>.
+        </p>
+      </div>
+
+      <div class="step-card emerald">
+        <span class="step-num">2</span>
+        <div class="step-heading">إدخال النقد الفعلي</div>
+        <p class="step-desc">
+          كتابة المبلغ الفعلي؛ يقوم النظام بمطابقته مع المبيعات الدفترية ويُظهر الفارق (عجز أو فائض) تلقائياً.
+        </p>
+      </div>
+
+      <div class="step-card indigo">
+        <span class="step-num">3</span>
+        <div class="step-heading">إرسال التقرير للمالك</div>
+        <p class="step-desc">
+          النقر على زر <strong>"إرسال تقرير الإغلاق لواتساب المالك"</strong> لإرسال ملخص الدخل والأرباح والمتبقي بالصندوق لرقم <code>770834754</code>.
+        </p>
+      </div>
+    </div>
+
+    <div class="alert-banner alert-warning">
+      <span class="alert-icon">⚖️</span>
+      <div class="alert-content">
+        <strong>المعالجة المحاسبية الصارمة للعجز والفائض:</strong>
+        إذا وجد عجز في الصندوق يتم ترحيله لحساب <code>6110 (عجز الصندوق)</code>، وإذا وجد فائض يرحل لحساب <code>4303 (فائض الصندوق)</code> دون أي تشويه لإيرادات مبيعات الزيوت والخدمات.
+      </div>
+    </div>
+  </div>
+
+  <!-- SECTION 6: OWNER PIN & SECURITY -->
+  <div class="section">
+    <div class="section-title">
+      <span class="icon-box">6</span>
+      <span>حماية وضع المالك والأمان المالي (Owner Vault & Master PIN)</span>
+    </div>
+
+    <div class="info-list">
+      <div class="info-item">
+        <span class="info-label">رمز PIN الافتراضي الأولي:</span>
+        <span class="info-value font-mono">1234</span>
+      </div>
+      <div class="info-item">
+        <span class="info-label">القفل التلقائي للشاشة:</span>
+        <span class="info-value">بعد 3 دقائق من عدم النشاط</span>
+      </div>
+    </div>
+
+    <table style="margin-top: 10px;">
+      <thead>
+        <tr>
+          <th>العملية الحساسة</th>
+          <th>مستوى الحماية برمز PIN</th>
+          <th>الهدف الأمني والرقابي</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><strong>عرض هوامش وأرقام الأرباح</strong></td>
+          <td><span class="badge badge-rose">مشفرة ومحمية</span></td>
+          <td>حجب أسعار الشراء بالجملة وهوامش ربح المركز عن العمال والكاشير.</td>
+        </tr>
+        <tr>
+          <td><strong>الموافقة على البيع بالخسارة</strong></td>
+          <td><span class="badge badge-amber">يتطلب موافقة المالك</span></td>
+          <td>منع الكاشير من تقديم خصم ينزل بسعر البيع تحت سعر التكلفة إلا بـ PIN.</td>
+        </tr>
+        <tr>
+          <td><strong>تعديل أو إبطال السندات</strong></td>
+          <td><span class="badge badge-blue">موثق في سجل التدقيق</span></td>
+          <td>منع مسح أو تعديل أي حركة مقبوضة دون إذن صريح من صاحب المركز.</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div style="font-size: 8.5pt; color: #475569; margin-top: 8px;">
+      🔒 <strong>لتغيير رمز PIN:</strong> افتح نافذة <strong>الإعدادات (Settings)</strong> من الشريط الجانبي، توجه إلى بند "رمز المالك السري"، أدخل الرمز الجديد المكون من 4 أرقام، واضغط "حفظ".
+    </div>
+  </div>
+
+  <!-- SECTION 7: CHRONO GUARD & DISASTER RECOVERY -->
+  <div class="section">
+    <div class="section-title">
+      <span class="icon-box">7</span>
+      <span>درع ساعة النظام والنسخ الاحتياطي (Chrono-Guard & Backups)</span>
+    </div>
+
+    <div class="alert-banner alert-danger">
+      <span class="alert-icon">🛡️</span>
+      <div class="alert-content">
+        <strong>درع حظر التراجع الزمني (Chrono-Guard Active):</strong>
+        يحظر النظام تماماً إصدار أي فاتورة إذا تم تأخير ساعة الكمبيوتر أو التراجع بتاريخ الويندوز للماضي، ويقوم النظام فوراً باعتراض الحركة وتوثيق محاولة التلاعب في سجل التدقيق الجنائي (Audit Logs) لحماية أمانة الصندوق.
+      </div>
+    </div>
+
+    <div style="background: #f8fafc; border-radius: 8px; padding: 10px 14px; border-right: 4px solid #10b981; font-size: 8.5pt; color: #334155;">
+      💾 <strong>النسخ الاحتياطي اليومي:</strong> يُنصح بنسخ ملف قاعدة البيانات أو أخذ نسخة عبر زر <strong>"إنشاء نسخة احتياطية الآن"</strong> من الإعدادات وحفظها في فلاش ميموري خارجي أسبوعياً لضمان سلامة الدفاتر المحاسبية مدى الحياة.
+    </div>
+  </div>
+
+  <!-- MANUAL FOOTER -->
+  <div class="manual-footer">
+    المركز الذهبي لخدمات السيارات وغيار الزيوت — نظام سريع وبنشر PRO © 2026<br>
+    صنعاء - شارع الزبيري | هاتف خدمة العملاء والدعم الفني: 770834754
+  </div>
+
+</div>
+
+</body>
+</html>

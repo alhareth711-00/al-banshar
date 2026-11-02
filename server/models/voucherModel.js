@@ -1,5 +1,5 @@
 const db = require('../db/database');
-const { formatDate } = require('../utils/helpers');
+const { formatDate, validateSystemClock } = require('../utils/helpers');
 const { roundMoney, safeNum } = require('../utils/mathPrecision');
 const { postOfficialVoucher, createJournalEntry, getIncomeStatement } = require('../utils/accountingEngine');
 
@@ -7,19 +7,19 @@ function generateVoucherNumber(type = 'receipt') {
   const today = formatDate().replace(/-/g, '');
   const prefix = type === 'receipt' ? `RV-${today}-` : `PV-${today}-`;
 
-  const lastVoucher = db.prepare(`
+  const vouchers = db.prepare(`
     SELECT voucher_number FROM official_vouchers 
-    WHERE voucher_number LIKE ? 
-    ORDER BY id DESC LIMIT 1
-  `).get(`${prefix}%`);
+    WHERE voucher_number LIKE ?
+  `).all(`${prefix}%`);
 
   let nextSeq = 1;
-  if (lastVoucher && lastVoucher.voucher_number) {
-    const parts = lastVoucher.voucher_number.split('-');
-    const seqStr = parts[parts.length - 1];
-    const parsed = parseInt(seqStr, 10);
-    if (!isNaN(parsed)) {
-      nextSeq = parsed + 1;
+  for (const v of vouchers) {
+    if (v && v.voucher_number) {
+      const parts = v.voucher_number.split('-');
+      const parsed = parseInt(parts[parts.length - 1].replace(/\D/g, ''), 10);
+      if (!isNaN(parsed) && parsed >= nextSeq) {
+        nextSeq = parsed + 1;
+      }
     }
   }
 
@@ -169,6 +169,9 @@ const voucherModel = {
   },
 
   create(data) {
+    // [MOD-CHRONO-GUARD]: Verify that system clock has not been rolled back (Executed before transaction so audit log persists)
+    validateSystemClock(db, data.created_at);
+
     const execute = db.transaction(() => {
       const voucherType = data.voucher_type === 'payment' ? 'payment' : 'receipt';
       const amount = roundMoney(safeNum(data.amount, 0));
@@ -263,8 +266,16 @@ const voucherModel = {
         }
       } else if (partyType === 'expense') {
         offsetAccountCode = data.offset_account_code || '6109'; // Operating expense
+      } else if (partyType === 'waste_oil') {
+        // [MOD-RECLAMATION]: Waste / Used Oil Sales to Recycling Companies
+        offsetAccountCode = data.offset_account_code || '4302'; // Reclamation Revenue
+        if (!partyName) partyName = 'شركة تدوير الزيوت (عام)';
+      } else if (partyType === 'scrap_battery') {
+        // [MOD-RECLAMATION]: Scrap Battery Liquidation
+        offsetAccountCode = data.offset_account_code || '1304'; // Scrap Asset Account
+        if (!partyName) partyName = 'تاجر خردة وسكراب';
       } else {
-        offsetAccountCode = voucherType === 'receipt' ? '4201' : '6109';
+        offsetAccountCode = data.offset_account_code || (voucherType === 'receipt' ? '4201' : '6109');
       }
 
       if (!partyName) {
@@ -479,6 +490,10 @@ const voucherModel = {
               db.prepare('UPDATE customers_vehicles SET balance_due = ? WHERE id = ?').run(newBalance, newPartyId);
             }
           }
+        } else if (newPartyType === 'waste_oil') {
+          offsetAccountCode = data.offset_account_code || '4302';
+        } else if (newPartyType === 'scrap_battery') {
+          offsetAccountCode = data.offset_account_code || '1304';
         }
       } else {
         if (newPartyType === 'supplier') {
@@ -1241,7 +1256,7 @@ const voucherModel = {
   },
 
   getOperatingExpenses(filters = {}) {
-    const vouchers = db.prepare(`
+    let voucherQuery = `
       SELECT 
         v.id,
         v.voucher_number,
@@ -1255,10 +1270,16 @@ const voucherModel = {
       FROM official_vouchers v
       LEFT JOIN chart_of_accounts coa ON v.offset_account_code = coa.code
       WHERE v.voucher_type = 'payment' AND v.party_type = 'expense'
-      ORDER BY v.id DESC
-    `).all();
+    `;
+    const vParams = [];
+    if (filters.date) {
+      voucherQuery += ' AND date(v.created_at) = date(?)';
+      vParams.push(filters.date);
+    }
+    voucherQuery += ' ORDER BY v.id DESC';
+    const vouchers = db.prepare(voucherQuery).all(...vParams);
 
-    const dailyTxs = db.prepare(`
+    let dtQuery = `
       SELECT 
         dt.id,
         NULL AS voucher_number,
@@ -1276,8 +1297,18 @@ const voucherModel = {
         AND dt.description NOT LIKE '%أجور شحن%'
         AND dt.description NOT LIKE '%سداد دفعة%'
         AND dt.description NOT LIKE '%مورد%'
-      ORDER BY dt.id DESC
-    `).all();
+        AND NOT EXISTS (
+          SELECT 1 FROM official_vouchers ov 
+          WHERE ov.amount = dt.amount AND date(ov.created_at) = date(dt.created_at)
+        )
+    `;
+    const dtParams = [];
+    if (filters.date) {
+      dtQuery += ' AND date(dt.created_at) = date(?)';
+      dtParams.push(filters.date);
+    }
+    dtQuery += ' ORDER BY dt.id DESC';
+    const dailyTxs = db.prepare(dtQuery).all(...dtParams);
 
     let list = [...vouchers, ...dailyTxs].sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
     if (filters.search) {

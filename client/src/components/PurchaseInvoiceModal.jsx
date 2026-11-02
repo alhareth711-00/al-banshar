@@ -15,6 +15,8 @@ import {
   Info,
 } from 'lucide-react';
 import SearchableCombobox from './SearchableCombobox';
+import { formatPackSize } from './InventoryView';
+import { getLocalTodayDate } from '../utils/dateUtils';
 
 export default function PurchaseInvoiceModal({
   isOpen,
@@ -28,7 +30,7 @@ export default function PurchaseInvoiceModal({
   const [supplierName, setSupplierName] = useState('');
   const [invoiceRef, setInvoiceRef] = useState('');
   const [paperBillNumber, setPaperBillNumber] = useState('');
-  const [billDate, setBillDate] = useState(new Date().toISOString().split('T')[0]);
+  const [billDate, setBillDate] = useState(getLocalTodayDate());
   const [dueDate, setDueDate] = useState('');
   const [paymentMethod, setPaymentMethod] = useState('cash'); // 'cash' | 'kuraimi' | 'credit' | 'jeeb'
   const [paidFromDrawer, setPaidFromDrawer] = useState(true);
@@ -103,7 +105,7 @@ export default function PurchaseInvoiceModal({
       if (supp.credit_days) {
         const d = new Date();
         d.setDate(d.getDate() + Number(supp.credit_days));
-        setDueDate(d.toISOString().split('T')[0]);
+        setDueDate(getLocalTodayDate(d));
       }
     } else {
       setSupplierId('');
@@ -139,7 +141,7 @@ export default function PurchaseInvoiceModal({
       if (found.credit_days) {
         const d = new Date();
         d.setDate(d.getDate() + Number(found.credit_days));
-        setDueDate(d.toISOString().split('T')[0]);
+        setDueDate(getLocalTodayDate(d));
       }
     } else {
       setSupplierName('');
@@ -641,7 +643,9 @@ export default function PurchaseInvoiceModal({
                                   </div>
                                   <div className="text-[10px] text-slate-400 flex items-center gap-2">
                                     {inv.brand && <span>{inv.brand}</span>}
-                                    {inv.pack_size && <span>• {inv.pack_size}</span>}
+                                    {inv.category === 'oil' && inv.pack_size && <span>• {formatPackSize(inv.pack_size)}</span>}
+                                    {inv.category === 'tire' && inv.tire_battery_spec && <span>• {inv.tire_battery_spec}</span>}
+                                    {inv.category === 'battery' && inv.battery_capacity_ah && <span>• {inv.battery_capacity_ah}</span>}
                                     {inv.barcode && <span className="font-mono">[{inv.barcode}]</span>}
                                   </div>
                                 </div>

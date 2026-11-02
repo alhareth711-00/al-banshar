@@ -11,8 +11,30 @@ const { formatDate } = require('./helpers');
  * Initializes and seeds default Chart of Accounts if not present.
  */
 function seedChartOfAccounts(db) {
+  // Ensure 3001 Opening Capital account exists even if accounts were seeded previously
+  try {
+    db.prepare(`
+      INSERT OR IGNORE INTO chart_of_accounts (code, name, type, sub_type, normal_balance, description)
+      VALUES ('3001', 'رأس المال / الأرصدة الافتتاحية (بضاعة أول المدة)', 'equity', 'capital', 'credit', 'رأس المال الافتتاحي وحقوق الملكية المقابلة لبضاعة أول المدة والأرصدة التأسيسية')
+    `).run();
+    db.prepare(`
+      INSERT OR IGNORE INTO chart_of_accounts (code, name, type, sub_type, normal_balance, description)
+      VALUES ('4302', 'إيراد مبيعات الزيوت التالفة والتدوير', 'revenue', 'reclamation_revenue', 'credit', 'عوائد بيع الزيوت المحروقة والتالفة لشركات التدوير (ربح صافٍ 100%)')
+    `).run();
+    db.prepare(`
+      INSERT OR IGNORE INTO chart_of_accounts (code, name, type, sub_type, normal_balance, description)
+      VALUES ('4303', 'فائض وأرباح تسوية عهدة الصندوق', 'revenue', 'cash_surplus', 'credit', 'الفائض النقدي غير المفسر الناتج عن جرد وتسوية عهدة الصندوق عند إغلاق الورديات')
+    `).run();
+    db.prepare(`
+      INSERT OR IGNORE INTO chart_of_accounts (code, name, type, sub_type, normal_balance, description)
+      VALUES ('6110', 'عجز وفروقات عهدة الصندوق النقدي', 'expense', 'cash_shortage', 'debit', 'العجز النقدي المثبت رسمياً الناتج عن جرد وتسوية عهدة الصندوق عند إغلاق الورديات')
+    `).run();
+  } catch (e) {
+    // ignore
+  }
+
   const count = db.prepare('SELECT COUNT(*) as count FROM chart_of_accounts').get().count;
-  if (count > 0) return;
+  if (count > 1) return;
 
   console.log('[Accounting] Initializing standard Chart of Accounts...');
 
@@ -36,6 +58,7 @@ function seedChartOfAccounts(db) {
     { code: '2201', name: 'مستحقات وأجور العمال المستحقة', type: 'liability', sub_type: 'payable', normal_balance: 'credit', description: 'أجور وعمولات الفنيين المستحقة غير المصروفة' },
 
     // 3000 - Equity (حقوق الملكية)
+    { code: '3001', name: 'رأس المال / الأرصدة الافتتاحية (بضاعة أول المدة)', type: 'equity', sub_type: 'capital', normal_balance: 'credit', description: 'رأس المال الافتتاحي وحقوق الملكية المقابلة لبضاعة أول المدة والأرصدة التأسيسية' },
     { code: '3101', name: 'رأس المال التشغيلي / جاري المالك', type: 'equity', sub_type: 'capital', normal_balance: 'credit', description: 'أموال مالك المركز المستثمرة في النشاط' },
     { code: '3201', name: 'الأرباح والخسائر المدورة', type: 'equity', sub_type: 'retained_earnings', normal_balance: 'credit', description: 'صافي الأرباح المتراكمة من النشاط' },
 
@@ -43,6 +66,8 @@ function seedChartOfAccounts(db) {
     { code: '4101', name: 'إيراد مبيعات الأصناف والبضائع', type: 'revenue', sub_type: 'goods_sales', normal_balance: 'credit', description: 'إيرادات بيع الزيوت والفلاتر والإطارات والبطاريات' },
     { code: '4201', name: 'إيراد الخدمات والتركيب', type: 'revenue', sub_type: 'service_revenue', normal_balance: 'credit', description: 'إيرادات خدمات تغيير الزيت، البنشر، والترصيص (ربح صافٍ)' },
     { code: '4301', name: 'إيراد مبيعات البطاريات الرجيع والخردة', type: 'revenue', sub_type: 'scrap_revenue', normal_balance: 'credit', description: 'عوائد بيع بطاريات السكراب المسترجعة' },
+    { code: '4302', name: 'إيراد مبيعات الزيوت التالفة والتدوير', type: 'revenue', sub_type: 'reclamation_revenue', normal_balance: 'credit', description: 'عوائد بيع الزيوت المحروقة والتالفة لشركات التدوير (ربح صافٍ 100%)' },
+    { code: '4303', name: 'فائض وأرباح تسوية عهدة الصندوق', type: 'revenue', sub_type: 'cash_surplus', normal_balance: 'credit', description: 'الفائض النقدي غير المفسر الناتج عن جرد وتسوية عهدة الصندوق عند إغلاق الورديات' },
 
     // 5000 - Cost of Goods Sold (تكلفة البضاعة المباعة)
     { code: '5101', name: 'تكلفة البضاعة المباعة (COGS)', type: 'expense', sub_type: 'cost_of_goods_sold', normal_balance: 'debit', description: 'التكلفة الشرائية للزيوت والفلاتر والإطارات المباعة' },
@@ -57,6 +82,7 @@ function seedChartOfAccounts(db) {
     { code: '6107', name: 'نظافة وعوائد بلدية ورسوم', type: 'expense', sub_type: 'operating_expense', normal_balance: 'debit', description: 'رسوم النظافة والبلدية ومستلزمات الغسيل' },
     { code: '6108', name: 'أجور ورواتب الفنيين الأساسية', type: 'expense', sub_type: 'operating_expense', normal_balance: 'debit', description: 'الأجور اليومية والشهرية الأساسية لطاقم العمل' },
     { code: '6109', name: 'مصاريف تشغيلية ونثرية عامة', type: 'expense', sub_type: 'operating_expense', normal_balance: 'debit', description: 'أي مصاريف نثرية أو طارئة أخرى' },
+    { code: '6110', name: 'عجز وفروقات عهدة الصندوق النقدي', type: 'expense', sub_type: 'cash_shortage', normal_balance: 'debit', description: 'العجز النقدي المثبت رسمياً الناتج عن جرد وتسوية عهدة الصندوق عند إغلاق الورديات' },
     { code: '6201', name: 'خصومات مسموح بها للعملاء', type: 'expense', sub_type: 'discount_allowed', normal_balance: 'debit', description: 'التخفيضات والخصومات الممنوحة في فواتير المبيعات' },
   ];
 
@@ -84,7 +110,7 @@ function getPaymentMethodAccountCode(paymentMethod) {
     case 'jeeb':    return '1103';
     case 'jawali':  return '1104';
     case 'onecash': return '1105';
-    case 'credit':  return '1201'; // Customer Receivable
+    case 'credit':  return '1101'; // Downpayment on credit sale is received cash into drawer
     case 'cash':
     default:        return '1101'; // Cash Drawer
   }
@@ -181,10 +207,29 @@ function createJournalEntry(db, { entry_date, ref_type, ref_id, ref_number, desc
     totalCredit = roundMoney(totalCredit + c);
   }
 
-  // Strict double-entry balance check (within 0.01 tolerance)
-  const diff = Math.abs(roundMoney(totalDebit - totalCredit));
-  if (diff > 0.01) {
-    throw new Error(`القيد المحاسبي غير متوازن! إجمالي المدين: ${totalDebit} لا يساوي إجمالي الدائن: ${totalCredit} (الفارق: ${diff})`);
+  // Strict double-entry balance check (Zero-Tolerance Standard)
+  const diff = roundMoney(totalDebit - totalCredit);
+  if (Math.abs(diff) > 0.01) {
+    throw new Error(`القيد المحاسبي غير متوازن! إجمالي المدين: ${totalDebit} لا يساوي إجمالي الدائن: ${totalCredit} (الفارق: ${Math.abs(diff)})`);
+  }
+
+  // Absorb any fractional penny (<= 0.01) on primary lines to achieve absolute 0.00 balance
+  if (Math.abs(diff) > 0.0001) {
+    if (diff > 0) {
+      // Debits > Credits: add difference to the first credit line
+      const creditLine = lines.find((l) => l.credit > 0);
+      if (creditLine) {
+        creditLine.credit = roundMoney(creditLine.credit + diff);
+        totalCredit = roundMoney(totalCredit + diff);
+      }
+    } else {
+      // Credits > Debits: add difference to the first debit line
+      const debitLine = lines.find((l) => l.debit > 0);
+      if (debitLine) {
+        debitLine.debit = roundMoney(debitLine.debit + Math.abs(diff));
+        totalDebit = roundMoney(totalDebit + Math.abs(diff));
+      }
+    }
   }
 
   const entryNumber = generateJournalNumber(db);
@@ -293,8 +338,11 @@ function postInvoice(db, { invoice, items }) {
     }
   }
 
-  // 2. Debit Customer Debt (Receivable)
+  // 2. Debit Customer Debt (Receivable) [MOD-CREDIT-PARTIES Invariant]
   if (remainingDebt > 0) {
+    if (invoice.vehicle_id === 1 || invoice.plate_number === 'فاتورة سريعة') {
+      throw new Error(`حظر محاسبي صارم [MOD-CREDIT-PARTIES]: لا يمكن ترحيل ذمم مدينة (حساب 1201) للعميل النقدي العام (${invoice.plate_number}).`);
+    }
     lines.push({
       account_code: '1201', // Customer Receivable
       debit: remainingDebt,
@@ -316,10 +364,12 @@ function postInvoice(db, { invoice, items }) {
   }
 
   // 4. Debit Discount Allowed (Expense/Contra-revenue)
-  if (discount > 0) {
+  const maxPossibleDiscount = roundMoney(Math.max(0, itemsTotal + laborTotal - scrapDeduction));
+  const effectiveDiscount = Math.min(discount, maxPossibleDiscount);
+  if (effectiveDiscount > 0) {
     lines.push({
       account_code: '6201', // Discount Allowed
-      debit: discount,
+      debit: effectiveDiscount,
       credit: 0,
       description: `خصم ممنوح للعميل فاتورة (${invoice.invoice_number})`,
     });
@@ -348,10 +398,11 @@ function postInvoice(db, { invoice, items }) {
   // 7. Calculate and record COGS (Cost of Goods Sold) & Stock Movements
   let totalCOGS = 0;
   const inventoryCategoryCosts = {};
+  const consignmentPayables = [];
 
   for (const item of items) {
     if (item.inventory_id) {
-      const inv = db.prepare('SELECT id, name, category, item_type, cost_price, stock_qty FROM inventory WHERE id = ?').get(item.inventory_id);
+      const inv = db.prepare('SELECT id, name, category, item_type, cost_price, stock_qty, is_consignment, consignment_supplier_name FROM inventory WHERE id = ?').get(item.inventory_id);
       // Pure labor services have no physical stock movements and no inventory COGS
       if (inv && inv.category !== 'service' && inv.item_type !== 'service') {
         const qty = safeNum(item.qty, 1);
@@ -359,8 +410,36 @@ function postInvoice(db, { invoice, items }) {
         const lineCost = roundMoney(qty * costPrice);
         totalCOGS = roundMoney(totalCOGS + lineCost);
 
-        const invAccount = getInventoryAccountCode(inv.category);
-        inventoryCategoryCosts[invAccount] = roundMoney((inventoryCategoryCosts[invAccount] || 0) + lineCost);
+        const isConsignment = Boolean(inv.is_consignment);
+
+        if (!isConsignment) {
+          // Regular owned inventory: credit asset account 1301-1305
+          const invAccount = getInventoryAccountCode(inv.category);
+          inventoryCategoryCosts[invAccount] = roundMoney((inventoryCategoryCosts[invAccount] || 0) + lineCost);
+        } else {
+          // Consignment inventory [MOD-CONSIGNMENT]:
+          // Shop does NOT own the inventory asset. Credit supplier payables (Account 2101).
+          const supplierName = (inv.consignment_supplier_name || 'مورد بضاعة أمانة').trim();
+          let supplier = db.prepare('SELECT id, name, balance_due FROM suppliers WHERE name = ? OR company_name = ? LIMIT 1').get(supplierName, supplierName);
+          if (!supplier) {
+            const newSup = db.prepare('INSERT INTO suppliers (name, company_name, balance_due, notes) VALUES (?, ?, ?, ?)').run(
+              supplierName,
+              supplierName,
+              lineCost,
+              'مورد بضاعة أمانة تم إنشاؤه آلياً عند تسجيل مبيعات الأمانة'
+            );
+            supplier = { id: newSup.lastInsertRowid, name: supplierName, balance_due: lineCost };
+          } else {
+            db.prepare('UPDATE suppliers SET balance_due = balance_due + ? WHERE id = ?').run(lineCost, supplier.id);
+          }
+
+          consignmentPayables.push({
+            supplier_id: supplier.id,
+            supplier_name: supplierName,
+            amount: lineCost,
+            item_name: inv.name,
+          });
+        }
 
         // Record granular stock movement
         const currentStock = safeNum(inv.stock_qty, 0);
@@ -379,13 +458,15 @@ function postInvoice(db, { invoice, items }) {
           safeNum(item.unit_price, 0),
           currentStock, // After decrement in invoice creation
           costPrice,
-          `صرف بيع فاتورة (${invoice.invoice_number})`
+          isConsignment
+            ? `صرف بيع بضاعة أمانة فاتورة (${invoice.invoice_number}) مورد: ${inv.consignment_supplier_name || 'عام'}`
+            : `صرف بيع فاتورة (${invoice.invoice_number})`
         );
       }
     }
   }
 
-  // 8. Add COGS Journal Lines (COGS Debit, Inventory Credit)
+  // 8. Add COGS Journal Lines (COGS Debit, Inventory/Consignment Credit)
   if (totalCOGS > 0) {
     lines.push({
       account_code: '5101', // COGS
@@ -394,12 +475,25 @@ function postInvoice(db, { invoice, items }) {
       description: `تكلفة البضاعة المباعة لفاتورة (${invoice.invoice_number})`,
     });
 
+    // Credit owned inventory assets (1301-1305)
     for (const [accCode, cost] of Object.entries(inventoryCategoryCosts)) {
       lines.push({
         account_code: accCode,
         debit: 0,
         credit: cost,
         description: `تخفيض المخزون بتكلفة البضاعة المباعة فاتورة (${invoice.invoice_number})`,
+      });
+    }
+
+    // Credit consignment supplier payables (2101) [MOD-CONSIGNMENT]
+    for (const cp of consignmentPayables) {
+      lines.push({
+        account_code: '2101',
+        debit: 0,
+        credit: cp.amount,
+        party_type: 'supplier',
+        party_id: cp.supplier_id,
+        description: `التزام مورد أمانة (${cp.supplier_name}) عن بيع (${cp.item_name}) فاتورة (${invoice.invoice_number})`,
       });
     }
   }
@@ -475,7 +569,7 @@ function postPurchase(db, { purchase, items }) {
     itemsSum = roundMoney(itemsSum + amount);
   }
   const diff = roundMoney(totalLandedCost - itemsSum);
-  if (Math.abs(diff) > 0.01) {
+  if (Math.abs(diff) > 0.0001) {
     // If there is freight/discount difference between header and lines, adjust first inventory account
     const firstCat = Object.keys(categoryDebits)[0] || '1301';
     categoryDebits[firstCat] = roundMoney((categoryDebits[firstCat] || 0) + diff);
@@ -607,7 +701,7 @@ function postPurchaseReturn(db, { purchaseReturn, items }) {
     itemsSum = roundMoney(itemsSum + amount);
   }
   const diff = roundMoney(totalAmount - itemsSum);
-  if (Math.abs(diff) > 0.01) {
+  if (Math.abs(diff) > 0.0001) {
     const firstCat = Object.keys(categoryCredits)[0] || '1301';
     categoryCredits[firstCat] = roundMoney((categoryCredits[firstCat] || 0) + diff);
   }
@@ -828,11 +922,367 @@ function postOfficialVoucher(db, voucher) {
  */
 
 /**
+ * Posts opening balance (رصيد افتتاحي سابق) for a customer vehicle or supplier to ensure General Ledger parity.
+ */
+function postOpeningBalance(db, { party_type, party_id, amount, date, description }) {
+  const amt = roundMoney(safeNum(amount, 0));
+  if (amt <= 0) return null;
+
+  const lines = [];
+  let desc = description;
+  let refNumber = '';
+
+  if (party_type === 'customer') {
+    const v = db.prepare('SELECT plate_number, customer_name FROM customers_vehicles WHERE id = ?').get(party_id);
+    refNumber = `OB-VEH-${party_id}`;
+    desc = desc || `رصيد مديونية سابقة مرحلة للمركبة (${v?.plate_number || party_id} - ${v?.customer_name || 'عميل'})`;
+
+    lines.push({
+      account_code: '1201', // Customer Receivable
+      debit: amt,
+      credit: 0,
+      party_type: 'customer',
+      party_id: party_id,
+      description: desc,
+    });
+    lines.push({
+      account_code: '3101', // Capital / Opening Balance Equity
+      debit: 0,
+      credit: amt,
+      description: `رصيد افتتاحي دائن (جاري المالك/أرصدة افتتاحية - ذمم عملاء مرحلة)`,
+    });
+  } else if (party_type === 'supplier') {
+    const s = db.prepare('SELECT name, company_name FROM suppliers WHERE id = ?').get(party_id);
+    refNumber = `OB-SUP-${party_id}`;
+    desc = desc || `رصيد مستحقات سابقة مرحلة للمورد (${s?.company_name || s?.name || party_id})`;
+
+    lines.push({
+      account_code: '3101', // Capital / Opening Balance Equity
+      debit: amt,
+      credit: 0,
+      description: `رصيد افتتاحي مدين (جاري المالك/أرصدة افتتاحية - ذمم موردين مرحلة)`,
+    });
+    lines.push({
+      account_code: '2101', // Supplier Payable
+      debit: 0,
+      credit: amt,
+      party_type: 'supplier',
+      party_id: party_id,
+      description: desc,
+    });
+  } else {
+    return null;
+  }
+
+  return createJournalEntry(db, {
+    entry_date: date ? date.slice(0, 10) : formatDate(),
+    ref_type: 'opening_balance',
+    ref_id: party_id,
+    ref_number: refNumber,
+    description: `قيد رصيد افتتاحي سابق (${refNumber}) - ${desc}`,
+    lines,
+  });
+}
+
+/**
+ * Posts opening inventory balance (بضاعة أول المدة) for an inventory item to ensure General Ledger parity.
+ * Dr. Inventory Asset (1301..1305)
+ * Cr. Capital / Opening Balances (3001)
+ */
+function postInventoryOpeningBalance(db, { inventory_id, name, category, stock_qty, cost_price, pack_size, retail_unit, date }) {
+  // [MOD-CONSIGNMENT Guard]: Consignment inventory is owned by third-party suppliers, not shop equity.
+  if (inventory_id) {
+    const invCheck = db.prepare('SELECT is_consignment FROM inventory WHERE id = ?').get(inventory_id);
+    if (invCheck && invCheck.is_consignment) {
+      return null;
+    }
+  }
+
+  const qty = safeNum(stock_qty, 0);
+  const cost = roundMoney(safeNum(cost_price, 0));
+  const totalCost = roundMoney(qty * cost);
+
+  if (qty <= 0 || totalCost <= 0) return null;
+
+  const invAcc = getInventoryAccountCode(category);
+  const refNumber = `OB-INV-${inventory_id}`;
+  const desc = `رصيد افتتاحي (بضاعة أول المدة) للصنف (${name}) - كمية: ${qty} ${pack_size || retail_unit || 'حبة'} @ ${cost.toLocaleString()} ر.ي`;
+
+  return createJournalEntry(db, {
+    entry_date: date ? date.slice(0, 10) : formatDate(),
+    ref_type: 'opening_balance',
+    ref_id: inventory_id,
+    ref_number: refNumber,
+    description: desc,
+    lines: [
+      {
+        account_code: invAcc,
+        debit: totalCost,
+        credit: 0,
+        description: `إثبات مخزون أول المدة - ${name}`,
+      },
+      {
+        account_code: '3001', // Capital / Opening Balance Equity
+        debit: 0,
+        credit: totalCost,
+        description: `رأس المال الافتتاحي (بضاعة أول المدة) - ${name}`,
+      },
+    ],
+  });
+}
+
+/**
+ * Posts adjustment entry when a customer or supplier balance is manually edited.
+ */
+function postBalanceAdjustment(db, { party_type, party_id, old_balance, new_balance, reason }) {
+  const oldB = roundMoney(safeNum(old_balance, 0));
+  const newB = roundMoney(safeNum(new_balance, 0));
+  const diff = roundMoney(newB - oldB);
+  if (Math.abs(diff) < 0.01) return null;
+
+  const lines = [];
+  const refNumber = `ADJ-${party_type.slice(0, 3).toUpperCase()}-${party_id}-${Date.now().toString().slice(-4)}`;
+  const desc = reason ? `تسوية رصيد يدوية: ${reason}` : `تسوية فارق رصيد (${oldB.toLocaleString()} -> ${newB.toLocaleString()} ر.ي)`;
+
+  if (party_type === 'customer') {
+    if (diff > 0) {
+      lines.push({
+        account_code: '1201',
+        debit: diff,
+        credit: 0,
+        party_type: 'customer',
+        party_id: party_id,
+        description: `تسوية زيادة مديونية عميل: ${desc}`,
+      });
+      lines.push({
+        account_code: '3101',
+        debit: 0,
+        credit: diff,
+        description: `أثر تسوية زيادة رصيد عميل على جاري المالك`,
+      });
+    } else {
+      const absDiff = Math.abs(diff);
+      lines.push({
+        account_code: '3101',
+        debit: absDiff,
+        credit: 0,
+        description: `أثر تسوية تخفيض رصيد عميل على جاري المالك`,
+      });
+      lines.push({
+        account_code: '1201',
+        debit: 0,
+        credit: absDiff,
+        party_type: 'customer',
+        party_id: party_id,
+        description: `تسوية تخفيض مديونية عميل: ${desc}`,
+      });
+    }
+  } else if (party_type === 'supplier') {
+    if (diff > 0) {
+      lines.push({
+        account_code: '3101',
+        debit: diff,
+        credit: 0,
+        description: `أثر تسوية زيادة مستحقات مورد على جاري المالك`,
+      });
+      lines.push({
+        account_code: '2101',
+        debit: 0,
+        credit: diff,
+        party_type: 'supplier',
+        party_id: party_id,
+        description: `تسوية زيادة مستحقات مورد: ${desc}`,
+      });
+    } else {
+      const absDiff = Math.abs(diff);
+      lines.push({
+        account_code: '2101',
+        debit: absDiff,
+        credit: 0,
+        party_type: 'supplier',
+        party_id: party_id,
+        description: `تسوية تخفيض مستحقات مورد: ${desc}`,
+      });
+      lines.push({
+        account_code: '3101',
+        debit: 0,
+        credit: absDiff,
+        description: `أثر تسوية تخفيض مستحقات مورد على جاري المالك`,
+      });
+    }
+  }
+
+  return createJournalEntry(db, {
+    entry_date: formatDate(),
+    ref_type: 'balance_adjustment',
+    ref_id: party_id,
+    ref_number: refNumber,
+    description: `قيد تسوية رصيد (${refNumber}) - ${desc}`,
+    lines,
+  });
+}
+
+/**
+ * Scans all customers_vehicles and suppliers to ensure any party with a balance_due has an opening balance entry.
+ */
+function reconcileAllOpeningBalances(db) {
+  let reconciledVehicles = 0;
+  let reconciledSuppliers = 0;
+
+  // 1. Reconcile vehicles with debt
+  const vehiclesWithDebt = db.prepare("SELECT id, plate_number, customer_name, balance_due, created_at FROM customers_vehicles WHERE balance_due > 0").all();
+  for (const v of vehiclesWithDebt) {
+    const existingLines = db.prepare("SELECT COUNT(*) as c FROM journal_lines WHERE account_code = '1201' AND party_type = 'customer' AND party_id = ?").get(v.id).c;
+    if (existingLines === 0) {
+      try {
+        postOpeningBalance(db, {
+          party_type: 'customer',
+          party_id: v.id,
+          amount: Number(v.balance_due),
+          date: v.created_at ? v.created_at.slice(0, 10) : formatDate(),
+          description: `رصيد مديونية سابقة مرحلة للمركبة (${v.plate_number} - ${v.customer_name})`,
+        });
+        reconciledVehicles++;
+      } catch (e) {
+        console.warn(`[Reconcile] Could not post opening balance for vehicle ${v.id}: ${e.message}`);
+      }
+    }
+  }
+
+  // 2. Reconcile suppliers with balance
+  const suppliersWithDebt = db.prepare("SELECT id, name, company_name, balance_due, created_at FROM suppliers WHERE balance_due > 0").all();
+  for (const s of suppliersWithDebt) {
+    const existingLines = db.prepare("SELECT COUNT(*) as c FROM journal_lines WHERE account_code = '2101' AND party_type = 'supplier' AND party_id = ?").get(s.id).c;
+    if (existingLines === 0) {
+      try {
+        postOpeningBalance(db, {
+          party_type: 'supplier',
+          party_id: s.id,
+          amount: Number(s.balance_due),
+          date: s.created_at ? s.created_at.slice(0, 10) : formatDate(),
+          description: `رصيد مستحقات سابقة مرحلة للمورد (${s.company_name || s.name})`,
+        });
+        reconciledSuppliers++;
+      } catch (e) {
+        console.warn(`[Reconcile] Could not post opening balance for supplier ${s.id}: ${e.message}`);
+      }
+    }
+  }
+
+  // 3. Reconcile inventory items with starting stock
+  const reconciledInventory = reconcileAllOpeningInventory(db);
+
+  return { reconciledVehicles, reconciledSuppliers, reconciledInventory };
+}
+
+/**
+ * Scans all inventory items with positive stock and ensures they have an opening stock movement and journal entry.
+ */
+function reconcileAllOpeningInventory(db) {
+  let reconciled = 0;
+  const items = db.prepare(`
+    SELECT id, name, category, item_type, stock_qty, cost_price, pack_size, retail_unit, created_at
+    FROM inventory
+    WHERE item_type = 'product' AND category != 'service' AND stock_qty > 0 AND cost_price > 0
+  `).all();
+
+  for (const item of items) {
+    const existingMovement = db.prepare(`
+      SELECT COUNT(*) as c FROM stock_movements
+      WHERE inventory_id = ? AND movement_type = 'opening_balance'
+    `).get(item.id).c;
+
+    const totalCost = roundMoney(item.stock_qty * item.cost_price);
+
+    if (existingMovement === 0) {
+      db.prepare(`
+        INSERT INTO stock_movements (
+          inventory_id, movement_type, ref_type, ref_id,
+          qty_in, qty_out, unit_cost, total_cost, balance_qty_after, wac_cost_after, notes
+        ) VALUES (?, 'opening_balance', 'inventory_initial', ?, ?, 0, ?, ?, ?, ?, 'رصيد افتتاحي (بضاعة أول المدة)')
+      `).run(
+        item.id,
+        item.id,
+        item.stock_qty,
+        item.cost_price,
+        totalCost,
+        item.stock_qty,
+        item.cost_price
+      );
+    }
+
+    const existingLines = db.prepare(`
+      SELECT COUNT(*) as c FROM journal_entries je
+      JOIN journal_lines jl ON je.id = jl.journal_entry_id
+      WHERE je.ref_type = 'opening_balance' AND je.ref_id = ? AND jl.account_code = '3001'
+    `).get(item.id).c;
+
+    if (existingLines === 0) {
+      try {
+        postInventoryOpeningBalance(db, {
+          inventory_id: item.id,
+          name: item.name,
+          category: item.category,
+          stock_qty: item.stock_qty,
+          cost_price: item.cost_price,
+          pack_size: item.pack_size,
+          retail_unit: item.retail_unit,
+          date: item.created_at ? item.created_at.slice(0, 10) : formatDate(),
+        });
+        reconciled++;
+      } catch (e) {
+        console.warn(`[Reconcile] Could not post opening balance for inventory item #${item.id}: ${e.message}`);
+      }
+    }
+  }
+  return reconciled;
+}
+
+/**
  * Generates official Statement of Account (كشف حساب تفصيلي مع الرصيد التراكمي).
  */
 function getStatementOfAccount(db, { party_type, party_id, start_date, end_date, paper_bill_number }) {
   if (!party_type || !party_id) {
     throw new Error('نوع الطرف (party_type) والمعرف (party_id) مطلوبان لتوليد كشف الحساب.');
+  }
+
+  // Defensive auto-check: ensure opening balance exists if entity has balance_due in master table
+  if (party_type === 'customer') {
+    const veh = db.prepare('SELECT id, customer_name, plate_number, balance_due, created_at FROM customers_vehicles WHERE id = ?').get(party_id);
+    if (veh && Number(veh.balance_due) > 0) {
+      const existingLines = db.prepare("SELECT COUNT(*) as c FROM journal_lines WHERE account_code = '1201' AND party_type = 'customer' AND party_id = ?").get(party_id).c;
+      if (existingLines === 0) {
+        try {
+          postOpeningBalance(db, {
+            party_type: 'customer',
+            party_id: veh.id,
+            amount: Number(veh.balance_due),
+            date: veh.created_at ? veh.created_at.slice(0, 10) : formatDate(),
+            description: `رصيد مديونية سابقة مرحلة للمركبة (${veh.plate_number} - ${veh.customer_name})`,
+          });
+        } catch (e) {
+          console.warn(`[Statement] Auto-reconcile opening balance failed for vehicle ${veh.id}:`, e.message);
+        }
+      }
+    }
+  } else if (party_type === 'supplier') {
+    const supp = db.prepare('SELECT id, name, company_name, balance_due, created_at FROM suppliers WHERE id = ?').get(party_id);
+    if (supp && Number(supp.balance_due) > 0) {
+      const existingLines = db.prepare("SELECT COUNT(*) as c FROM journal_lines WHERE account_code = '2101' AND party_type = 'supplier' AND party_id = ?").get(party_id).c;
+      if (existingLines === 0) {
+        try {
+          postOpeningBalance(db, {
+            party_type: 'supplier',
+            party_id: supp.id,
+            amount: Number(supp.balance_due),
+            date: supp.created_at ? supp.created_at.slice(0, 10) : formatDate(),
+            description: `رصيد مستحقات سابقة مرحلة للمورد (${supp.company_name || supp.name})`,
+          });
+        } catch (e) {
+          console.warn(`[Statement] Auto-reconcile opening balance failed for supplier ${supp.id}:`, e.message);
+        }
+      }
+    }
   }
 
   // Determine party name and info
@@ -921,6 +1371,50 @@ function getStatementOfAccount(db, { party_type, party_id, start_date, end_date,
   query += ' ORDER BY je.entry_date ASC, je.id ASC';
   let transactions = db.prepare(query).all(...params);
 
+  // If party_type === 'customer', also include cash settled invoices so service visits are visible
+  if (party_type === 'customer') {
+    let invQuery = `
+      SELECT id, invoice_number, created_at, net_total, paid_amount, payment_method, notes
+      FROM invoices
+      WHERE vehicle_id = ? AND remaining_debt = 0 AND net_total > 0
+    `;
+    const invParams = [party_id];
+    if (start_date) {
+      invQuery += ' AND date(created_at) >= date(?)';
+      invParams.push(start_date);
+    }
+    if (end_date) {
+      invQuery += ' AND date(created_at) <= date(?)';
+      invParams.push(end_date);
+    }
+    const cashInvoices = db.prepare(invQuery).all(...invParams);
+    for (const inv of cashInvoices) {
+      const exists = transactions.some((t) => t.ref_number === inv.invoice_number);
+      if (!exists) {
+        transactions.push({
+          entry_id: `inv-${inv.id}`,
+          entry_number: inv.invoice_number,
+          entry_date: inv.created_at ? inv.created_at.slice(0, 10) : formatDate(),
+          ref_type: 'invoice',
+          ref_number: inv.invoice_number,
+          description: `فاتورة صيانة وتغيير زيت (مسددة نقداً بالكامل - طريقة: ${inv.payment_method})`,
+          debit: inv.net_total,
+          credit: inv.paid_amount,
+          created_at: inv.created_at,
+          paper_bill_number: null,
+          is_settled_cash: true,
+        });
+      }
+    }
+    // Re-sort transactions by date
+    transactions.sort((a, b) => {
+      const dateA = a.entry_date || '';
+      const dateB = b.entry_date || '';
+      if (dateA !== dateB) return dateA.localeCompare(dateB);
+      return String(a.entry_id).localeCompare(String(b.entry_id));
+    });
+  }
+
   // Optional filter by paper_bill_number (Upgrade 4)
   if (paper_bill_number && paper_bill_number.trim()) {
     const pTerm = paper_bill_number.trim().toLowerCase();
@@ -980,11 +1474,15 @@ function getTrialBalance(db, asOfDate) {
       coa.type,
       coa.sub_type,
       coa.normal_balance,
-      COALESCE(SUM(jl.debit), 0) AS total_debit,
-      COALESCE(SUM(jl.credit), 0) AS total_credit
+      COALESCE(SUM(sub.debit), 0) AS total_debit,
+      COALESCE(SUM(sub.credit), 0) AS total_credit
     FROM chart_of_accounts coa
-    LEFT JOIN journal_lines jl ON coa.code = jl.account_code
-    LEFT JOIN journal_entries je ON jl.journal_entry_id = je.id AND date(je.entry_date) <= date(?)
+    LEFT JOIN (
+      SELECT jl.account_code, jl.debit, jl.credit
+      FROM journal_lines jl
+      JOIN journal_entries je ON jl.journal_entry_id = je.id
+      WHERE date(je.entry_date) <= date(?)
+    ) sub ON coa.code = sub.account_code
     GROUP BY coa.code
     ORDER BY coa.code ASC
   `).all(date);
@@ -1075,14 +1573,22 @@ function getIncomeStatement(db, { start_date, end_date } = {}) {
   const scrapMov = getAccountMovement('4301');
   const totalScrapRevenue = roundMoney(scrapMov.credit - scrapMov.debit);
 
-  // Total Gross Operating Income
-  const grossOperatingIncome = roundMoney(grossProfitGoods + totalLaborRevenue + totalScrapRevenue);
+  // 6. Waste Oil Reclamation Revenue (4302) [MOD-RECLAMATION]
+  const wasteOilMov = getAccountMovement('4302');
+  const totalWasteOilRevenue = roundMoney(wasteOilMov.credit - wasteOilMov.debit);
 
-  // 6. Discounts Allowed (6201)
+  // 7. Cash Drawer Surplus Revenue (4303) [MOD-VAULT]
+  const surplusMov = getAccountMovement('4303');
+  const totalSurplusRevenue = roundMoney(surplusMov.credit - surplusMov.debit);
+
+  // Total Gross Operating Income
+  const grossOperatingIncome = roundMoney(grossProfitGoods + totalLaborRevenue + totalScrapRevenue + totalWasteOilRevenue + totalSurplusRevenue);
+
+  // 8. Discounts Allowed (6201)
   const discMov = getAccountMovement('6201');
   const totalDiscounts = roundMoney(discMov.debit - discMov.credit);
 
-  // 7. Operating Expenses Breakdown
+  // 9. Operating Expenses Breakdown
   const expenseAccounts = db.prepare(`
     SELECT coa.code, coa.name,
       COALESCE(SUM(jl.debit - jl.credit), 0) AS amount
@@ -1110,7 +1616,9 @@ function getIncomeStatement(db, { start_date, end_date } = {}) {
       goods_sales_revenue: totalGoodsRevenue,
       labor_service_revenue: totalLaborRevenue,
       scrap_revenue: totalScrapRevenue,
-      total_gross_revenues: roundMoney(totalGoodsRevenue + totalLaborRevenue + totalScrapRevenue),
+      waste_oil_revenue: totalWasteOilRevenue,
+      cash_surplus_revenue: totalSurplusRevenue,
+      total_gross_revenues: roundMoney(totalGoodsRevenue + totalLaborRevenue + totalScrapRevenue + totalWasteOilRevenue + totalSurplusRevenue),
     },
     cost_of_goods_sold: {
       total_cogs: totalCOGS,
@@ -1274,16 +1782,29 @@ function getFinancialPulse(db) {
     FROM customers_vehicles
   `).get();
 
-  // 4. Today's Invoices & Revenues
+  // 4. Today's Invoices & Revenues (Filtering out voided invoices [MOD-GAPLESS + MOD-LANE])
   const todayInvoices = db.prepare(`
     SELECT 
       COUNT(*) AS total_invoices,
       COALESCE(SUM(items_total), 0) AS goods_revenue,
       COALESCE(SUM(labor_total), 0) AS pure_labor_revenue,
       COALESCE(SUM(net_total), 0) AS net_sales,
-      COALESCE(SUM(discount), 0) AS discounts
+      COALESCE(SUM(discount), 0) AS discounts,
+      SUM(CASE WHEN service_status = 'completed' THEN 1 ELSE 0 END) AS cars_completed,
+      SUM(CASE WHEN service_status = 'pending_service' THEN 1 ELSE 0 END) AS cars_in_service
     FROM invoices
-    WHERE date(created_at) = date(?)
+    WHERE date(created_at) = date(?) AND is_voided = 0
+  `).get(today);
+
+  // Pure oil sales specifically (items with category = 'oil' from non-voided invoices)
+  const oilSalesRes = db.prepare(`
+    SELECT 
+      COALESCE(SUM(ii.subtotal), 0) AS oil_sales,
+      COALESCE(SUM(ii.qty), 0) AS oil_packs_count
+    FROM invoice_items ii
+    JOIN invoices i ON ii.invoice_id = i.id
+    JOIN inventory inv ON ii.inventory_id = inv.id
+    WHERE date(i.created_at) = date(?) AND inv.category = 'oil' AND i.is_voided = 0
   `).get(today);
 
   // Today's COGS from journal lines
@@ -1303,8 +1824,17 @@ function getFinancialPulse(db) {
   `).get(today);
   const todayExpenses = roundMoney(todayExpRes.expenses);
 
+  // Today's Reclamation & Scrap Revenue from journal lines [MOD-RECLAMATION]
+  const todayReclamationRes = db.prepare(`
+    SELECT COALESCE(SUM(jl.credit - jl.debit), 0) AS reclamation
+    FROM journal_lines jl
+    JOIN journal_entries je ON jl.journal_entry_id = je.id
+    WHERE jl.account_code IN ('4301', '4302', '4303') AND date(je.entry_date) = date(?)
+  `).get(today);
+  const todayReclamation = roundMoney(todayReclamationRes?.reclamation || 0);
+
   const goodsProfit = roundMoney(todayInvoices.goods_revenue - todayCOGS);
-  const grossOperatingProfit = roundMoney(goodsProfit + todayInvoices.pure_labor_revenue);
+  const grossOperatingProfit = roundMoney(goodsProfit + todayInvoices.pure_labor_revenue + todayReclamation);
   const todayNetProfit = roundMoney(grossOperatingProfit - todayExpenses - todayInvoices.discounts);
 
   return {
@@ -1327,8 +1857,16 @@ function getFinancialPulse(db) {
     },
     today: {
       total_invoices: todayInvoices.total_invoices,
+      total_cars_served: todayInvoices.total_invoices,
+      cars_completed: todayInvoices.cars_completed || 0,
+      cars_in_service: todayInvoices.cars_in_service || 0,
       goods_revenue: roundMoney(todayInvoices.goods_revenue),
+      goods_sales: roundMoney(todayInvoices.goods_revenue),
+      oil_sales: roundMoney(oilSalesRes?.oil_sales || 0),
+      oil_packs_count: oilSalesRes?.oil_packs_count || 0,
       pure_labor_revenue: roundMoney(todayInvoices.pure_labor_revenue),
+      services_revenue: roundMoney(todayInvoices.pure_labor_revenue),
+      total_sales: roundMoney(todayInvoices.net_sales),
       cogs: todayCOGS,
       goods_gross_profit: goodsProfit,
       operating_expenses: todayExpenses,
@@ -1345,15 +1883,26 @@ function getBayProfitability(db, { start_date, end_date } = {}) {
   const start = start_date || '2000-01-01';
   const end = end_date || formatDate();
 
-  // Pure Labor & Services Revenue
+  // Pure Labor & Services Revenue (excluding voided invoices)
   const laborSummary = db.prepare(`
     SELECT 
       COUNT(DISTINCT i.id) AS invoices_with_service,
-      COUNT(DISTINCT i.vehicle_id) AS vehicles_served,
+      COUNT(DISTINCT i.id) AS vehicles_served,
       COALESCE(SUM(i.labor_total), 0) AS total_labor_revenue,
       COALESCE(SUM(i.items_total), 0) AS total_goods_revenue
     FROM invoices i
-    WHERE date(i.created_at) BETWEEN date(?) AND date(?)
+    WHERE date(i.created_at) BETWEEN date(?) AND date(?) AND i.is_voided = 0
+  `).get(start, end);
+
+  // Pure oil sales for the period (excluding voided invoices)
+  const oilSalesPeriod = db.prepare(`
+    SELECT 
+      COALESCE(SUM(ii.subtotal), 0) AS oil_sales,
+      COALESCE(SUM(ii.qty), 0) AS oil_packs_count
+    FROM invoice_items ii
+    JOIN invoices i ON ii.invoice_id = i.id
+    JOIN inventory inv ON ii.inventory_id = inv.id
+    WHERE date(i.created_at) BETWEEN date(?) AND date(?) AND inv.category = 'oil' AND i.is_voided = 0
   `).get(start, end);
 
   // COGS for the period
@@ -1389,6 +1938,7 @@ function getBayProfitability(db, { start_date, end_date } = {}) {
     JOIN invoices i ON ii.invoice_id = i.id
     WHERE (ii.item_type = 'service' OR ii.labor_fee > 0)
       AND date(i.created_at) BETWEEN date(?) AND date(?)
+      AND i.is_voided = 0
     GROUP BY description
     ORDER BY total_revenue DESC
     LIMIT 10
@@ -1404,6 +1954,10 @@ function getBayProfitability(db, { start_date, end_date } = {}) {
     summary: {
       pure_labor_revenue: roundMoney(laborSummary.total_labor_revenue),
       goods_gross_profit: goodsGrossProfit,
+      total_goods_revenue: roundMoney(laborSummary.total_goods_revenue),
+      goods_sales: roundMoney(laborSummary.total_goods_revenue),
+      oil_sales: roundMoney(oilSalesPeriod?.oil_sales || 0),
+      oil_packs_count: oilSalesPeriod?.oil_packs_count || 0,
       total_gross_income: roundMoney(laborSummary.total_labor_revenue + goodsGrossProfit),
       operating_expenses: totalExpenses,
       labor_coverage_ratio_percent: laborCoverageRatio,
@@ -1509,6 +2063,11 @@ module.exports = {
   postSupplierPayment,
   postWorkerAdvance,
   postOfficialVoucher,
+  postOpeningBalance,
+  postInventoryOpeningBalance,
+  postBalanceAdjustment,
+  reconcileAllOpeningBalances,
+  reconcileAllOpeningInventory,
   getStatementOfAccount,
   getTrialBalance,
   getIncomeStatement,

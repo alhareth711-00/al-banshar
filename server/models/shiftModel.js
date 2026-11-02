@@ -1,5 +1,5 @@
 const db = require('../db/database');
-const { formatDate } = require('../utils/helpers');
+const { formatDate, validateSystemClock } = require('../utils/helpers');
 const { roundMoney, safeNum } = require('../utils/mathPrecision');
 
 function generateShiftCode() {
@@ -63,7 +63,7 @@ const shiftModel = {
     const invStats = db.prepare(`
       SELECT 
         COUNT(*) AS invoices_count,
-        COUNT(DISTINCT vehicle_id) AS cars_served,
+        COUNT(*) AS cars_served,
         COALESCE(SUM(net_total), 0) AS total_sales,
         COALESCE(SUM(paid_amount), 0) AS total_collected,
         COALESCE(SUM(CASE WHEN payment_method = 'cash' THEN paid_amount ELSE 0 END), 0) AS cash_sales,
@@ -145,10 +145,13 @@ const shiftModel = {
   },
 
   openShift(data = {}) {
-    // Check if open shift already exists
+    // [MOD-CHRONO-GUARD]: Check for clock regression
+    validateSystemClock(db);
+
+    // Check if open shift already exists [MOD-VAULT Poka-Yoke]
     const existing = db.prepare("SELECT id, shift_code FROM cash_shifts WHERE status = 'open' LIMIT 1").get();
     if (existing) {
-      throw new Error(`توجد بالفعل وردية مفتوحة حالياً برقم (${existing.shift_code}). يجب إغلاقها أولاً قبل فتح وردية جديدة.`);
+      throw new Error(`حظر أمني [MOD-VAULT]: توجد بالفعل وردية مفتوحة حالياً برقم (${existing.shift_code}). يجب إغلاقها أولاً قبل فتح وردية جديدة.`);
     }
 
     const shiftCode = generateShiftCode();
@@ -184,10 +187,29 @@ const shiftModel = {
       notes,
     });
 
-    return this.getShiftById(res.lastInsertRowid);
+    const newShiftId = res.lastInsertRowid;
+
+    try {
+      db.prepare(`
+        INSERT INTO financial_audit_logs (
+          action, entity_type, entity_id, old_data, new_data, performed_by, created_at
+        ) VALUES ('SHIFT_OPENED', 'cash_shift', ?, NULL, ?, ?, datetime('now', 'localtime'))
+      `).run(
+        newShiftId,
+        JSON.stringify({ shift_code: shiftCode, opening_cash: openingCash, cashier_name: cashierName }),
+        cashierName
+      );
+    } catch (auditErr) {
+      // Non-fatal
+    }
+
+    return this.getShiftById(newShiftId);
   },
 
   closeShift(data = {}) {
+    // [MOD-CHRONO-GUARD]: Check for clock regression (Executed before transaction so audit log persists)
+    validateSystemClock(db);
+
     const execute = db.transaction(() => {
       const shiftId = data.shift_id ? Number(data.shift_id) : null;
       let shift = null;
@@ -248,7 +270,7 @@ const shiftModel = {
         const { createJournalEntry } = require('../utils/accountingEngine');
 
         if (difference < 0) {
-          // Deficit (عجز عهدة الصندوق): Debit 6109 (تسوية عجز صندوق), Credit 1101 (الصندوق النقدي)
+          // Deficit (عجز عهدة الصندوق) [MOD-VAULT]: Debit 6110 (عجز وفروقات الصندوق), Credit 1101 (الصندوق النقدي)
           settlementJv = createJournalEntry(db, {
             entry_date: today,
             ref_type: 'expense',
@@ -257,7 +279,7 @@ const shiftModel = {
             description: `قيد تسوية عجز الصندوق النقدي لوردية (${shift.shift_code}) - الكاشير: ${shift.cashier_name || 'الكاشير'}`,
             lines: [
               {
-                account_code: '6109',
+                account_code: '6110', // [MOD-VAULT]: Dedicated cash shortage account
                 debit: absDiff,
                 credit: 0,
                 description: `عجز عهدة نقدية وردية (${shift.shift_code})`,
@@ -271,7 +293,7 @@ const shiftModel = {
             ],
           });
         } else {
-          // Surplus (فائض نقدي في الصندوق): Debit 1101 (الصندوق النقدي), Credit 4201 (إيرادات نقدية متنوعة)
+          // Surplus (فائض نقدي في الصندوق) [MOD-VAULT]: Debit 1101 (الصندوق النقدي), Credit 4303 (فائض وأرباح تسوية عهدة الصندوق)
           settlementJv = createJournalEntry(db, {
             entry_date: today,
             ref_type: 'closing_entry',
@@ -286,7 +308,7 @@ const shiftModel = {
                 description: `توريد زيادة نقدية فعلية بالصندوق وردية (${shift.shift_code})`,
               },
               {
-                account_code: '4201',
+                account_code: '4303', // [MOD-VAULT]: Dedicated cash surplus revenue (preserves 4201 service margin)
                 debit: 0,
                 credit: absDiff,
                 description: `إيراد زيادة نقدية عهدة وردية (${shift.shift_code})`,

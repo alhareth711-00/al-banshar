@@ -21,6 +21,11 @@ import {
   Clock,
   Layers,
   Droplets,
+  Upload,
+  Download,
+  FileUp,
+  FileCheck,
+  History,
 } from 'lucide-react';
 import {
   getShopSettings,
@@ -42,6 +47,19 @@ export default function SettingsModal({ isOpen, onClose, onSettingsUpdated }) {
   const [backupStatus, setBackupStatus] = useState(null);
   const [isCreatingSnapshot, setIsCreatingSnapshot] = useState(false);
   const [snapshotSuccess, setSnapshotSuccess] = useState('');
+
+  // Backup Restore State (استيراد واستعادة قاعدة البيانات)
+  const [restoreFile, setRestoreFile] = useState(null);
+  const [restoreValidation, setRestoreValidation] = useState(null);
+  const [isValidatingRestore, setIsValidatingRestore] = useState(false);
+  const [showRestoreConfirmModal, setShowRestoreConfirmModal] = useState(false);
+  const [restoreConfirmWord, setRestoreConfirmWord] = useState('');
+  const [isRestoring, setIsRestoring] = useState(false);
+  const [restoreError, setRestoreError] = useState('');
+  const [restoreSuccessNotice, setRestoreSuccessNotice] = useState('');
+  const [localBackupsList, setLocalBackupsList] = useState([]);
+  const [selectedLocalBackup, setSelectedLocalBackup] = useState('');
+  const [restoreSourceTab, setRestoreSourceTab] = useState('upload'); // 'upload' | 'local'
 
   // Factory Reset Confirmation State (الجزء الثالث)
   const [showResetModal, setShowResetModal] = useState(false);
@@ -122,6 +140,18 @@ export default function SettingsModal({ isOpen, onClose, onSettingsUpdated }) {
     }
   };
 
+  const fetchLocalBackupsList = async () => {
+    try {
+      const res = await fetch('/api/backup/list');
+      const data = await res.json();
+      if (data.success) {
+        setLocalBackupsList(data.data || []);
+      }
+    } catch (e) {
+      console.error('Error fetching backups list:', e);
+    }
+  };
+
   useEffect(() => {
     if (isOpen) {
       setFormData(getShopSettings());
@@ -130,8 +160,136 @@ export default function SettingsModal({ isOpen, onClose, onSettingsUpdated }) {
       setVolPresets(getOilVolumePresets());
       setSavedSuccess(false);
       fetchBackupStatus();
+      fetchLocalBackupsList();
+      setRestoreFile(null);
+      setRestoreValidation(null);
+      setRestoreError('');
+      setRestoreSuccessNotice('');
     }
   }, [isOpen]);
+
+  const handleFileSelected = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setRestoreFile(file);
+    setSelectedLocalBackup('');
+    setRestoreError('');
+    setIsValidatingRestore(true);
+    setRestoreValidation(null);
+
+    try {
+      const reader = new FileReader();
+      reader.onload = async () => {
+        try {
+          const base64 = reader.result.split(',')[1];
+          const res = await fetch('/api/backup/validate', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ fileBase64: base64, fileName: file.name }),
+          });
+          const data = await res.json();
+          if (data.success) {
+            setRestoreValidation(data.data);
+          } else {
+            setRestoreError(data.message || 'الملف غير صالح للاستعادة');
+          }
+        } catch (err) {
+          setRestoreError('فشل فحص الملف: ' + err.message);
+        } finally {
+          setIsValidatingRestore(false);
+        }
+      };
+      reader.readAsDataURL(file);
+    } catch (err) {
+      setRestoreError('فشل قراءة الملف: ' + err.message);
+      setIsValidatingRestore(false);
+    }
+  };
+
+  const handleSelectLocalBackup = async (fileName) => {
+    setSelectedLocalBackup(fileName);
+    setRestoreFile(null);
+    setRestoreError('');
+    setIsValidatingRestore(true);
+    setRestoreValidation(null);
+
+    try {
+      const res = await fetch('/api/backup/validate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ localFileName: fileName }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setRestoreValidation(data.data);
+      } else {
+        setRestoreError(data.message || 'الملف غير صالح');
+      }
+    } catch (err) {
+      setRestoreError('فشل فحص النسخة: ' + err.message);
+    } finally {
+      setIsValidatingRestore(false);
+    }
+  };
+
+  const handleExecuteRestore = async () => {
+    if (restoreConfirmWord.trim() !== 'استعادة') {
+      setRestoreError('يرجى كتابة كلمة "استعادة" بدقة لتأكيد الاسترجاع');
+      return;
+    }
+    setIsRestoring(true);
+    setRestoreError('');
+
+    try {
+      let res;
+      if (restoreFile) {
+        const reader = new FileReader();
+        const base64 = await new Promise((resolve, reject) => {
+          reader.onload = () => resolve(reader.result.split(',')[1]);
+          reader.onerror = reject;
+          reader.readAsDataURL(restoreFile);
+        });
+
+        res = await fetch('/api/backup/restore-upload', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            fileBase64: base64,
+            fileName: restoreFile.name,
+            confirmation_word: 'استعادة',
+          }),
+        });
+      } else if (selectedLocalBackup) {
+        res = await fetch('/api/backup/restore-local', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            fileName: selectedLocalBackup,
+            confirmation_word: 'استعادة',
+          }),
+        });
+      } else {
+        setRestoreError('لم يتم تحديد أي ملف للاستعادة');
+        setIsRestoring(false);
+        return;
+      }
+
+      const data = await res.json();
+      if (data.success) {
+        setShowRestoreConfirmModal(false);
+        setRestoreSuccessNotice(data.message || 'تمت استعادة وتنشيط قاعدة البيانات بنجاح!');
+        setTimeout(() => {
+          window.location.reload();
+        }, 1600);
+      } else {
+        setRestoreError(data.message || 'فشلت عملية الاستعادة');
+      }
+    } catch (err) {
+      setRestoreError('خطأ أثناء الاستعادة: ' + err.message);
+    } finally {
+      setIsRestoring(false);
+    }
+  };
 
   const handleCreateSnapshotNow = async () => {
     try {
@@ -612,12 +770,12 @@ export default function SettingsModal({ isOpen, onClose, onSettingsUpdated }) {
               </div>
             </div>
 
-            {/* 7. DATABASE BACKUP SENTINEL (درع الأمان وتنبيه 7 أيام) */}
-            <div className="p-4 rounded-2xl bg-slate-900/90 border-2 border-blue-500/30 space-y-3 shadow-lg">
+            {/* 6. ADVANCED DATABASE BACKUP & RESTORE HUB (إدارة النسخ الاحتياطي والاستعادة) */}
+            <div className="p-4 rounded-2xl bg-slate-900/95 border-2 border-cyan-500/30 space-y-3.5 shadow-xl">
               <div className="flex items-center justify-between border-b border-white/10 pb-2">
-                <div className="flex items-center gap-1.5 text-xs font-extrabold text-blue-300">
-                  <Database className="w-4 h-4 text-blue-400" />
-                  <span>6. درع الأمان والنسخ الاحتياطي التلقائي لقاعدة البيانات:</span>
+                <div className="flex items-center gap-1.5 text-xs font-black text-cyan-300">
+                  <Database className="w-4 h-4 text-cyan-400" />
+                  <span>6. درع الأمان والنسخ الاحتياطي والاستعادة المباشرة:</span>
                 </div>
                 {backupStatus && (
                   <span
@@ -632,24 +790,38 @@ export default function SettingsModal({ isOpen, onClose, onSettingsUpdated }) {
                 )}
               </div>
 
-              {backupStatus && (
-                <div className="p-3 bg-slate-950 rounded-xl border border-white/10 flex flex-wrap items-center justify-between gap-2 text-xs">
-                  <div>
-                    <div className="text-slate-300 font-bold flex items-center gap-1.5">
-                      <ShieldCheck className="w-4 h-4 text-emerald-400" />
-                      <span>آخر لقطة محفوظة:</span>
-                      <b className="text-white font-mono">{backupStatus.lastBackupAt ? new Date(backupStatus.lastBackupAt).toLocaleString('ar-YE') : 'لم تُؤخذ بعد'}</b>
-                    </div>
-                    <div className="text-[10px] text-slate-400 mt-0.5 font-mono">
-                      الملف: {backupStatus.backupFilePath || 'data/al_banshar.db'}
-                    </div>
+              {/* Status and Fast Export Bar */}
+              <div className="p-3 bg-slate-950 rounded-xl border border-white/10 flex flex-wrap items-center justify-between gap-2.5 text-xs">
+                <div>
+                  <div className="text-slate-300 font-bold flex items-center gap-1.5">
+                    <ShieldCheck className="w-4 h-4 text-emerald-400" />
+                    <span>آخر لقطة محفوظة:</span>
+                    <b className="text-white font-mono">
+                      {backupStatus?.lastBackupDate ? `${backupStatus.lastBackupDate} (${backupStatus.sizeFormatted || ''})` : 'لم تُؤخذ بعد'}
+                    </b>
                   </div>
+                  <div className="text-[10px] text-slate-400 mt-0.5 font-mono">
+                    إجمالي النسخ المحفوظة محلياً: {backupStatus?.totalBackups || 0} نسخة في <span className="text-slate-300">server/backups</span>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <a
+                    href="/api/backup"
+                    download
+                    onClick={recordBackupDownloaded}
+                    className="min-h-[38px] px-3.5 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white font-extrabold text-xs shadow-md shadow-cyan-600/20 flex items-center gap-1.5 transition active:scale-95"
+                    title="تنزيل نسخة من قاعدة البيانات الآن كملف .sqlite"
+                  >
+                    <Download className="w-3.5 h-3.5" />
+                    <span>تصدير وتنزيل النسخة 💾</span>
+                  </a>
 
                   <button
                     type="button"
                     onClick={handleCreateSnapshotNow}
                     disabled={isCreatingSnapshot}
-                    className="min-h-[40px] px-4 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-extrabold text-xs shadow-md shadow-blue-600/30 flex items-center gap-1.5 transition active:scale-95 disabled:opacity-50"
+                    className="min-h-[38px] px-3.5 rounded-xl bg-blue-600/30 hover:bg-blue-600 text-blue-200 hover:text-white border border-blue-500/40 font-bold text-xs flex items-center gap-1.5 transition active:scale-95 disabled:opacity-50"
                   >
                     {isCreatingSnapshot ? (
                       <>
@@ -659,19 +831,169 @@ export default function SettingsModal({ isOpen, onClose, onSettingsUpdated }) {
                     ) : (
                       <>
                         <Database className="w-3.5 h-3.5" />
-                        <span>أخذ لقطة فورية لقاعدة البيانات 💾</span>
+                        <span>أخذ لقطة سريعة</span>
                       </>
                     )}
                   </button>
                 </div>
-              )}
+              </div>
 
               {snapshotSuccess && (
                 <div className="p-2.5 rounded-xl bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 font-bold text-xs flex items-center gap-1.5">
-                  <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+                  <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
                   <span>{snapshotSuccess}</span>
                 </div>
               )}
+
+              {/* RESTORE DATABASE SUB-SECTION */}
+              <div className="p-3.5 bg-slate-950/80 rounded-xl border border-cyan-500/25 space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="text-xs font-black text-white flex items-center gap-1.5">
+                    <FileUp className="w-4 h-4 text-amber-400" />
+                    <span>استيراد واستعادة قاعدة البيانات (Restore Database):</span>
+                  </div>
+
+                  {/* Toggle source tab */}
+                  <div className="flex items-center bg-slate-900 p-0.5 rounded-lg border border-white/10 text-[11px]">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setRestoreSourceTab('upload');
+                        setRestoreError('');
+                      }}
+                      className={`px-2.5 py-1 rounded-md font-bold transition ${
+                        restoreSourceTab === 'upload' ? 'bg-cyan-600 text-white shadow' : 'text-slate-400 hover:text-white'
+                      }`}
+                    >
+                      رفع ملف من جهازك
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setRestoreSourceTab('local');
+                        setRestoreError('');
+                        fetchLocalBackupsList();
+                      }}
+                      className={`px-2.5 py-1 rounded-md font-bold transition ${
+                        restoreSourceTab === 'local' ? 'bg-cyan-600 text-white shadow' : 'text-slate-400 hover:text-white'
+                      }`}
+                    >
+                      من النسخ المحلية ({localBackupsList.length})
+                    </button>
+                  </div>
+                </div>
+
+                {restoreSourceTab === 'upload' ? (
+                  <div>
+                    <label className="block border-2 border-dashed border-cyan-500/30 hover:border-cyan-400 rounded-xl p-3.5 text-center cursor-pointer bg-cyan-950/20 hover:bg-cyan-950/30 transition">
+                      <input
+                        type="file"
+                        accept=".sqlite,.db"
+                        onChange={handleFileSelected}
+                        className="hidden"
+                      />
+                      <Upload className="w-5 h-5 text-cyan-400 mx-auto mb-1.5" />
+                      <div className="text-xs font-bold text-slate-200">
+                        {restoreFile ? (
+                          <span className="text-emerald-300 font-mono">الملف المختار: {restoreFile.name} ({(restoreFile.size / 1024 / 1024).toFixed(2)} MB)</span>
+                        ) : (
+                          'انقر هنا لاختيار ملف النسخة الاحتياطية (.sqlite أو .db) من جهازك'
+                        )}
+                      </div>
+                      <div className="text-[10px] text-slate-400 mt-1">يتم فحص وتأكيد سلامة الملف تلقائياً قبل تطبيقه</div>
+                    </label>
+                  </div>
+                ) : (
+                  <div>
+                    <label className="block text-[11px] font-bold text-slate-300 mb-1">اختر لقطة من النسخ المحفوظة محلياً على السيرفر:</label>
+                    <select
+                      value={selectedLocalBackup}
+                      onChange={(e) => handleSelectLocalBackup(e.target.value)}
+                      className="w-full min-h-[38px] px-3 rounded-xl bg-slate-900 border border-white/15 text-white font-mono text-xs font-bold focus:outline-none focus:border-cyan-400"
+                    >
+                      <option value="">-- اضغط لاختيار لقطة سابقة --</option>
+                      {localBackupsList.map((b) => (
+                        <option key={b.fileName} value={b.fileName}>
+                          {b.fileName} — {b.sizeFormatted} ({new Date(b.modifiedAt || b.createdAt).toLocaleDateString('ar-YE')})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+
+                {/* Validation Loading Spinner */}
+                {isValidatingRestore && (
+                  <div className="p-2.5 rounded-xl bg-blue-500/10 border border-blue-500/30 text-blue-300 text-xs flex items-center gap-2">
+                    <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                    <span>جاري فحص سلامة النسخة الاحتياطية والجداول...</span>
+                  </div>
+                )}
+
+                {/* Validation Success Card */}
+                {restoreValidation && (
+                  <div className="p-3 rounded-xl bg-emerald-500/15 border border-emerald-500/40 space-y-2 animate-in fade-in">
+                    <div className="flex items-center justify-between text-xs font-black text-emerald-300">
+                      <div className="flex items-center gap-1.5">
+                        <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+                        <span>تم فحص النسخة: {restoreValidation.message}</span>
+                      </div>
+                      <span className="font-mono text-[11px] bg-emerald-950 px-2 py-0.5 rounded border border-emerald-500/30">
+                        {restoreValidation.sizeFormatted}
+                      </span>
+                    </div>
+
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-[11px] font-bold text-slate-200 pt-1">
+                      <div className="p-1.5 rounded-lg bg-slate-900/80 border border-white/5 text-center">
+                        <div className="text-slate-400 text-[10px]">السيارات والعملاء</div>
+                        <div className="text-amber-300 font-mono text-sm">{restoreValidation.counts.vehicles}</div>
+                      </div>
+                      <div className="p-1.5 rounded-lg bg-slate-900/80 border border-white/5 text-center">
+                        <div className="text-slate-400 text-[10px]">فواتير المبيعات</div>
+                        <div className="text-cyan-300 font-mono text-sm">{restoreValidation.counts.invoices}</div>
+                      </div>
+                      <div className="p-1.5 rounded-lg bg-slate-900/80 border border-white/5 text-center">
+                        <div className="text-slate-400 text-[10px]">أصناف المخزون</div>
+                        <div className="text-emerald-300 font-mono text-sm">{restoreValidation.counts.inventory}</div>
+                      </div>
+                      <div className="p-1.5 rounded-lg bg-slate-900/80 border border-white/5 text-center">
+                        <div className="text-slate-400 text-[10px]">السندات والقيود</div>
+                        <div className="text-purple-300 font-mono text-sm">
+                          {(restoreValidation.counts.vouchers || 0) + (restoreValidation.counts.journal_entries || 0)}
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="pt-2 flex justify-end">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setRestoreConfirmWord('');
+                          setRestoreError('');
+                          setShowRestoreConfirmModal(true);
+                        }}
+                        className="w-full sm:w-auto min-h-[40px] px-5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-black text-xs shadow-lg shadow-emerald-600/30 flex items-center justify-center gap-2 transition active:scale-95"
+                      >
+                        <ShieldCheck className="w-4 h-4" />
+                        <span>بدء استعادة وتنشيط هذه النسخة الآن 🛡️</span>
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {restoreError && (
+                  <div className="p-2.5 rounded-xl bg-rose-500/20 border border-rose-500/40 text-rose-300 text-xs font-bold flex items-center gap-2">
+                    <AlertTriangle className="w-4 h-4 text-rose-400 shrink-0" />
+                    <span>{restoreError}</span>
+                  </div>
+                )}
+
+                {restoreSuccessNotice && (
+                  <div className="p-3 rounded-xl bg-emerald-500/25 border border-emerald-500/50 text-emerald-200 text-xs font-black flex items-center gap-2">
+                    <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0" />
+                    <span>{restoreSuccessNotice} (جاري تحديث النظام...)</span>
+                  </div>
+                )}
+              </div>
             </div>
 
             {/* 7. DANGER ZONE & FACTORY RESET */}
@@ -714,6 +1036,95 @@ export default function SettingsModal({ isOpen, onClose, onSettingsUpdated }) {
           </form>
         </div>
       </div>
+
+      {/* RESTORE DATABASE CONFIRMATION MODAL */}
+      {showRestoreConfirmModal && (
+        <div className="fixed inset-0 z-60 flex items-center justify-center p-4 bg-black/90 backdrop-blur-lg">
+          <div className="apple-glass border-2 border-emerald-500/50 rounded-3xl w-full max-w-md overflow-hidden shadow-2xl p-6 space-y-4">
+            <div className="flex items-center gap-3 border-b border-white/10 pb-3">
+              <div className="w-10 h-10 rounded-2xl bg-emerald-500/20 text-emerald-400 border border-emerald-500/40 flex items-center justify-center">
+                <ShieldCheck className="w-6 h-6 stroke-[2.2]" />
+              </div>
+              <div>
+                <h4 className="font-black text-emerald-300 text-base">تأكيد استعادة قاعدة البيانات</h4>
+                <p className="text-[11px] text-slate-400">تنشيط واسترجاع البيانات من النسخة الاحتياطية</p>
+              </div>
+            </div>
+
+            <div className="space-y-3 text-xs">
+              <div className="p-3 rounded-xl bg-cyan-950/40 border border-cyan-500/30 text-cyan-200 text-xs leading-relaxed space-y-1.5">
+                <div className="font-bold text-white flex items-center gap-1.5">
+                  <ShieldCheck className="w-4 h-4 text-cyan-400 shrink-0" />
+                  <span>حماية البيانات الحالية (لقطة أمان تلقائية):</span>
+                </div>
+                <p className="text-[11px] text-slate-300">
+                  سيقوم النظام بأخذ لقطة أمان احتياطية تلقائياً للوضع الحالي قبل البدء، لتتمكن من التراجع في أي وقت.
+                </p>
+              </div>
+
+              {restoreValidation && (
+                <div className="p-3 bg-slate-950 rounded-xl border border-white/10 text-[11px] space-y-1">
+                  <div className="text-slate-400 font-bold">البيانات التي سيتم تنشيطها فوراً:</div>
+                  <div className="text-white font-mono flex items-center justify-between">
+                    <span>السيارات: <b className="text-amber-300">{restoreValidation.counts.vehicles}</b></span>
+                    <span>الفواتير: <b className="text-cyan-300">{restoreValidation.counts.invoices}</b></span>
+                    <span>الأصناف: <b className="text-emerald-300">{restoreValidation.counts.inventory}</b></span>
+                  </div>
+                </div>
+              )}
+
+              <div>
+                <label className="block text-slate-300 font-bold mb-1 text-[11px]">
+                  اكتب كلمة <span className="text-emerald-400 underline font-black">"استعادة"</span> للتأكيد:
+                </label>
+                <input
+                  type="text"
+                  placeholder='اكتب: استعادة'
+                  value={restoreConfirmWord}
+                  onChange={(e) => setRestoreConfirmWord(e.target.value.trim())}
+                  className="w-full min-h-[42px] px-3 rounded-xl bg-slate-900 border border-emerald-500/40 text-emerald-300 text-center text-sm font-black focus:outline-none focus:border-emerald-400"
+                />
+              </div>
+
+              {restoreError && (
+                <div className="p-2.5 rounded-xl bg-rose-500/20 border border-rose-500/40 text-rose-300 text-xs font-bold flex items-center gap-2">
+                  <AlertTriangle className="w-4 h-4 text-rose-400 shrink-0" />
+                  <span>{restoreError}</span>
+                </div>
+              )}
+
+              <div className="pt-2 flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => setShowRestoreConfirmModal(false)}
+                  disabled={isRestoring}
+                  className="flex-1 min-h-[46px] rounded-xl bg-white/10 hover:bg-white/15 text-slate-300 font-bold text-xs"
+                >
+                  إلغاء وتراجع
+                </button>
+                <button
+                  type="button"
+                  onClick={handleExecuteRestore}
+                  disabled={isRestoring || restoreConfirmWord !== 'استعادة'}
+                  className="flex-1 min-h-[46px] rounded-xl bg-emerald-600 hover:bg-emerald-500 disabled:opacity-40 text-white font-black text-xs shadow-lg shadow-emerald-600/30 flex items-center justify-center gap-2 transition active:scale-95"
+                >
+                  {isRestoring ? (
+                    <>
+                      <RefreshCw className="w-4 h-4 animate-spin" />
+                      <span>جاري الاستعادة والتنشيط...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Check className="w-4 h-4 stroke-[3]" />
+                      <span>تأكيد الاستعادة الفورية</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* FACTORY RESET CONFIRMATION MODAL */}
       {showResetModal && (

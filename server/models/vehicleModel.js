@@ -180,12 +180,30 @@ const vehicleModel = {
       service_interval_km: serviceInterval,
     });
 
-    return this.getById(result.lastInsertRowid);
+    const newVehicle = this.getById(result.lastInsertRowid);
+    if (newVehicle && Number(newVehicle.balance_due) > 0) {
+      try {
+        const { postOpeningBalance } = require('../utils/accountingEngine');
+        postOpeningBalance(db, {
+          party_type: 'customer',
+          party_id: newVehicle.id,
+          amount: Number(newVehicle.balance_due),
+          date: newVehicle.created_at ? newVehicle.created_at.slice(0, 10) : null,
+          description: `رصيد مديونية سابقة مسجلة عند قيد المركبة (${newVehicle.plate_number} - ${newVehicle.customer_name})`,
+        });
+      } catch (err) {
+        console.warn(`[VehicleModel] Failed to post opening balance for vehicle ${newVehicle.id}:`, err.message);
+      }
+    }
+    return newVehicle;
   },
 
   update(id, data) {
     const existing = db.prepare('SELECT * FROM customers_vehicles WHERE id = ?').get(id);
     if (!existing) return null;
+
+    const oldBalance = Number(existing.balance_due) || 0;
+    const newBalance = data.balance_due !== undefined ? Number(data.balance_due) : oldBalance;
 
     const stmt = db.prepare(`
       UPDATE customers_vehicles SET
@@ -226,7 +244,7 @@ const vehicleModel = {
       last_odometer: data.last_odometer !== undefined ? Number(data.last_odometer) : existing.last_odometer,
       next_due_odometer: data.next_due_odometer !== undefined ? Number(data.next_due_odometer) : existing.next_due_odometer,
       next_due_date: data.next_due_date !== undefined ? data.next_due_date : existing.next_due_date,
-      balance_due: data.balance_due !== undefined ? Number(data.balance_due) : existing.balance_due,
+      balance_due: newBalance,
       credit_limit: data.credit_limit !== undefined ? Number(data.credit_limit) : existing.credit_limit,
       customer_type: data.customer_type !== undefined ? data.customer_type : existing.customer_type,
       corporate_name: data.corporate_name !== undefined ? (data.corporate_name ? data.corporate_name.trim() : null) : existing.corporate_name,
@@ -239,6 +257,21 @@ const vehicleModel = {
       customer_notes: data.customer_notes !== undefined ? data.customer_notes : (existing.customer_notes || ''),
       service_interval_km: data.service_interval_km !== undefined ? Number(data.service_interval_km) : (existing.service_interval_km || 3000),
     });
+
+    if (!isNaN(newBalance) && Math.abs(newBalance - oldBalance) >= 0.01) {
+      try {
+        const { postBalanceAdjustment } = require('../utils/accountingEngine');
+        postBalanceAdjustment(db, {
+          party_type: 'customer',
+          party_id: id,
+          old_balance: oldBalance,
+          new_balance: newBalance,
+          reason: `تعديل يدوي لمديونية المركبة (${existing.plate_number}) من شاشة التعديل`,
+        });
+      } catch (err) {
+        console.warn(`[VehicleModel] Failed to post balance adjustment for vehicle ${id}:`, err.message);
+      }
+    }
 
     return this.getById(id);
   },
@@ -317,7 +350,12 @@ const vehicleModel = {
         (SELECT sent_at FROM service_reminders_log WHERE vehicle_id = cv.id ORDER BY id DESC LIMIT 1) AS last_reminded_at,
         (SELECT COUNT(*) FROM service_reminders_log WHERE vehicle_id = cv.id) AS reminder_sent_count
       FROM customers_vehicles cv
-      WHERE cv.next_due_date IS NOT NULL OR cv.next_due_odometer > 0 OR cv.last_odometer > 0
+      WHERE cv.id != 1 
+        AND cv.plate_number != 'فاتورة سريعة'
+        AND cv.phone IS NOT NULL 
+        AND cv.phone != '---' 
+        AND TRIM(cv.phone) != ''
+        AND (cv.next_due_date IS NOT NULL OR cv.next_due_odometer > 0 OR cv.last_odometer > 0)
     `).all();
 
     const radarList = [];

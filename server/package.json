@@ -6,7 +6,12 @@
   "scripts": {
     "start": "node index.js",
     "dev": "node --watch index.js",
-    "test": "node test.js"
+    "test": "node test.js",
+    "audit:financial": "node scripts/financialAudit.js",
+    "audit:inventory": "node scripts/inventoryAudit.js",
+    "audit:radar": "node scripts/retentionRadarAudit.js",
+    "audit:chaos": "node scripts/chaosAudit.js",
+    "audit:all": "node scripts/runMasterAudit.js"
   },
   "keywords": [
     "pos",

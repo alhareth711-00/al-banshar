@@ -1,6 +1,7 @@
 const express = require('express');
 const cors = require('cors');
 const path = require('path');
+const fs = require('fs');
 const { initDb } = require('./db/init');
 const { seedDatabase } = require('./db/seed');
 const { errorHandler } = require('./utils/errorHandler');
@@ -26,10 +27,10 @@ const voucherController = require('./controllers/voucherController');
 const app = express();
 const PORT = process.env.PORT || 5000;
 
-// Enable CORS and JSON parsing
+// Enable CORS and JSON parsing (supporting up to 50MB for SQLite backup uploads)
 app.use(cors());
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+app.use(express.json({ limit: '50mb' }));
+app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
 // Request logger
 app.use((req, res, next) => {
@@ -89,6 +90,110 @@ app.get('/api/backup/status', (req, res) => {
   res.json({ success: true, data: status });
 });
 
+// Validate Backup File before restoration
+app.post('/api/backup/validate', (req, res) => {
+  try {
+    const fs = require('fs');
+    const { fileBase64, localFileName } = req.body;
+
+    let targetPath = null;
+    let isTemp = false;
+
+    if (localFileName) {
+      targetPath = path.join(backupEngine.getBackupsDir(), path.basename(localFileName));
+    } else if (fileBase64) {
+      const buffer = Buffer.from(fileBase64, 'base64');
+      targetPath = path.join(backupEngine.getBackupsDir(), `temp_val_${Date.now()}.sqlite`);
+      fs.writeFileSync(targetPath, buffer);
+      isTemp = true;
+    } else {
+      return res.status(400).json({ success: false, message: 'يجب تقديم ملف النسخة الاحتياطية أو اسمه' });
+    }
+
+    const validation = backupEngine.validateBackupFile(targetPath);
+
+    if (isTemp && fs.existsSync(targetPath)) {
+      try { fs.unlinkSync(targetPath); } catch (e) {}
+    }
+
+    if (!validation.valid) {
+      return res.status(400).json({ success: false, message: validation.error });
+    }
+
+    res.json({ success: true, data: validation });
+  } catch (err) {
+    res.status(500).json({ success: false, message: 'فشل فحص النسخة الاحتياطية', error: err.message });
+  }
+});
+
+// Restore Database from Uploaded Backup File (Hot-Swap)
+app.post('/api/backup/restore-upload', (req, res) => {
+  const fs = require('fs');
+  let tempPath = null;
+  try {
+    const { fileBase64, fileName, confirmation_word } = req.body;
+
+    if (!confirmation_word || confirmation_word.trim() !== 'استعادة') {
+      return res.status(400).json({ success: false, message: 'يرجى كتابة كلمة "استعادة" لتأكيد عملية استرجاع البيانات' });
+    }
+
+    if (!fileBase64) {
+      return res.status(400).json({ success: false, message: 'لم يتم استلام ملف النسخة الاحتياطية' });
+    }
+
+    const buffer = Buffer.from(fileBase64, 'base64');
+    tempPath = path.join(backupEngine.getBackupsDir(), `temp_restore_${Date.now()}.sqlite`);
+    fs.writeFileSync(tempPath, buffer);
+
+    const result = backupEngine.restoreFromBackup(tempPath, { createSafetySnapshot: true });
+
+    if (fs.existsSync(tempPath)) {
+      try { fs.unlinkSync(tempPath); } catch (e) {}
+    }
+
+    res.json({
+      success: true,
+      message: 'تمت استعادة وتنشيط قاعدة البيانات بنجاح تام، وأخذ لقطة أمان احتياطية تلقائياً 🛡️',
+      data: result,
+    });
+  } catch (err) {
+    if (tempPath && fs.existsSync(tempPath)) {
+      try { fs.unlinkSync(tempPath); } catch (e) {}
+    }
+    res.status(500).json({ success: false, message: 'فشلت استعادة النسخة الاحتياطية', error: err.message });
+  }
+});
+
+// Restore Database from Existing Local Backup Snapshot
+app.post('/api/backup/restore-local', (req, res) => {
+  try {
+    const { fileName, confirmation_word } = req.body;
+
+    if (!confirmation_word || confirmation_word.trim() !== 'استعادة') {
+      return res.status(400).json({ success: false, message: 'يرجى كتابة كلمة "استعادة" لتأكيد عملية استرجاع البيانات' });
+    }
+
+    if (!fileName) {
+      return res.status(400).json({ success: false, message: 'يرجى تحديد اسم ملف النسخة الاحتياطية' });
+    }
+
+    const targetPath = path.join(backupEngine.getBackupsDir(), path.basename(fileName));
+    if (!require('fs').existsSync(targetPath)) {
+      return res.status(404).json({ success: false, message: 'ملف النسخة الاحتياطية المحدد غير موجود على القرص' });
+    }
+
+    const result = backupEngine.restoreFromBackup(targetPath, { createSafetySnapshot: true });
+
+    res.json({
+      success: true,
+      message: `تمت استعادة البيانات بنجاح من اللقطة (${fileName}) 🛡️`,
+      data: result,
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, message: 'فشلت استعادة اللقطة المحلية', error: err.message });
+  }
+});
+
 // API Routes
 app.use('/api/vehicles', vehicleRoutes);
 app.use('/api/inventory', inventoryRoutes);
@@ -105,6 +210,16 @@ app.get('/api/expenses', voucherController.getExpenses);
 app.use('/api/accounting', accountingRoutes);
 app.use('/api/shifts', shiftRoutes);
 app.use('/api/system', systemRoutes);
+
+// Serve production static frontend if available
+const clientDistPath = path.join(__dirname, '..', 'client', 'dist');
+if (fs.existsSync(clientDistPath)) {
+  app.use(express.static(clientDistPath));
+  app.use((req, res, next) => {
+    if (req.path.startsWith('/api')) return next();
+    res.sendFile(path.join(clientDistPath, 'index.html'));
+  });
+}
 
 // Global Error Handler
 app.use(errorHandler);

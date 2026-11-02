@@ -6,6 +6,8 @@ export default function PackagingConversionModal({ isOpen, onClose, inventory = 
   const [toId, setToId] = useState('');
   const [packagesCount, setPackagesCount] = useState(1);
   const [unitsPerPack, setUnitsPerPack] = useState(24);
+  const [applyDrumDecantingLoss, setApplyDrumDecantingLoss] = useState(true);
+  const [customActualUnits, setCustomActualUnits] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState('');
 
@@ -47,7 +49,29 @@ export default function PackagingConversionModal({ isOpen, onClose, inventory = 
     }
   };
 
-  const totalUnitsProduced = (Number(packagesCount) || 0) * (Number(unitsPerPack) || 0);
+  // Check if source package is a 208L oil drum
+  const isDrum = useMemo(() => {
+    return (
+      Number(unitsPerPack) === 208 ||
+      selectedParent?.pack_size === '208L' ||
+      (selectedParent?.name || '').includes('برميل') ||
+      (selectedParent?.name || '').includes('208')
+    );
+  }, [unitsPerPack, selectedParent]);
+
+  const nominalUnitsProduced = (Number(packagesCount) || 0) * (Number(unitsPerPack) || 0);
+
+  const effectiveUnitsProduced = useMemo(() => {
+    if (customActualUnits && Number(customActualUnits) > 0) {
+      return Number(customActualUnits);
+    }
+    if (isDrum && applyDrumDecantingLoss) {
+      return (Number(packagesCount) || 1) * 204;
+    }
+    return nominalUnitsProduced;
+  }, [customActualUnits, isDrum, applyDrumDecantingLoss, packagesCount, nominalUnitsProduced]);
+
+  const wasteUnits = Math.max(0, nominalUnitsProduced - effectiveUnitsProduced);
 
   if (!isOpen) return null;
 
@@ -65,7 +89,7 @@ export default function PackagingConversionModal({ isOpen, onClose, inventory = 
       return;
     }
 
-    if (totalUnitsProduced <= 0) {
+    if (effectiveUnitsProduced <= 0) {
       setError('إجمالي الوحدات الناتجة يجب أن يكون أكبر من الصفر');
       return;
     }
@@ -80,6 +104,7 @@ export default function PackagingConversionModal({ isOpen, onClose, inventory = 
           to_id: Number(toId),
           packages_to_convert: Number(packagesCount),
           units_per_package: Number(unitsPerPack),
+          actual_units_produced: effectiveUnitsProduced,
         }),
       });
 
@@ -208,10 +233,43 @@ export default function PackagingConversionModal({ isOpen, onClose, inventory = 
             <div>
               <label className="block text-teal-400 font-bold mb-1.5">إجمالي الناتج المضاف للمخزن:</label>
               <div className="w-full min-h-[44px] px-3.5 rounded-xl bg-slate-950 border border-teal-500/30 text-teal-300 font-mono text-lg font-black flex items-center">
-                +{totalUnitsProduced} <span className="text-xs font-sans text-slate-400 mr-1.5">علبة</span>
+                +{effectiveUnitsProduced} <span className="text-xs font-sans text-slate-400 mr-1.5">لتر/علبة</span>
               </div>
             </div>
           </div>
+
+          {/* 208L Drum Decanting Loss Guard Card [MOD-CATALOG-RETRO] */}
+          {isDrum && (
+            <div className="p-3.5 rounded-2xl bg-amber-500/15 border border-amber-500/40 space-y-2.5">
+              <div className="flex items-center justify-between flex-wrap gap-2">
+                <div className="flex items-center gap-2 text-amber-300 font-bold text-xs">
+                  <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0" />
+                  <span>معالجة فاقد تفريغ البرميل 208L (هدر وترسيب اللزوجة) 🛢️</span>
+                </div>
+                <label className="flex items-center gap-2 text-xs text-amber-200 cursor-pointer bg-black/40 px-2.5 py-1 rounded-lg border border-amber-500/30 font-bold">
+                  <input
+                    type="checkbox"
+                    checked={applyDrumDecantingLoss}
+                    onChange={(e) => setApplyDrumDecantingLoss(e.target.checked)}
+                    className="rounded border-amber-400 text-amber-500 focus:ring-0"
+                  />
+                  <span>تطبيق الهدر الطبيعي (204L فعلي)</span>
+                </label>
+              </div>
+              <p className="text-[11px] text-amber-200/80 leading-relaxed">
+                فيزيائياً، برميل الزيت 208 لتر يتبقى في قعره وجدرانه 3 إلى 4 لترات لا يمكن سحبها بالمضخة (~204 لتر صافي فعلي). يمنع هذا الخيار تسجيل لترات وهمية في النظام ويحمل تكلفة البرميل كاملة على صافي اللترات المنتجة.
+              </p>
+              {wasteUnits > 0 && (
+                <div className="flex items-center gap-3 text-xs font-mono font-bold text-amber-300 bg-black/30 p-2.5 rounded-xl border border-white/5">
+                  <span>الفاقد المحسوب: <strong className="text-rose-400 font-black">-{wasteUnits} لتر</strong></span>
+                  <span>•</span>
+                  <span>الصافي الفعلي بالمخزن: <strong className="text-emerald-400 font-black">+{effectiveUnitsProduced} لتر</strong></span>
+                  <span>•</span>
+                  <span className="text-slate-300 text-[11px]">يتم تحديث WAC تلقائياً لامتصاص تكلفة الهدر</span>
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Summary Audit Card */}
           <div className="p-3.5 rounded-2xl bg-slate-950/80 border border-white/10 space-y-1.5 text-[11px] text-slate-400 font-mono">
@@ -220,8 +278,8 @@ export default function PackagingConversionModal({ isOpen, onClose, inventory = 
               أثر عملية الفك في سجل الحركات المخزنية:
             </div>
             <div>• سيتم خصم ({packagesCount}) من رصيد الصنف المصدر.</div>
-            <div>• سيتم إضافة ({totalUnitsProduced}) إلى رصيد الصنف الناتج فوراً.</div>
-            <div>• يتم تسجيل قيد حركة مخزنية رسمية (Packaging Conversion) لضمان عدم ضياع التكلفة.</div>
+            <div>• سيتم إضافة ({effectiveUnitsProduced}) إلى رصيد الصنف الناتج فوراً{wasteUnits > 0 ? ` (بعد استبعاد ${wasteUnits} لتر هدر تفريغ)` : ''}.</div>
+            <div>• يتم تحديث متوسط التكلفة WAC للصنف الناتج لضمان نقل التكلفة بدقة 100%.</div>
           </div>
 
           {/* Action Buttons */}
@@ -235,7 +293,7 @@ export default function PackagingConversionModal({ isOpen, onClose, inventory = 
             </button>
             <button
               type="submit"
-              disabled={isSubmitting || !fromId || !toId || totalUnitsProduced <= 0}
+              disabled={isSubmitting || !fromId || !toId || effectiveUnitsProduced <= 0}
               className="flex-1 min-h-[46px] rounded-2xl bg-gradient-to-r from-teal-500 to-emerald-600 hover:from-teal-400 hover:to-emerald-500 text-slate-950 font-black shadow-lg shadow-teal-500/20 disabled:opacity-50"
             >
               {isSubmitting ? 'جاري تنفيذ الفك والتحويل...' : 'تأكيد فك العبوات وإضافتها للمخزن 🔄'}

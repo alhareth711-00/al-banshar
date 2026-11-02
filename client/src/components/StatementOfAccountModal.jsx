@@ -19,6 +19,7 @@ import {
   ArrowUpRight,
 } from 'lucide-react';
 import { getShopSettings, formatYemeniWhatsAppLink } from '../utils/settings';
+import { getLocalTodayDate } from '../utils/dateUtils';
 
 export default function StatementOfAccountModal({ isOpen, onClose, initialPartyType = 'customer', initialPartyId = null }) {
   const [partyType, setPartyType] = useState(initialPartyType); // 'customer' | 'supplier' | 'worker'
@@ -127,7 +128,7 @@ export default function StatementOfAccountModal({ isOpen, onClose, initialPartyT
   // Handle Quick Date Filters
   const handleDatePreset = (preset) => {
     setDateFilter(preset);
-    const today = new Date().toISOString().split('T')[0];
+    const today = getLocalTodayDate();
 
     if (preset === 'all') {
       setStartDate('');
@@ -138,7 +139,7 @@ export default function StatementOfAccountModal({ isOpen, onClose, initialPartyT
     } else if (preset === 'month') {
       const firstDay = new Date();
       firstDay.setDate(1);
-      setStartDate(firstDay.toISOString().split('T')[0]);
+      setStartDate(getLocalTodayDate(firstDay));
       setEndDate(today);
     }
   };
@@ -165,6 +166,17 @@ export default function StatementOfAccountModal({ isOpen, onClose, initialPartyT
       return p.name && p.name.toLowerCase().includes(q);
     }
   });
+
+  // Auto select matching party when searching
+  useEffect(() => {
+    if (searchQuery.trim() && filteredParties.length > 0) {
+      const alreadySelected = filteredParties.some((p) => Number(p.id) === Number(partyId));
+      if (!alreadySelected) {
+        setSelectedParty(filteredParties[0]);
+        setPartyId(filteredParties[0].id);
+      }
+    }
+  }, [searchQuery, filteredParties, partyId]);
 
   // Prepare WhatsApp text
   const formatWhatsAppMessage = () => {
@@ -499,9 +511,13 @@ ${linesText}
           ) : !statement || (statement.statement_lines || []).length === 0 ? (
             <div className="p-12 text-center text-slate-400">
               <CheckCircle className="w-12 h-12 mx-auto text-emerald-500/40 mb-3" />
-              <h4 className="font-bold text-sm text-white">لا توجد حركات مالية مسجلة</h4>
+              <h4 className="font-bold text-sm text-white">لا توجد حركات مالية مسجلة في هذه الفترة</h4>
               <p className="text-xs text-slate-400 mt-1">
-                {selectedParty ? `الحساب متوازن وصافي الرصيد: ${statement?.closing_balance || 0} ر.ي` : 'يرجى اختيار عميل أو مورد لعرض كشف حسابه'}
+                {selectedParty
+                  ? Number(statement?.closing_balance) === 0
+                    ? 'الحساب متوازن وصافي الرصيد: 0 ر.ي'
+                    : `الرصيد القائم المستحق: ${Number(statement?.closing_balance).toLocaleString()} ر.ي`
+                  : 'يرجى اختيار عميل أو مورد لعرض كشف حسابه'}
               </p>
             </div>
           ) : (
@@ -539,20 +555,32 @@ ${linesText}
                         <span
                           className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
                             line.ref_type === 'invoice'
-                              ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
+                              ? line.is_settled_cash
+                                ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
+                                : 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
                               : line.ref_type === 'debt_collection'
                               ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
                               : line.ref_type === 'purchase'
                               ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/30'
+                              : line.ref_type === 'opening_balance'
+                              ? 'bg-blue-500/20 text-blue-300 border border-blue-500/30'
+                              : line.ref_type === 'balance_adjustment'
+                              ? 'bg-indigo-500/20 text-indigo-300 border border-indigo-500/30'
                               : 'bg-purple-500/20 text-purple-300 border border-purple-500/30'
                           }`}
                         >
                           {line.ref_type === 'invoice'
-                            ? 'فاتورة بيع'
+                            ? line.is_settled_cash
+                              ? 'فاتورة كاش'
+                              : 'فاتورة بيع'
                             : line.ref_type === 'debt_collection'
                             ? 'سند قبض'
                             : line.ref_type === 'purchase'
                             ? 'فاتورة شراء'
+                            : line.ref_type === 'opening_balance'
+                            ? 'رصيد افتتاحي'
+                            : line.ref_type === 'balance_adjustment'
+                            ? 'تسوية رصيد'
                             : 'سند مالي'}
                         </span>
                       </td>

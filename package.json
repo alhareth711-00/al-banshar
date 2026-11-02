@@ -6,6 +6,11 @@
     "server": "cmd /c \"cd server && npm start\"",
     "server:dev": "cmd /c \"cd server && npm run dev\"",
     "server:test": "cmd /c \"cd server && npm test\"",
+    "audit:financial": "cmd /c \"cd server && npm run audit:financial\"",
+    "audit:inventory": "cmd /c \"cd server && npm run audit:inventory\"",
+    "audit:radar": "cmd /c \"cd server && npm run audit:radar\"",
+    "audit:chaos": "cmd /c \"cd server && npm run audit:chaos\"",
+    "audit:all": "cmd /c \"cd server && npm run audit:all\"",
     "client": "cmd /c \"cd client && npm run dev\"",
     "client:build": "cmd /c \"cd client && npm run build\""
   },

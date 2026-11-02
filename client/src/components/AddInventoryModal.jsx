@@ -63,6 +63,20 @@ export function calculateDotAge(dotCode) {
   return { week, year, ageInMonths, ageInYears, status, label, color };
 }
 
+export const RETAIL_UNITS = ['لتر', 'حبة', 'قطعة', 'علبة', 'دبة', 'إطار', 'بطارية', 'طقم', 'متر'];
+export const BULK_UNITS = ['كرتون', 'شدة', 'برميل الزيت', 'دبة', 'باكت', 'طقم', 'إطار', 'حبة'];
+
+export const isBulkPackType = (b) => ['كرتون', 'شدة', 'برميل الزيت', 'باكت', 'طقم'].includes(b);
+
+export const getPackQtyLabel = (bulkUnit, retailUnit) => {
+  if (bulkUnit === 'كرتون') return `عدد الـ (${retailUnit}) في الكرتون (للتوريد):`;
+  if (bulkUnit === 'شدة') return `عدد الـ (${retailUnit}) في الشدة (للتوريد):`;
+  if (bulkUnit === 'برميل الزيت') return `سعة البرميل باللتر (للتوريد):`;
+  if (bulkUnit === 'باكت') return `عدد الـ (${retailUnit}) في الباكت:`;
+  if (bulkUnit === 'طقم') return `عدد الـ (${retailUnit}) في الطقم:`;
+  return `الكمية داخل العبوة:`;
+};
+
 // Single-letter prefix SKU generator (Z=زيت, F=فلتر, T=إطار, B=بطارية, S=خدمة, P=منتج عام)
 export const generateSingleLetterSku = (category) => {
   const prefixMap = {
@@ -89,10 +103,12 @@ export default function AddInventoryModal({ isOpen, onClose, onCreated, itemToEd
     item_type: 'product',
     brand: 'تويوتا',
     viscosity: '20W-50',
-    oil_type: 'معدني تقليدي',
+    oil_type: 'معدني',
     api_grade: 'SP / CF',
     pack_size: '4L',
-    carton_pack_qty: 24,
+    retail_unit: 'دبة',
+    bulk_unit: 'كرتون',
+    carton_pack_qty: 4,
     tire_battery_spec: '',
     country_of_origin: 'اليابان',
     dot_code: '',
@@ -160,10 +176,12 @@ export default function AddInventoryModal({ isOpen, onClose, onCreated, itemToEd
         item_type: itemToEdit.item_type || (itemToEdit.category === 'service' ? 'service' : 'product'),
         brand: itemToEdit.brand || 'عام',
         viscosity: itemToEdit.viscosity || '20W-50',
-        oil_type: itemToEdit.oil_type || 'معدني تقليدي',
+        oil_type: (itemToEdit.oil_type === 'معدني تقليدي' ? 'معدني' : itemToEdit.oil_type) || 'معدني',
         api_grade: itemToEdit.api_grade || 'SP / CF',
-        pack_size: itemToEdit.pack_size || '4L',
-        carton_pack_qty: itemToEdit.carton_pack_qty || 24,
+        pack_size: itemToEdit.pack_size || (itemToEdit.category === 'service' ? 'unit' : '4L'),
+        retail_unit: itemToEdit.retail_unit || (itemToEdit.category === 'oil' ? (itemToEdit.pack_size === '1L' ? 'علبة' : itemToEdit.pack_size === 'bulk_liter' ? 'لتر' : 'دبة') : itemToEdit.category === 'tire' ? 'إطار' : itemToEdit.category === 'accessory' ? 'قطعة' : 'حبة'),
+        bulk_unit: itemToEdit.bulk_unit || (itemToEdit.category === 'oil' ? (itemToEdit.pack_size === 'bulk_liter' ? 'برميل الزيت' : ['20L', '25L'].includes(itemToEdit.pack_size) ? 'دبة' : 'كرتون') : itemToEdit.category === 'tire' ? 'إطار' : itemToEdit.category === 'battery' ? 'حبة' : 'شدة'),
+        carton_pack_qty: itemToEdit.carton_pack_qty || (itemToEdit.category === 'oil' ? (itemToEdit.pack_size === '1L' ? 24 : itemToEdit.pack_size === 'bulk_liter' ? 200 : 4) : ['filter', 'accessory'].includes(itemToEdit.category) ? 10 : 1),
         tire_battery_spec: itemToEdit.tire_battery_spec || '',
         country_of_origin: itemToEdit.country_of_origin || 'اليابان',
         dot_code: itemToEdit.dot_code || '',
@@ -189,10 +207,12 @@ export default function AddInventoryModal({ isOpen, onClose, onCreated, itemToEd
         item_type: 'product',
         brand: 'تويوتا',
         viscosity: '20W-50',
-        oil_type: 'معدني تقليدي',
+        oil_type: 'معدني',
         api_grade: 'SP / CF',
         pack_size: '4L',
-        carton_pack_qty: 24,
+        retail_unit: 'دبة',
+        bulk_unit: 'كرتون',
+        carton_pack_qty: 4,
         tire_battery_spec: '',
         country_of_origin: 'اليابان',
         dot_code: '',
@@ -254,14 +274,109 @@ export default function AddInventoryModal({ isOpen, onClose, onCreated, itemToEd
 
   const handleCategoryChange = (cat) => {
     const isSrv = cat === 'service';
+    setFormData((prev) => {
+      const updated = {
+        ...prev,
+        category: cat,
+        item_type: isSrv ? 'service' : 'product',
+        min_stock_alert: isSrv ? 0 : prev.min_stock_alert || 5,
+        cost_price: isSrv && !prev.cost_price ? '0' : prev.cost_price,
+      };
+
+      if (cat === 'oil') {
+        updated.brand = prev.brand && prev.brand !== 'خدمات المركز' && prev.brand !== 'عام' ? prev.brand : 'تويوتا';
+        updated.viscosity = prev.viscosity || '20W-50';
+        updated.oil_type = prev.oil_type || 'معدني';
+        updated.pack_size = prev.pack_size && prev.pack_size !== 'unit' ? prev.pack_size : '4L';
+        if (updated.pack_size === '1L') {
+          updated.retail_unit = 'علبة'; updated.bulk_unit = 'كرتون'; updated.carton_pack_qty = 24;
+        } else if (updated.pack_size === 'bulk_liter') {
+          updated.retail_unit = 'لتر'; updated.bulk_unit = 'برميل الزيت'; updated.carton_pack_qty = 200;
+        } else if (['20L', '25L'].includes(updated.pack_size)) {
+          updated.retail_unit = 'دبة'; updated.bulk_unit = 'دبة'; updated.carton_pack_qty = 1;
+        } else {
+          updated.retail_unit = 'دبة'; updated.bulk_unit = 'كرتون'; updated.carton_pack_qty = 4;
+        }
+      } else if (cat === 'filter') {
+        updated.brand = prev.brand === 'تويوتا' || prev.brand === 'خدمات المركز' ? '' : prev.brand;
+        updated.viscosity = '';
+        updated.oil_type = '';
+        updated.api_grade = '';
+        updated.pack_size = 'unit';
+        updated.retail_unit = 'حبة';
+        updated.bulk_unit = 'شدة';
+        updated.carton_pack_qty = 10;
+      } else if (cat === 'battery') {
+        updated.brand = prev.brand === 'تويوتا' || prev.brand === 'خدمات المركز' ? '' : prev.brand;
+        updated.viscosity = '';
+        updated.oil_type = '';
+        updated.api_grade = '';
+        updated.pack_size = 'unit';
+        updated.retail_unit = 'حبة';
+        updated.bulk_unit = 'حبة';
+        updated.carton_pack_qty = 1;
+      } else if (cat === 'tire') {
+        updated.brand = prev.brand === 'تويوتا' || prev.brand === 'خدمات المركز' ? '' : prev.brand;
+        updated.viscosity = '';
+        updated.oil_type = '';
+        updated.api_grade = '';
+        updated.pack_size = 'unit';
+        updated.retail_unit = 'إطار';
+        updated.bulk_unit = 'إطار';
+        updated.carton_pack_qty = 1;
+      } else if (cat === 'accessory') {
+        updated.brand = prev.brand === 'تويوتا' || prev.brand === 'خدمات المركز' ? 'عام' : prev.brand;
+        updated.viscosity = '';
+        updated.oil_type = '';
+        updated.api_grade = '';
+        updated.pack_size = 'unit';
+        updated.retail_unit = 'قطعة';
+        updated.bulk_unit = 'شدة';
+        updated.carton_pack_qty = 10;
+      } else if (isSrv) {
+        updated.brand = 'خدمات المركز';
+        updated.viscosity = '';
+        updated.oil_type = '';
+        updated.api_grade = '';
+        updated.pack_size = 'unit';
+        updated.retail_unit = 'خدمة';
+        updated.bulk_unit = 'خدمة';
+        updated.carton_pack_qty = 1;
+      }
+
+      return updated;
+    });
+  };
+
+  const handlePackSizeChange = (size) => {
+    let rUnit = 'دبة';
+    let bUnit = 'كرتون';
+    let pQty = 4;
+
+    if (size === '1L') {
+      rUnit = 'علبة';
+      bUnit = 'كرتون';
+      pQty = 24;
+    } else if (size === 'bulk_liter') {
+      rUnit = 'لتر';
+      bUnit = 'برميل الزيت';
+      pQty = 200;
+    } else if (['20L', '25L'].includes(size)) {
+      rUnit = 'دبة';
+      bUnit = 'دبة';
+      pQty = 1;
+    } else {
+      rUnit = 'دبة';
+      bUnit = 'كرتون';
+      pQty = 4;
+    }
+
     setFormData((prev) => ({
       ...prev,
-      category: cat,
-      item_type: isSrv ? 'service' : 'product',
-      brand: isSrv ? 'خدمات المركز' : prev.brand === 'خدمات المركز' ? 'تويوتا' : prev.brand,
-      pack_size: isSrv ? 'unit' : prev.pack_size,
-      min_stock_alert: isSrv ? 0 : prev.min_stock_alert || 5,
-      cost_price: isSrv && !prev.cost_price ? '0' : prev.cost_price,
+      pack_size: size,
+      retail_unit: rUnit,
+      bulk_unit: bUnit,
+      carton_pack_qty: pQty,
     }));
   };
 
@@ -291,14 +406,26 @@ export default function AddInventoryModal({ isOpen, onClose, onCreated, itemToEd
       // Auto-generate single-letter SKU if user left it blank
       const sku = formData.sku.trim() || generateSingleLetterSku(formData.category);
 
+      const isOil = formData.category === 'oil';
+      const isTire = formData.category === 'tire';
+      const isBattery = formData.category === 'battery';
+
       const payload = {
         ...formData,
         sku,
         barcode: formData.barcode.trim() || null,
+        viscosity: isOil ? (formData.viscosity || null) : null,
+        oil_type: isOil ? (formData.oil_type || null) : null,
+        api_grade: isOil ? (formData.api_grade || null) : null,
+        pack_size: isOil ? (formData.pack_size || '4L') : 'unit',
+        retail_unit: formData.retail_unit || (isOil ? 'علبة' : isTire ? 'إطار' : 'حبة'),
+        bulk_unit: formData.bulk_unit || (isOil ? 'كرتون' : isTire ? 'إطار' : 'شدة'),
+        dot_code: isTire && formData.dot_code ? formData.dot_code.trim() : null,
+        battery_capacity_ah: isBattery && formData.battery_capacity_ah ? formData.battery_capacity_ah.trim() : null,
         cost_price: Number(formData.cost_price) || 0,
         sell_price: Number(formData.sell_price) || 0,
         warranty_months: Number(formData.warranty_months) || 0,
-        carton_pack_qty: Number(formData.carton_pack_qty) || 24,
+        carton_pack_qty: ['حبة', 'إطار', 'دبة'].includes(formData.bulk_unit) ? 1 : (Number(formData.carton_pack_qty) || 1),
         min_stock_alert: isService ? 0 : Number(formData.min_stock_alert) || 5,
         is_consignment: formData.is_consignment ? 1 : 0,
         consignment_supplier_name: formData.is_consignment ? formData.consignment_supplier_name.trim() : null,
@@ -486,9 +613,10 @@ export default function AddInventoryModal({ isOpen, onClose, onCreated, itemToEd
                     onChange={(e) => setFormData({ ...formData, oil_type: e.target.value })}
                     className="w-full min-h-[40px] px-2.5 rounded-xl bg-slate-950 border border-white/15 text-white text-xs font-bold"
                   >
-                    <option value="معدني تقليدي">معدني تقليدي</option>
+                    <option value="معدني">معدني</option>
                     <option value="نصف تخليقي">نصف تخليقي</option>
                     <option value="تخليقي بالكامل">تخليقي بالكامل</option>
+                    <option value="عالي تحمل درجة الحرارة">عالي تحمل درجة الحرارة</option>
                   </select>
                 </div>
 
@@ -496,12 +624,15 @@ export default function AddInventoryModal({ isOpen, onClose, onCreated, itemToEd
                   <label className="block text-slate-300 mb-1 text-[11px] font-bold">سعة العبوة:</label>
                   <select
                     value={formData.pack_size}
-                    onChange={(e) => setFormData({ ...formData, pack_size: e.target.value })}
-                    className="w-full min-h-[40px] px-2.5 rounded-xl bg-slate-950 border border-white/15 text-white font-mono text-xs font-bold"
+                    onChange={(e) => handlePackSizeChange(e.target.value)}
+                    className="w-full min-h-[40px] px-2.5 rounded-xl bg-slate-950 border border-white/15 text-white text-xs font-bold"
                   >
-                    <option value="1L">1 لتر (علبة)</option>
-                    <option value="4L">4 لتر (دبة)</option>
-                    <option value="5L">5 لتر</option>
+                    <option value="1L">علبة 1 لتر</option>
+                    <option value="4L">دبة 4 لتر</option>
+                    <option value="5L">دبة 5 لتر</option>
+                    <option value="20L">دبة 20 لتر</option>
+                    <option value="25L">دبة 25 لتر</option>
+                    <option value="bulk_liter">برميل الزيت (200 لتر)</option>
                   </select>
                 </div>
               </div>
@@ -848,17 +979,99 @@ export default function AddInventoryModal({ isOpen, onClose, onCreated, itemToEd
                   </div>
                 </div>
 
-                {/* Carton pack qty for products */}
+                {/* Smart Packaging & Units Suite (تخصيص وحدات البيع والتوريد وسعة العبوة) */}
                 {!isService && (
-                  <div>
-                    <label className="block text-slate-300 font-bold mb-1">عدد العلب / اللترات في الكرتون أو الشدة (للتوريد):</label>
-                    <input
-                      type="number"
-                      min="1"
-                      value={formData.carton_pack_qty}
-                      onChange={(e) => setFormData({ ...formData, carton_pack_qty: e.target.value })}
-                      className="w-full min-h-[40px] px-3.5 rounded-xl bg-slate-900 border border-white/15 text-white font-mono text-xs"
-                    />
+                  <div className="p-3.5 rounded-2xl bg-slate-900/90 border border-amber-500/30 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-extrabold text-amber-300 flex items-center gap-1.5">
+                        <span>📦</span>
+                        <span>تخصيص وحدات البيع والتوريد وسعة التعبئة:</span>
+                      </span>
+                      <span className="text-[10px] text-slate-400">
+                        يحدد طريقة البيع للزبون وطريقة الشراء من المورد
+                      </span>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                      {/* 1. Retail Unit (وحدة البيع بالتجزئة) */}
+                      <div>
+                        <label className="block text-slate-300 font-bold mb-1 text-[11px]">
+                          وحدة البيع المباشر (بالتجزئة للزبون):
+                        </label>
+                        <select
+                          value={formData.retail_unit}
+                          onChange={(e) => setFormData({ ...formData, retail_unit: e.target.value })}
+                          className="w-full min-h-[40px] px-2.5 rounded-xl bg-slate-950 border border-white/15 text-white text-xs font-bold focus:outline-none focus:border-amber-400"
+                        >
+                          {RETAIL_UNITS.map((u) => (
+                            <option key={u} value={u}>{u}</option>
+                          ))}
+                        </select>
+                      </div>
+
+                      {/* 2. Bulk Unit (وحدة الشراء والتوريد بالجملة) */}
+                      <div>
+                        <label className="block text-slate-300 font-bold mb-1 text-[11px]">
+                          وحدة الشراء والتوريد (بالجملة من المورد):
+                        </label>
+                        <select
+                          value={formData.bulk_unit}
+                          onChange={(e) => {
+                            const nextBulk = e.target.value;
+                            let nextQty = formData.carton_pack_qty;
+                            if (['حبة', 'إطار', 'دبة'].includes(nextBulk)) {
+                              nextQty = 1;
+                            } else if (nextBulk === 'برميل الزيت') {
+                              nextQty = 200;
+                            } else if (nextBulk === 'شدة' && (nextQty === 1 || nextQty === 24 || nextQty === 200)) {
+                              nextQty = 10;
+                            } else if (nextBulk === 'كرتون' && (nextQty === 1 || nextQty === 200)) {
+                              nextQty = formData.category === 'filter' ? 10 : 24;
+                            }
+                            setFormData({ ...formData, bulk_unit: nextBulk, carton_pack_qty: nextQty });
+                          }}
+                          className="w-full min-h-[40px] px-2.5 rounded-xl bg-slate-950 border border-white/15 text-white text-xs font-bold focus:outline-none focus:border-amber-400"
+                        >
+                          {BULK_UNITS.map((u) => (
+                            <option key={u} value={u}>{u}</option>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
+
+                    {/* 3. Carton / Pack Capacity Input - Shows only when bulk pack needs conversion */}
+                    {isBulkPackType(formData.bulk_unit) && (
+                      <div className="pt-0.5 animate-in fade-in">
+                        <label className="block text-amber-300 font-bold mb-1 text-[11px] flex items-center gap-1.5">
+                          <span>📦</span>
+                          <span>{getPackQtyLabel(formData.bulk_unit, formData.retail_unit)}</span>
+                        </label>
+                        <div className="relative">
+                          <input
+                            type="number"
+                            min="1"
+                            value={formData.carton_pack_qty}
+                            onChange={(e) => setFormData({ ...formData, carton_pack_qty: e.target.value })}
+                            className="w-full min-h-[40px] pr-3 pl-20 rounded-xl bg-slate-950 border border-amber-500/40 text-amber-300 font-mono text-sm font-bold focus:outline-none focus:border-amber-400"
+                          />
+                          <span className="absolute left-3 top-2.5 text-xs font-bold text-slate-400">
+                            {formData.bulk_unit === 'برميل الزيت' ? 'لتر' : formData.retail_unit}
+                          </span>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* 4. Live Human Summary Bar */}
+                    <div className="p-2 rounded-xl bg-slate-950/80 border border-white/5 flex items-center gap-2 text-xs text-slate-300 font-sans">
+                      <span className="text-amber-400 text-sm">💡</span>
+                      <span>
+                        {formData.bulk_unit === 'برميل الزيت'
+                          ? `التوريد: برميل زيت بسعة (${formData.carton_pack_qty || 200}) لتر • البيع للزبون: بالـ ${formData.retail_unit}`
+                          : isBulkPackType(formData.bulk_unit)
+                          ? `التوريد: ${formData.bulk_unit} يحتوي على (${formData.carton_pack_qty || 1}) ${formData.retail_unit} • البيع للزبون: بالـ ${formData.retail_unit}`
+                          : `التوريد والبيع المباشر كلاهما بـ الـ ${formData.retail_unit} (سعة مفردة = 1)`}
+                      </span>
+                    </div>
                   </div>
                 )}
 

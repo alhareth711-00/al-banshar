@@ -38,6 +38,7 @@ import VoucherDetailsModal from './VoucherDetailsModal';
 import OwnerPinModal from './OwnerPinModal';
 import { getShopSettings, formatYemeniWhatsAppLink } from '../utils/settings';
 import { tafqeet } from '../utils/tafqeet';
+import { APP_EVENTS, emitAppEvent, subscribeAppEvent } from '../utils/eventBus';
 
 export default function VouchersManagementView({
   onRefreshData,
@@ -162,10 +163,13 @@ export default function VouchersManagementView({
 
   useEffect(() => {
     loadData();
+    const unsubscribe = subscribeAppEvent(APP_EVENTS.DATA_INVALIDATED, loadData);
+    return unsubscribe;
   }, [loadData, refreshTrigger]);
 
   const handleDataChanged = () => {
     setRefreshTrigger((prev) => prev + 1);
+    emitAppEvent(APP_EVENTS.VOUCHER_SAVED);
     if (onRefreshData) onRefreshData();
   };
 

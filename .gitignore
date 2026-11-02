@@ -7,7 +7,7 @@ server/node_modules/
 client/dist/
 
 # Auto backups & sqlite temp files (preserve core db)
-server/backups/*.sqlite
+server/backups/
 *.db-journal
 *.db-wal
 *.db-shm

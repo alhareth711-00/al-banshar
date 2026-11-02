@@ -19,6 +19,7 @@ import {
   RefreshCw,
 } from 'lucide-react';
 import { getShopSettings, formatYemeniWhatsAppLink } from '../utils/settings';
+import { APP_EVENTS, emitAppEvent } from '../utils/eventBus';
 
 const DEFAULT_SAFETY_POINTS = {
   radiator: true,
@@ -193,6 +194,7 @@ ${safetyReportText}
       setTimeout(() => setSuccessToast(''), 4000);
 
       if (onServiceCompleted) onServiceCompleted();
+      emitAppEvent(APP_EVENTS.SERVICE_COMPLETED, { invoice: updatedInv });
       fetchPending();
     } catch (err) {
       setErrorToast(err.message || 'حدث خطأ أثناء حفظ الفحص');

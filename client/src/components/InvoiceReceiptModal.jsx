@@ -19,6 +19,7 @@ import {
   Store,
 } from 'lucide-react';
 import { getShopSettings, formatYemeniWhatsAppLink } from '../utils/settings';
+import { getLocalTodayDate } from '../utils/dateUtils';
 
 export default function InvoiceReceiptModal({ isOpen, onClose, invoice, onNewInvoice }) {
   const [activeTab, setActiveTab] = useState('pass'); // 'pass' | 'thermal' | 'sticker'
@@ -69,7 +70,7 @@ export default function InvoiceReceiptModal({ isOpen, onClose, invoice, onNewInv
 🔹 الفلتر: ${filterDetailsText}.
 🔹 قراءة العداد الحالية: ${Number(invoice.current_odometer).toLocaleString()} كم.
 🔹 الموعد المقترح للتغيير القادم: ${Number(invoice.next_odometer).toLocaleString()} كم أو بتاريخ ${invoice.next_service_date}.${safetyNote}
-💰 الإجمالي: ${Number(invoice.net_total).toLocaleString()} ر.ي (طريقة الدفع: ${paymentMethodLabel}).
+${Number(invoice.scrap_battery_deduction) > 0 ? `🔹 خصم بدل بطارية قديمة (سكراب): -${Number(invoice.scrap_battery_deduction).toLocaleString()} ر.ي\n` : ''}${Number(invoice.discount) > 0 ? `🔹 الخصم الممنوح: -${Number(invoice.discount).toLocaleString()} ر.ي\n` : ''}💰 الإجمالي: ${Number(invoice.net_total).toLocaleString()} ر.ي (طريقة الدفع: ${paymentMethodLabel}).
 شكراً لثقتكم ويسعدنا دائماً خدمتكم بكل أهتمام.`;
 
   const whatsappUrl = formatYemeniWhatsAppLink(invoice.customer_phone, customerWhatsAppMessage);
@@ -276,6 +277,13 @@ export default function InvoiceReceiptModal({ isOpen, onClose, invoice, onNewInv
                   </div>
                 </div>
 
+                {Number(invoice.scrap_battery_deduction) > 0 && (
+                  <div className="p-2.5 rounded-xl bg-emerald-500/15 border border-emerald-500/30 flex justify-between font-bold text-emerald-300 text-xs font-mono">
+                    <span>خصم بدل بطارية قديمة (سكراب):</span>
+                    <span>-{Number(invoice.scrap_battery_deduction).toLocaleString()} ر.ي</span>
+                  </div>
+                )}
+
                 {invoice.remaining_debt > 0 && (
                   <div className="p-2.5 rounded-xl bg-rose-500/15 border border-rose-500/30 flex justify-between font-bold text-rose-300 text-xs font-mono">
                     <span>المتبقي آجل على العميل:</span>
@@ -364,6 +372,12 @@ export default function InvoiceReceiptModal({ isOpen, onClose, invoice, onNewInv
                       : '0 ر.ي (مجاناً)'}
                   </span>
                 </div>
+                {Number(invoice.scrap_battery_deduction) > 0 && (
+                  <div className="flex justify-between text-emerald-700 font-bold">
+                    <span>خصم بدل بطارية قديمة (سكراب):</span>
+                    <span>-{Number(invoice.scrap_battery_deduction).toLocaleString()} ر.ي</span>
+                  </div>
+                )}
                 {Number(invoice.discount) > 0 && (
                   <div className="flex justify-between text-rose-600">
                     <span>الخصم الممنوح:</span>
@@ -424,7 +438,7 @@ export default function InvoiceReceiptModal({ isOpen, onClose, invoice, onNewInv
                 </div>
                 <div className="text-left font-mono">
                   <div className="text-[10px] text-slate-600 font-medium">تاريخ الغيار:</div>
-                  <div className="font-bold text-slate-900">{new Date().toISOString().split('T')[0]}</div>
+                  <div className="font-bold text-slate-900">{invoice.created_at ? invoice.created_at.split(' ')[0] : getLocalTodayDate()}</div>
                 </div>
               </div>
 

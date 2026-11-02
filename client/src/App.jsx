@@ -18,6 +18,7 @@ import OwnerPinModal from './components/OwnerPinModal';
 import GlobalCommandPalette from './components/GlobalCommandPalette';
 import ErrorBoundary from './components/ErrorBoundary';
 import { getAutoLockMinutes } from './utils/settings';
+import { APP_EVENTS, subscribeAppEvent } from './utils/eventBus';
 
 export default function App() {
   const [activeTab, setActiveTab] = useState('pos');
@@ -202,6 +203,11 @@ export default function App() {
 
   useEffect(() => {
     fetchData();
+    const unsubscribe = subscribeAppEvent(APP_EVENTS.DATA_INVALIDATED, () => {
+      fetchData();
+      setPulseRefreshTrigger((prev) => prev + 1);
+    });
+    return unsubscribe;
   }, [fetchData]);
 
   // Press F1 anywhere to toggle User Guide, Ctrl+K for Global Command Search

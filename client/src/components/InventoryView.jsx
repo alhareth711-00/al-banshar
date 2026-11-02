@@ -38,6 +38,7 @@ import InventoryValuationModal from './InventoryValuationModal';
 import BarcodeLabelModal from './BarcodeLabelModal';
 import TurnoverAnalyticsModal from './TurnoverAnalyticsModal';
 import ReorderOrderSheetModal from './ReorderOrderSheetModal';
+import { getLocalTodayDate } from '../utils/dateUtils';
 
 // Helper: Normalize Arabic characters for robust search (الهمزات والتاء المربوطة)
 export function normalizeArabic(text) {
@@ -60,6 +61,20 @@ function escapeHtml(str) {
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#039;');
+}
+
+// Helper: Format pack size into standard readable Arabic representation
+export function formatPackSize(size) {
+  if (!size) return 'حبة';
+  if (size === '1L') return 'علبة 1 لتر';
+  if (size === '4L') return 'دبة 4 لتر';
+  if (size === '5L') return 'دبة 5 لتر';
+  if (size === '20L') return 'دبة 20 لتر';
+  if (size === '25L') return 'دبة 25 لتر';
+  if (size === 'bulk_liter') return 'برميل الزيت (200 لتر)';
+  if (size === 'carton') return 'كرتون';
+  if (size === 'unit') return 'حبة/قطعة';
+  return size;
 }
 
 export default function InventoryView({
@@ -245,7 +260,7 @@ export default function InventoryView({
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.setAttribute('href', url);
-    link.setAttribute('download', `جرد_مخزون_البنشر_${new Date().toISOString().split('T')[0]}.csv`);
+    link.setAttribute('download', `جرد_مخزون_البنشر_${getLocalTodayDate()}.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -506,8 +521,11 @@ export default function InventoryView({
     });
 
     pills.push(
-      { id: '4L', label: 'دبة 4L', count: oils.filter((i) => i.pack_size === '4L').length },
-      { id: '1L', label: 'علبة 1L', count: oils.filter((i) => i.pack_size === '1L').length },
+      { id: '1L', label: 'علبة 1 لتر', count: oils.filter((i) => i.pack_size === '1L').length },
+      { id: '4L', label: 'دبة 4 لتر', count: oils.filter((i) => i.pack_size === '4L').length },
+      { id: '5L', label: 'دبة 5 لتر', count: oils.filter((i) => i.pack_size === '5L').length },
+      { id: '20L', label: 'دبة 20 لتر', count: oils.filter((i) => i.pack_size === '20L').length },
+      { id: '25L', label: 'دبة 25 لتر', count: oils.filter((i) => i.pack_size === '25L').length },
       { id: 'bulk_liter', label: 'لتر فلت', count: oils.filter((i) => i.pack_size === 'bulk_liter').length }
     );
     return pills;
@@ -635,11 +653,14 @@ export default function InventoryView({
   // Helper: Get item unit badge
   const getItemUnitLabel = (item) => {
     if (item.category === 'service' || item.item_type === 'service') return 'خدمة';
+    if (item.retail_unit) return item.retail_unit;
     if (item.pack_size === 'bulk_liter') return 'لتر';
     if (item.category === 'tire') return 'إطار';
-    if (item.category === 'battery') return 'بطارية';
-    if (item.category === 'filter') return 'فلتر';
-    if (item.pack_size === '4L' || item.pack_size === '5L') return 'دبة';
+    if (item.category === 'battery') return 'حبة';
+    if (item.category === 'filter') return 'حبة';
+    if (item.category === 'accessory') return 'قطعة';
+    if (['4L', '5L', '20L', '25L'].includes(item.pack_size)) return 'دبة';
+    if (item.pack_size === '1L') return 'علبة';
     if (item.pack_size === 'carton') return 'كرتون';
     return 'عبوة';
   };
@@ -1337,30 +1358,44 @@ export default function InventoryView({
                     {/* Brand & Viscosity */}
                     <td className="p-3.5">
                       <span className="font-bold text-slate-300">{item.brand}</span>
-                      {item.viscosity && (
+                      {item.category === 'oil' && item.viscosity && (
                         <div className="mt-1">
                           <span className="px-2 py-0.5 rounded-full bg-slate-800 text-[10px] font-mono font-bold text-amber-300 border border-amber-500/20">
                             {item.viscosity}
                           </span>
                         </div>
                       )}
-                      {item.oil_type && (
+                      {item.category === 'oil' && item.oil_type && (
                         <div className="text-[10px] text-slate-400 mt-0.5">{item.oil_type}</div>
                       )}
                     </td>
 
-                    {/* Pack Size */}
+                    {/* Pack Size & Specs (العبوة / المقاس) */}
                     <td className="p-3.5 font-mono font-bold text-slate-300">
                       {isService ? (
                         <span className="px-2 py-0.5 rounded-lg bg-teal-500/10 text-teal-300 border border-teal-500/20 font-sans">
                           أجر وخدمة
                         </span>
-                      ) : item.pack_size ? (
-                        <span className="px-2 py-0.5 rounded-lg bg-white/5 text-white border border-white/10">
-                          {item.pack_size === 'bulk_liter' ? 'لتر فلت' : item.pack_size}
+                      ) : item.category === 'oil' ? (
+                        <span className="px-2 py-0.5 rounded-lg bg-white/5 text-white border border-white/10 text-xs font-sans">
+                          {formatPackSize(item.pack_size)}
+                        </span>
+                      ) : item.category === 'tire' ? (
+                        <span className="px-2 py-0.5 rounded-lg bg-teal-500/10 text-teal-300 border border-teal-500/20 text-xs font-sans">
+                          {item.tire_battery_spec ? `مقاس ${item.tire_battery_spec}` : 'إطار مفرد'}
+                        </span>
+                      ) : item.category === 'battery' ? (
+                        <span className="px-2 py-0.5 rounded-lg bg-emerald-500/10 text-emerald-300 border border-emerald-500/20 text-xs font-sans">
+                          {item.battery_capacity_ah ? item.battery_capacity_ah : 'حبة بطارية'}
+                        </span>
+                      ) : item.category === 'filter' ? (
+                        <span className="px-2 py-0.5 rounded-lg bg-white/5 text-slate-300 border border-white/10 text-xs font-sans">
+                          {item.bulk_unit && item.bulk_unit !== 'حبة' ? `${item.retail_unit || 'حبة'} (${item.bulk_unit} ${item.carton_pack_qty || 10})` : (item.retail_unit || 'حبة')}
                         </span>
                       ) : (
-                        <span className="text-slate-500">حبة</span>
+                        <span className="px-2 py-0.5 rounded-lg bg-white/5 text-slate-300 border border-white/10 text-xs font-sans">
+                          {item.bulk_unit && item.bulk_unit !== 'قطعة' && item.bulk_unit !== 'حبة' ? `${item.retail_unit || 'قطعة'} (${item.bulk_unit} ${item.carton_pack_qty || 10})` : (item.retail_unit || 'قطعة')}
+                        </span>
                       )}
                     </td>
 

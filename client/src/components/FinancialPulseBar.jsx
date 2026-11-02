@@ -19,7 +19,10 @@ import {
   Car,
   ShieldCheck,
   Droplets,
+  Database,
+  Download,
 } from 'lucide-react';
+import { APP_EVENTS, subscribeAppEvent } from '../utils/eventBus';
 
 export default function FinancialPulseBar({
   onOpenStatement,
@@ -50,6 +53,8 @@ export default function FinancialPulseBar({
 
   useEffect(() => {
     fetchPulse();
+    const unsubscribe = subscribeAppEvent(APP_EVENTS.DATA_INVALIDATED, fetchPulse);
+    return unsubscribe;
   }, [refreshTrigger]);
 
   if (!pulse && loading) {
@@ -81,6 +86,13 @@ export default function FinancialPulseBar({
             <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
             <span>النظام متصل</span>
           </span>
+          {today && (
+            <span className="hidden lg:flex items-center gap-2 px-2.5 py-1 rounded-xl bg-white/5 border border-white/10 text-xs font-mono font-bold text-slate-300">
+              <span className="text-amber-400">🚗 {today.total_cars_served || today.total_invoices || 0} سيارات</span>
+              <span className="text-white/20">•</span>
+              <span className="text-teal-300">🛢️ {(today.oil_sales !== undefined ? today.oil_sales : (today.goods_sales || today.goods_revenue || 0)).toLocaleString()} ر.ي زيوت</span>
+            </span>
+          )}
         </div>
 
         {/* Center / Action Pills */}
@@ -133,6 +145,18 @@ export default function FinancialPulseBar({
               </button>
             </>
           )}
+
+          {/* Quick Backup Export Action */}
+          <a
+            href="/api/backup"
+            download
+            className="min-h-[42px] px-3.5 py-1.5 rounded-xl bg-cyan-500/15 hover:bg-cyan-500/25 text-cyan-300 border border-cyan-500/30 text-xs font-black flex items-center gap-1.5 tap-bounce shadow-sm"
+            title="تصدير وتنزيل نسخة احتياطية فورية (.sqlite) لقاعدة البيانات الحالية على جهازك بنقرة واحدة"
+          >
+            <Download className="w-3.5 h-3.5 text-cyan-400" />
+            <span className="hidden md:inline">تصدير نسخة احتياطية 💾</span>
+            <span className="md:hidden">نسخ احتياطي 💾</span>
+          </a>
 
           {/* Refresh button */}
           <button
@@ -232,7 +256,7 @@ export default function FinancialPulseBar({
               {/* Card 4: Today's Profit & Pure Services */}
               <div className="apple-glass-card rounded-2xl p-3 border border-purple-500/25">
                 <div className="flex items-center justify-between text-white text-[15.5px] font-black">
-                  <span>أرباح وخدمات اليوم:</span>
+                  <span>أرباح ونشاط اليوم:</span>
                   <div className="w-6 h-6 rounded-lg bg-purple-500/20 text-purple-400 flex items-center justify-center">
                     <TrendingUp className="w-3.5 h-3.5" />
                   </div>
@@ -243,9 +267,9 @@ export default function FinancialPulseBar({
                   </span>
                   <span className="text-xs font-sans text-slate-400 font-normal">ر.ي صافي</span>
                 </div>
-                <div className="text-[13px] font-extrabold text-slate-200 text-purple-300 mt-1 truncate flex items-center justify-between">
-                  <span>إيراد خدمات: {today.pure_labor_revenue.toLocaleString()} ر.ي</span>
-                  <span className="text-slate-400">{today.total_invoices} سيارات</span>
+                <div className="text-[12px] font-extrabold text-slate-200 mt-1 truncate flex items-center justify-between">
+                  <span className="text-amber-300">🚗 {today.total_cars_served || today.total_invoices || 0} سيارات ({today.cars_completed || 0} منجزة)</span>
+                  <span className="text-teal-300">🛢️ زيوت: {(today.oil_sales !== undefined ? today.oil_sales : (today.goods_sales || today.goods_revenue || 0)).toLocaleString()}</span>
                 </div>
               </div>
             </>
@@ -263,11 +287,11 @@ export default function FinancialPulseBar({
                   </div>
                 </div>
                 <div className="kiosk-stat-val text-emerald-400 text-3xl font-black font-mono mt-1 flex items-baseline gap-1">
-                  <span>{((today.goods_sales || 0) + (today.pure_labor_revenue || 0)).toLocaleString()}</span>
+                  <span>{((today.goods_sales || today.goods_revenue || 0) + (today.pure_labor_revenue || 0)).toLocaleString()}</span>
                   <span className="text-xs font-sans text-slate-400 font-normal">ر.ي</span>
                 </div>
                 <div className="text-[13px] font-extrabold text-slate-200 mt-1 truncate">
-                  القطع: {(today.goods_sales || 0).toLocaleString()} • الخدمات: {(today.pure_labor_revenue || 0).toLocaleString()}
+                  القطع: {(today.goods_sales || today.goods_revenue || 0).toLocaleString()} • الخدمات: {(today.pure_labor_revenue || 0).toLocaleString()}
                 </div>
               </div>
 
@@ -280,11 +304,14 @@ export default function FinancialPulseBar({
                   </div>
                 </div>
                 <div className="kiosk-stat-val text-amber-400 text-3xl font-black font-mono mt-1 flex items-baseline gap-1">
-                  <span>{today.total_invoices || 0}</span>
-                  <span className="text-xs font-sans text-slate-400 font-normal">سيارات منجزة</span>
+                  <span>{today.total_cars_served || today.total_invoices || 0}</span>
+                  <span className="text-xs font-sans text-slate-400 font-normal">سيارات اليوم</span>
                 </div>
-                <div className="text-[13px] font-extrabold text-slate-200 mt-1 truncate">
-                  أداء تشغيلي مستمر للوردية 🚗
+                <div className="text-[12px] font-extrabold text-slate-200 mt-1 truncate flex items-center justify-between">
+                  <span className="text-emerald-400">✅ {today.cars_completed || 0} منجزة</span>
+                  <span className={today.cars_in_service > 0 ? 'text-amber-400 font-bold' : 'text-slate-400'}>
+                    {today.cars_in_service > 0 ? `⏳ ${today.cars_in_service} بالحفرة` : 'لا سيارات بالحفرة'}
+                  </span>
                 </div>
               </div>
 
@@ -314,11 +341,12 @@ export default function FinancialPulseBar({
                   </div>
                 </div>
                 <div className="kiosk-stat-val text-teal-400 text-3xl font-black font-mono mt-1 flex items-baseline gap-1">
-                  <span>{((today.goods_sales || 0) + (today.pure_labor_revenue || 0)).toLocaleString()}</span>
+                  <span>{((today.oil_sales !== undefined ? today.oil_sales : (today.goods_sales || today.goods_revenue || 0)) + (today.pure_labor_revenue || 0)).toLocaleString()}</span>
                   <span className="text-xs font-sans text-slate-400 font-normal">ر.ي</span>
                 </div>
-                <div className="text-[13px] font-extrabold text-slate-200 mt-1 truncate">
-                  إجمالي مبيعات اليوم للوردية 🛢️
+                <div className="text-[12px] font-extrabold text-slate-200 mt-1 truncate flex items-center justify-between">
+                  <span className="text-teal-300">زيوت: {(today.oil_sales !== undefined ? today.oil_sales : (today.goods_sales || today.goods_revenue || 0)).toLocaleString()} ({today.oil_packs_count || 0} عبوة)</span>
+                  <span className="text-purple-300">خدمات: {(today.pure_labor_revenue || 0).toLocaleString()}</span>
                 </div>
               </div>
             </>

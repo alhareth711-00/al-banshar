@@ -22,10 +22,14 @@ export default function ReceiptVoucherModal({
   vehicles = [],
   onVoucherCreated,
 }) {
-  const [partyType, setPartyType] = useState('customer'); // 'customer' | 'other'
+  const [partyType, setPartyType] = useState('customer'); // 'customer' | 'waste_oil' | 'scrap_battery' | 'other'
   const [selectedVehicleId, setSelectedVehicleId] = useState('');
   const [partyName, setPartyName] = useState('');
   const [amount, setAmount] = useState('');
+  const [barrelsCount, setBarrelsCount] = useState('1');
+  const [barrelPrice, setBarrelPrice] = useState('25000');
+  const [scrapCount, setScrapCount] = useState('1');
+  const [scrapUnitPrice, setScrapUnitPrice] = useState('5000');
   const [paymentMethod, setPaymentMethod] = useState('cash'); // 'cash' | 'kuraimi' | 'jeeb'
   const [paperBillNumber, setPaperBillNumber] = useState('');
   const [description, setDescription] = useState('');
@@ -33,6 +37,27 @@ export default function ReceiptVoucherModal({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState('');
   const [printedVoucher, setPrintedVoucher] = useState(null);
+
+  const handleSelectPartyType = (type) => {
+    setPartyType(type);
+    setError('');
+    if (type === 'customer') {
+      setDescription('');
+    } else if (type === 'waste_oil') {
+      setPartyName((prev) => (prev && prev !== 'شركة تدوير الزيوت (عام)' && prev !== 'تاجر خردة وسكراب' ? prev : 'شركة تدوير الزيوت (عام)'));
+      const total = (Number(barrelsCount) || 1) * (Number(barrelPrice) || 25000);
+      setAmount(String(total));
+      setDescription(`توريد قيمة بيع عدد (${barrelsCount || 1}) برميل زيت تالف ومحروق لشركة التدوير`);
+    } else if (type === 'scrap_battery') {
+      setPartyName((prev) => (prev && prev !== 'شركة تدوير الزيوت (عام)' && prev !== 'تاجر خردة وسكراب' ? prev : 'تاجر خردة وسكراب'));
+      const total = (Number(scrapCount) || 1) * (Number(scrapUnitPrice) || 5000);
+      setAmount(String(total));
+      setDescription(`توريد قيمة بيع سكراب عدد (${scrapCount || 1}) بطارية تالفة لتاجر الخردة`);
+    } else {
+      if (partyName === 'شركة تدوير الزيوت (عام)' || partyName === 'تاجر خردة وسكراب') setPartyName('');
+      setDescription('سند قبض نقدية رسمي');
+    }
+  };
 
   useEffect(() => {
     if (initialData) {
@@ -96,8 +121,9 @@ export default function ReceiptVoucherModal({
         voucher_type: 'receipt',
         party_type: partyType,
         party_id: partyType === 'customer' && selectedVehicleId ? Number(selectedVehicleId) : null,
-        party_name: partyName.trim() || (partyType === 'customer' ? 'عميل' : 'مستلم عام'),
+        party_name: partyName.trim() || (partyType === 'customer' ? 'عميل' : partyType === 'waste_oil' ? 'شركة تدوير الزيوت (عام)' : partyType === 'scrap_battery' ? 'تاجر خردة وسكراب' : 'مستلم عام'),
         amount: numAmount,
+        offset_account_code: partyType === 'waste_oil' ? '4302' : partyType === 'scrap_battery' ? '1304' : null,
         payment_method: paymentMethod,
         paper_bill_number: paperBillNumber.trim() || null,
         description: description.trim() || 'سند قبض نقدية رسمي',
@@ -231,7 +257,13 @@ export default function ReceiptVoucherModal({
               <div>
                 <span className="text-[11px] text-slate-400 print:text-gray-600 block">نوع السند:</span>
                 <span className="text-sm font-bold text-amber-400 print:text-black">
-                  {printedVoucher.party_type === 'customer' ? 'تحصيل دفعة حساب عميل' : 'إيراد نقدية'}
+                  {printedVoucher.party_type === 'customer'
+                    ? 'تحصيل دفعة حساب عميل'
+                    : printedVoucher.party_type === 'waste_oil'
+                    ? 'مبيعات زيوت تالفة وتدوير'
+                    : printedVoucher.party_type === 'scrap_battery'
+                    ? 'بيع سكراب بطاريات وخردة'
+                    : 'إيراد نقدية'}
                 </span>
               </div>
             </div>
@@ -310,7 +342,7 @@ export default function ReceiptVoucherModal({
                   <a
                     href={formatYemeniWhatsAppLink(
                       selectedVehicleObj.phone,
-                      `*سند قبض مالي رسمي - ${getShopSettings().shopName || 'مركز الصقر'}* 🦅\nتحية طيبة أخي الكريم: *${printedVoucher.party_name}*\nتم استلام دفعة من حسابكم بموجب:\n📄 *سند قبض رقم:* ${printedVoucher.voucher_number}${printedVoucher.paper_bill_number ? `\n📑 رقم السند الدفتري: ${printedVoucher.paper_bill_number}` : ''}\n💵 *المبلغ المستلم:* ${Number(printedVoucher.amount).toLocaleString()} ريال يمني (${tafqeet(Number(printedVoucher.amount))})\n💳 *طريقة الدفع:* ${printedVoucher.payment_method === 'cash' ? 'نقداً بالصندوق' : printedVoucher.payment_method}${printedVoucher.prev_balance > 0 ? `\n\n📊 *تفاصيل الحساب:*\n- الرصيد السابق: ${Number(printedVoucher.prev_balance).toLocaleString()} ر.ي\n- الدفعة المقبوضة: ${Number(printedVoucher.amount).toLocaleString()} ر.ي\n- الرصيد المتبقي عليكم: ${Number(printedVoucher.new_balance).toLocaleString()} ر.ي` : ''}\n\nنسعد دائماً بخدمتكم وشكراً لتعاملكم معنا! 🤝`
+                      `*سند قبض مالي رسمي - ${getShopSettings().shopName || 'المركز الذهبي'}* 🌟\nتحية طيبة أخي الكريم: *${printedVoucher.party_name}*\nتم استلام دفعة من حسابكم بموجب:\n📄 *سند قبض رقم:* ${printedVoucher.voucher_number}${printedVoucher.paper_bill_number ? `\n📑 رقم السند الدفتري: ${printedVoucher.paper_bill_number}` : ''}\n💵 *المبلغ المستلم:* ${Number(printedVoucher.amount).toLocaleString()} ريال يمني (${tafqeet(Number(printedVoucher.amount))})\n💳 *طريقة الدفع:* ${printedVoucher.payment_method === 'cash' ? 'نقداً بالصندوق' : printedVoucher.payment_method}${printedVoucher.prev_balance > 0 ? `\n\n📊 *تفاصيل الحساب:*\n- الرصيد السابق: ${Number(printedVoucher.prev_balance).toLocaleString()} ر.ي\n- الدفعة المقبوضة: ${Number(printedVoucher.amount).toLocaleString()} ر.ي\n- الرصيد المتبقي عليكم: ${Number(printedVoucher.new_balance).toLocaleString()} ر.ي` : ''}\n\nنسعد دائماً بخدمتكم وشكراً لتعاملكم معنا! 🤝`
                     )}
                     target="_blank"
                     rel="noopener noreferrer"
@@ -353,28 +385,50 @@ export default function ReceiptVoucherModal({
             {/* Party Type Select */}
             <div>
               <label className="block text-slate-300 font-bold mb-1.5">جهة القبض (من الأخ / السادة):</label>
-              <div className="grid grid-cols-2 gap-2 mb-2">
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5 mb-2.5">
                 <button
                   type="button"
-                  onClick={() => setPartyType('customer')}
+                  onClick={() => handleSelectPartyType('customer')}
                   className={`p-2.5 rounded-xl font-bold text-xs border transition ${
                     partyType === 'customer'
-                      ? 'bg-emerald-500 text-slate-950 border-emerald-400 font-black'
+                      ? 'bg-emerald-500 text-slate-950 border-emerald-400 font-black shadow-lg shadow-emerald-500/20'
                       : 'bg-slate-900 text-slate-400 border-white/10 hover:text-white'
                   }`}
                 >
-                  🚗 سداد دين عميل / سيارة
+                  🚗 سداد دين عميل
                 </button>
                 <button
                   type="button"
-                  onClick={() => setPartyType('other')}
+                  onClick={() => handleSelectPartyType('waste_oil')}
                   className={`p-2.5 rounded-xl font-bold text-xs border transition ${
-                    partyType === 'other'
-                      ? 'bg-emerald-500 text-slate-950 border-emerald-400 font-black'
+                    partyType === 'waste_oil'
+                      ? 'bg-amber-400 text-slate-950 border-amber-300 font-black shadow-lg shadow-amber-400/20'
                       : 'bg-slate-900 text-slate-400 border-white/10 hover:text-white'
                   }`}
                 >
-                  🏢 جهة أخرى / إيراد متنوع
+                  🛢️ مبيعات زيوت تالفة
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleSelectPartyType('scrap_battery')}
+                  className={`p-2.5 rounded-xl font-bold text-xs border transition ${
+                    partyType === 'scrap_battery'
+                      ? 'bg-teal-400 text-slate-950 border-teal-300 font-black shadow-lg shadow-teal-400/20'
+                      : 'bg-slate-900 text-slate-400 border-white/10 hover:text-white'
+                  }`}
+                >
+                  🔋 سكراب بطاريات
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleSelectPartyType('other')}
+                  className={`p-2.5 rounded-xl font-bold text-xs border transition ${
+                    partyType === 'other'
+                      ? 'bg-emerald-500 text-slate-950 border-emerald-400 font-black shadow-lg shadow-emerald-500/20'
+                      : 'bg-slate-900 text-slate-400 border-white/10 hover:text-white'
+                  }`}
+                >
+                  🏢 إيراد متنوع / أخرى
                 </button>
               </div>
 
@@ -407,6 +461,102 @@ export default function ReceiptVoucherModal({
                       </div>
                     </div>
                   )}
+                </div>
+              ) : partyType === 'waste_oil' ? (
+                <div className="space-y-2">
+                  <input
+                    type="text"
+                    placeholder="اسم شركة أو مندوب تدوير الزيوت..."
+                    value={partyName}
+                    onChange={(e) => setPartyName(e.target.value)}
+                    className="w-full min-h-[44px] px-3.5 rounded-xl bg-slate-900 border border-white/15 text-white text-xs font-bold"
+                    required
+                  />
+                  <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/20 space-y-2">
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <label className="block text-[11px] text-amber-300 font-bold mb-1">عدد البراميل (سعة 208L):</label>
+                        <input
+                          type="number"
+                          min="1"
+                          value={barrelsCount}
+                          onChange={(e) => {
+                            const c = e.target.value;
+                            setBarrelsCount(c);
+                            const tot = (Number(c) || 0) * (Number(barrelPrice) || 0);
+                            setAmount(String(tot));
+                            setDescription(`توريد قيمة بيع عدد (${c || 1}) برميل زيت تالف ومحروق لشركة التدوير`);
+                          }}
+                          className="w-full px-2.5 py-1.5 rounded-lg bg-slate-900 border border-amber-500/30 font-mono text-xs font-bold text-white text-center"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[11px] text-amber-300 font-bold mb-1">سعر بيع البرميل (ر.ي):</label>
+                        <input
+                          type="number"
+                          value={barrelPrice}
+                          onChange={(e) => {
+                            const p = e.target.value;
+                            setBarrelPrice(p);
+                            const tot = (Number(barrelsCount) || 0) * (Number(p) || 0);
+                            setAmount(String(tot));
+                          }}
+                          className="w-full px-2.5 py-1.5 rounded-lg bg-slate-900 border border-amber-500/30 font-mono text-xs font-bold text-white text-center"
+                        />
+                      </div>
+                    </div>
+                    <p className="text-[10px] text-amber-200/80 font-medium">
+                      💡 مبيعات الزيوت التالفة تُقيد كإيراد صافٍ 100% في حساب (4302: إيراد مبيعات الزيوت التالفة والتدوير) وتدخل فوراً بصندوق الوردية.
+                    </p>
+                  </div>
+                </div>
+              ) : partyType === 'scrap_battery' ? (
+                <div className="space-y-2">
+                  <input
+                    type="text"
+                    placeholder="اسم تاجر الخردة أو المشتري..."
+                    value={partyName}
+                    onChange={(e) => setPartyName(e.target.value)}
+                    className="w-full min-h-[44px] px-3.5 rounded-xl bg-slate-900 border border-white/15 text-white text-xs font-bold"
+                    required
+                  />
+                  <div className="p-3 rounded-xl bg-teal-500/10 border border-teal-500/20 space-y-2">
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <label className="block text-[11px] text-teal-300 font-bold mb-1">عدد بطاريات السكراب:</label>
+                        <input
+                          type="number"
+                          min="1"
+                          value={scrapCount}
+                          onChange={(e) => {
+                            const c = e.target.value;
+                            setScrapCount(c);
+                            const tot = (Number(c) || 0) * (Number(scrapUnitPrice) || 0);
+                            setAmount(String(tot));
+                            setDescription(`توريد قيمة بيع سكراب عدد (${c || 1}) بطارية تالفة لتاجر الخردة`);
+                          }}
+                          className="w-full px-2.5 py-1.5 rounded-lg bg-slate-900 border border-teal-500/30 font-mono text-xs font-bold text-white text-center"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[11px] text-teal-300 font-bold mb-1">سعر بيع البطارية (ر.ي):</label>
+                        <input
+                          type="number"
+                          value={scrapUnitPrice}
+                          onChange={(e) => {
+                            const p = e.target.value;
+                            setScrapUnitPrice(p);
+                            const tot = (Number(scrapCount) || 0) * (Number(p) || 0);
+                            setAmount(String(tot));
+                          }}
+                          className="w-full px-2.5 py-1.5 rounded-lg bg-slate-900 border border-teal-500/30 font-mono text-xs font-bold text-white text-center"
+                        />
+                      </div>
+                    </div>
+                    <p className="text-[10px] text-teal-200/80 font-medium">
+                      💡 مبيعات السكراب تُخفض أصل بطاريات الرجيع (1304) وتدخل فوراً بصندوق الوردية ونبض السيولة.
+                    </p>
+                  </div>
                 </div>
               ) : (
                 <input

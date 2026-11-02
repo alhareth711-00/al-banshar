@@ -91,7 +91,9 @@ const vehicleController = {
   }),
 
   getRetentionRadar: asyncHandler(async (req, res) => {
-    const radarData = vehicleModel.getRetentionRadar();
+    const radarData = vehicleModel.getRetentionRadar({
+      includeSafe: req.query.include_safe === 'true',
+    });
     res.json({
       success: true,
       count: radarData.length,

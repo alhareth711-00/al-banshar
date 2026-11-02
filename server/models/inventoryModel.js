@@ -1,6 +1,6 @@
 const db = require('../db/database');
-const { roundMoney, safeNum } = require('../utils/mathPrecision');
-const { createJournalEntry, getInventoryAccountCode } = require('../utils/accountingEngine');
+const { roundMoney, safeNum, calcWAC } = require('../utils/mathPrecision');
+const { createJournalEntry, getInventoryAccountCode, postInventoryOpeningBalance } = require('../utils/accountingEngine');
 const { formatDate } = require('../utils/helpers');
 
 const inventoryModel = {
@@ -103,60 +103,177 @@ const inventoryModel = {
 
   create(data) {
     const isService = data.category === 'service' || data.item_type === 'service';
+    const category = data.category || (isService ? 'service' : 'oil');
     const sku = data.sku && data.sku.trim() ? data.sku.trim() : `SKU-${Date.now().toString().slice(-6)}`;
+
+    // Category-specific sanitization
+    const isOil = category === 'oil';
+    const isTire = category === 'tire';
+    const isBattery = category === 'battery';
+
+    const viscosity = isOil ? (data.viscosity || null) : null;
+    const oil_type = isOil ? (data.oil_type || null) : null;
+    const api_grade = isOil ? (data.api_grade || null) : null;
+    const pack_size = isOil ? (data.pack_size || '4L') : 'unit';
+
+    const dot_code = isTire && data.dot_code ? data.dot_code.trim() : null;
+    const battery_capacity_ah = isBattery && data.battery_capacity_ah ? data.battery_capacity_ah.trim() : null;
+
+    // Default units
+    let defaultRetail = 'حبة';
+    let defaultBulk = 'كرتون';
+    let defaultPackQty = 1;
+
+    if (isOil) {
+      if (pack_size === '1L') { defaultRetail = 'علبة'; defaultBulk = 'كرتون'; defaultPackQty = 24; }
+      else if (pack_size === 'bulk_liter') { defaultRetail = 'لتر'; defaultBulk = 'برميل الزيت'; defaultPackQty = 200; }
+      else if (['20L', '25L'].includes(pack_size)) { defaultRetail = 'دبة'; defaultBulk = 'دبة'; defaultPackQty = 1; }
+      else { defaultRetail = 'دبة'; defaultBulk = 'كرتون'; defaultPackQty = 4; }
+    } else if (category === 'filter') {
+      defaultRetail = 'حبة'; defaultBulk = 'شدة'; defaultPackQty = 10;
+    } else if (isBattery) {
+      defaultRetail = 'حبة'; defaultBulk = 'حبة'; defaultPackQty = 1;
+    } else if (isTire) {
+      defaultRetail = 'إطار'; defaultBulk = 'إطار'; defaultPackQty = 1;
+    } else if (category === 'accessory') {
+      defaultRetail = 'قطعة'; defaultBulk = 'شدة'; defaultPackQty = 10;
+    } else if (isService) {
+      defaultRetail = 'خدمة'; defaultBulk = 'خدمة'; defaultPackQty = 1;
+    }
+
+    const retail_unit = data.retail_unit || defaultRetail;
+    const bulk_unit = data.bulk_unit || defaultBulk;
+    const carton_pack_qty = isService
+      ? 1
+      : ['حبة', 'إطار', 'دبة'].includes(bulk_unit)
+      ? 1
+      : Math.max(1, safeNum(data.carton_pack_qty, defaultPackQty));
 
     const stmt = db.prepare(`
       INSERT INTO inventory (
         sku, barcode, name, category, item_type, brand, viscosity, oil_type, api_grade,
-        pack_size, carton_pack_qty, tire_battery_spec, country_of_origin, dot_code,
+        pack_size, retail_unit, bulk_unit, carton_pack_qty, tire_battery_spec, country_of_origin, dot_code,
         battery_capacity_ah, warranty_months, cost_price, sell_price, stock_qty,
         min_stock_alert, location_shelf, is_consignment, consignment_supplier_name,
         is_active, notes, created_at
       ) VALUES (
         @sku, @barcode, @name, @category, @item_type, @brand, @viscosity, @oil_type, @api_grade,
-        @pack_size, @carton_pack_qty, @tire_battery_spec, @country_of_origin, @dot_code,
+        @pack_size, @retail_unit, @bulk_unit, @carton_pack_qty, @tire_battery_spec, @country_of_origin, @dot_code,
         @battery_capacity_ah, @warranty_months, @cost_price, @sell_price, @stock_qty,
         @min_stock_alert, @location_shelf, @is_consignment, @consignment_supplier_name,
         @is_active, @notes, datetime('now', 'localtime')
       )
     `);
 
-    const result = stmt.run({
-      sku,
-      barcode: data.barcode ? data.barcode.trim() : null,
-      name: data.name.trim(),
-      category: data.category || (isService ? 'service' : 'oil'),
-      item_type: isService ? 'service' : 'product',
-      brand: data.brand ? data.brand.trim() : 'عام',
-      viscosity: data.viscosity || null,
-      oil_type: data.oil_type || null,
-      api_grade: data.api_grade || null,
-      pack_size: data.pack_size || (isService ? 'unit' : '4L'),
-      carton_pack_qty: Math.max(1, safeNum(data.carton_pack_qty, 1)),
-      tire_battery_spec: data.tire_battery_spec || null,
-      country_of_origin: data.country_of_origin ? data.country_of_origin.trim() : null,
-      dot_code: data.dot_code ? data.dot_code.trim() : null,
-      battery_capacity_ah: data.battery_capacity_ah ? data.battery_capacity_ah.trim() : null,
-      warranty_months: Math.max(0, safeNum(data.warranty_months, 0)),
-      cost_price: Math.max(0, roundMoney(safeNum(data.cost_price, 0))),
-      sell_price: Math.max(0, roundMoney(safeNum(data.sell_price, 0))),
-      stock_qty: isService ? 9999 : Math.max(0, safeNum(data.stock_qty, 0)),
-      min_stock_alert: isService ? 0 : Math.max(0, safeNum(data.min_stock_alert, 5)),
-      location_shelf: data.location_shelf ? data.location_shelf.trim() : null,
-      is_consignment: data.is_consignment ? 1 : 0,
-      consignment_supplier_name: data.is_consignment && data.consignment_supplier_name ? data.consignment_supplier_name.trim() : null,
-      is_active: data.is_active !== undefined ? (data.is_active ? 1 : 0) : 1,
-      notes: data.notes ? data.notes.trim() : null,
+    const executeTx = db.transaction(() => {
+      const result = stmt.run({
+        sku,
+        barcode: data.barcode ? data.barcode.trim() : null,
+        name: data.name.trim(),
+        category,
+        item_type: isService ? 'service' : 'product',
+        brand: data.brand ? data.brand.trim() : (isService ? 'خدمات المركز' : 'عام'),
+        viscosity,
+        oil_type,
+        api_grade,
+        pack_size,
+        retail_unit,
+        bulk_unit,
+        carton_pack_qty,
+        tire_battery_spec: data.tire_battery_spec || null,
+        country_of_origin: data.country_of_origin ? data.country_of_origin.trim() : null,
+        dot_code,
+        battery_capacity_ah,
+        warranty_months: Math.max(0, safeNum(data.warranty_months, 0)),
+        cost_price: Math.max(0, roundMoney(safeNum(data.cost_price, 0))),
+        sell_price: Math.max(0, roundMoney(safeNum(data.sell_price, 0))),
+        stock_qty: isService ? 9999 : Math.max(0, safeNum(data.stock_qty, 0)),
+        min_stock_alert: isService ? 0 : Math.max(0, safeNum(data.min_stock_alert, 5)),
+        location_shelf: data.location_shelf ? data.location_shelf.trim() : null,
+        is_consignment: data.is_consignment ? 1 : 0,
+        consignment_supplier_name: data.is_consignment && data.consignment_supplier_name ? data.consignment_supplier_name.trim() : null,
+        is_active: data.is_active !== undefined ? (data.is_active ? 1 : 0) : 1,
+        notes: data.notes ? data.notes.trim() : null,
+      });
+
+      const newId = result.lastInsertRowid;
+      const initialQty = isService ? 0 : Math.max(0, safeNum(data.stock_qty, 0));
+      const unitCost = Math.max(0, roundMoney(safeNum(data.cost_price, 0)));
+      const totalCost = roundMoney(initialQty * unitCost);
+
+      if (!isService && initialQty > 0 && unitCost > 0) {
+        // 1. Record official stock movement for opening balance
+        const isConsignment = Boolean(data.is_consignment);
+        db.prepare(`
+          INSERT INTO stock_movements (
+            inventory_id, movement_type, ref_type, ref_id,
+            qty_in, qty_out, unit_cost, total_cost, balance_qty_after, wac_cost_after, notes
+          ) VALUES (?, 'opening_balance', 'inventory_initial', ?, ?, 0, ?, ?, ?, ?, ?)
+        `).run(
+          newId,
+          newId,
+          initialQty,
+          unitCost,
+          totalCost,
+          initialQty,
+          unitCost,
+          isConsignment ? 'رصيد أولي (بضاعة أمانة عهدة للغير برسم البيع)' : 'رصيد افتتاحي (بضاعة أول المدة)'
+        );
+
+        // 2. Post opening journal entry to GL: Dr. Inventory Asset, Cr. 3001 Capital (ONLY FOR OWNED INVENTORY)
+        // [MOD-CONSIGNMENT]: Consignment stock belongs to third-party suppliers, NOT shop capital or assets!
+        if (!isConsignment) {
+          try {
+            postInventoryOpeningBalance(db, {
+              inventory_id: newId,
+              name: data.name.trim(),
+              category,
+              stock_qty: initialQty,
+              cost_price: unitCost,
+              pack_size,
+              retail_unit,
+            });
+          } catch (e) {
+            console.warn(`[Inventory] Warning posting opening balance journal entry: ${e.message}`);
+          }
+        }
+      }
+
+      return this.getById(newId);
     });
 
-    return this.getById(result.lastInsertRowid);
+    return executeTx();
   },
 
   update(id, data) {
     const existing = this.getById(id);
     if (!existing) return null;
 
-    const isService = (data.category || existing.category) === 'service' || (data.item_type || existing.item_type) === 'service';
+    const category = data.category || existing.category;
+    const isService = category === 'service' || (data.item_type || existing.item_type) === 'service';
+
+    // Category sanitization
+    const isOil = category === 'oil';
+    const isTire = category === 'tire';
+    const isBattery = category === 'battery';
+
+    const viscosity = isOil ? (data.viscosity !== undefined ? data.viscosity : existing.viscosity) : null;
+    const oil_type = isOil ? (data.oil_type !== undefined ? data.oil_type : existing.oil_type) : null;
+    const api_grade = isOil ? (data.api_grade !== undefined ? data.api_grade : existing.api_grade) : null;
+    const pack_size = isOil ? (data.pack_size || existing.pack_size || '4L') : 'unit';
+
+    const dot_code = isTire ? (data.dot_code !== undefined ? (data.dot_code ? data.dot_code.trim() : null) : existing.dot_code) : null;
+    const battery_capacity_ah = isBattery ? (data.battery_capacity_ah !== undefined ? (data.battery_capacity_ah ? data.battery_capacity_ah.trim() : null) : existing.battery_capacity_ah) : null;
+
+    const retail_unit = data.retail_unit !== undefined ? data.retail_unit : (existing.retail_unit || 'حبة');
+    const bulk_unit = data.bulk_unit !== undefined ? data.bulk_unit : (existing.bulk_unit || 'كرتون');
+    const carton_pack_qty = isService
+      ? 1
+      : ['حبة', 'إطار', 'دبة'].includes(bulk_unit)
+      ? 1
+      : data.carton_pack_qty !== undefined
+      ? Math.max(1, safeNum(data.carton_pack_qty, 1))
+      : (existing.carton_pack_qty || 1);
 
     const stmt = db.prepare(`
       UPDATE inventory SET
@@ -170,6 +287,8 @@ const inventoryModel = {
         oil_type = @oil_type,
         api_grade = @api_grade,
         pack_size = @pack_size,
+        retail_unit = @retail_unit,
+        bulk_unit = @bulk_unit,
         carton_pack_qty = @carton_pack_qty,
         tire_battery_spec = @tire_battery_spec,
         country_of_origin = @country_of_origin,
@@ -193,18 +312,20 @@ const inventoryModel = {
       sku: data.sku ? data.sku.trim() : existing.sku,
       barcode: data.barcode !== undefined ? (data.barcode ? data.barcode.trim() : null) : existing.barcode,
       name: data.name ? data.name.trim() : existing.name,
-      category: data.category || existing.category,
+      category,
       item_type: isService ? 'service' : (data.item_type || existing.item_type || 'product'),
       brand: data.brand ? data.brand.trim() : existing.brand,
-      viscosity: data.viscosity !== undefined ? data.viscosity : existing.viscosity,
-      oil_type: data.oil_type !== undefined ? data.oil_type : existing.oil_type,
-      api_grade: data.api_grade !== undefined ? data.api_grade : existing.api_grade,
-      pack_size: data.pack_size || existing.pack_size,
-      carton_pack_qty: data.carton_pack_qty !== undefined ? Math.max(1, safeNum(data.carton_pack_qty, 1)) : existing.carton_pack_qty,
+      viscosity,
+      oil_type,
+      api_grade,
+      pack_size,
+      retail_unit,
+      bulk_unit,
+      carton_pack_qty,
       tire_battery_spec: data.tire_battery_spec !== undefined ? data.tire_battery_spec : existing.tire_battery_spec,
       country_of_origin: data.country_of_origin !== undefined ? data.country_of_origin : existing.country_of_origin,
-      dot_code: data.dot_code !== undefined ? data.dot_code : existing.dot_code,
-      battery_capacity_ah: data.battery_capacity_ah !== undefined ? data.battery_capacity_ah : existing.battery_capacity_ah,
+      dot_code,
+      battery_capacity_ah,
       warranty_months: data.warranty_months !== undefined ? Math.max(0, safeNum(data.warranty_months, 0)) : existing.warranty_months,
       cost_price: data.cost_price !== undefined ? Math.max(0, roundMoney(safeNum(data.cost_price, 0))) : existing.cost_price,
       sell_price: data.sell_price !== undefined ? Math.max(0, roundMoney(safeNum(data.sell_price, 0))) : existing.sell_price,
@@ -226,31 +347,45 @@ const inventoryModel = {
     const item = this.getById(id);
     if (!item) return null;
 
-    // Check references in invoice_items, purchase_items, or stock_movements
-    const invoiceRefCount = db.prepare('SELECT COUNT(*) as count FROM invoice_items WHERE inventory_id = ?').get(id).count;
-    const purchaseRefCount = db.prepare('SELECT COUNT(*) as count FROM purchase_items WHERE inventory_id = ?').get(id).count;
-    const movementRefCount = db.prepare('SELECT COUNT(*) as count FROM stock_movements WHERE inventory_id = ?').get(id).count;
+    const executeTx = db.transaction(() => {
+      // Check references in invoice_items, purchase_items, purchase_return_items, or stock_movements
+      const invoiceRefCount = db.prepare('SELECT COUNT(*) as count FROM invoice_items WHERE inventory_id = ?').get(id).count;
+      const purchaseRefCount = db.prepare('SELECT COUNT(*) as count FROM purchase_items WHERE inventory_id = ?').get(id).count;
+      const returnRefCount = db.prepare('SELECT COUNT(*) as count FROM purchase_return_items WHERE inventory_id = ?').get(id).count;
+      const movementRefCount = db.prepare('SELECT COUNT(*) as count FROM stock_movements WHERE inventory_id = ?').get(id).count;
 
-    const totalRefs = invoiceRefCount + purchaseRefCount + movementRefCount;
+      const totalRefs = invoiceRefCount + purchaseRefCount + returnRefCount + movementRefCount;
+      const hasStock = item.item_type !== 'service' && item.category !== 'service' && Number(item.stock_qty) > 0;
 
-    if (totalRefs > 0) {
-      // Soft-delete / Archive to preserve financial ledger integrity
-      db.prepare('UPDATE inventory SET is_active = 0 WHERE id = ?').run(id);
-      return {
-        id,
-        action: 'archived',
-        is_active: 0,
-        message: `تم أرشفة الصنف وتعطيله لحماية السجلات المحاسبية؛ لوجود (${invoiceRefCount} مبيعات / ${purchaseRefCount} مشتريات) مسجلة عليه مسبقاً.`,
-      };
-    } else {
-      // Clean delete
-      db.prepare('DELETE FROM inventory WHERE id = ?').run(id);
-      return {
-        id,
-        action: 'deleted',
-        message: 'تم حذف الصنف نهائياً من قاعدة البيانات لعدم ارتباطه بأي معاملات سابقة.',
-      };
-    }
+      if (totalRefs > 0 || hasStock) {
+        // Soft-delete / Archive to preserve financial ledger and physical stock integrity
+        db.prepare('UPDATE inventory SET is_active = 0 WHERE id = ?').run(id);
+
+        let reason = '';
+        if (totalRefs > 0) {
+          reason = `لوجود (${invoiceRefCount} مبيعات / ${purchaseRefCount} مشتريات / ${returnRefCount} مردودات / ${movementRefCount} حركات مخزن) مسجلة عليه مسبقاً.`;
+        } else if (hasStock) {
+          reason = `لاحتوائه على رصيد كمية فعلي بالمستودع (${item.stock_qty} ${item.retail_unit || 'حبة'}). يرجى تسوية المخزون أولاً في حال الرغبة بحذفه نهائياً.`;
+        }
+
+        return {
+          id,
+          action: 'archived',
+          is_active: 0,
+          message: `تم أرشفة الصنف وتعطيله لحماية السجلات المالية والمخزنية؛ ${reason}`,
+        };
+      } else {
+        // Clean delete
+        db.prepare('DELETE FROM inventory WHERE id = ?').run(id);
+        return {
+          id,
+          action: 'deleted',
+          message: 'تم حذف الصنف نهائياً من قاعدة البيانات لعدم ارتباطه بأي معاملات سابقة وتصفير رصيده.',
+        };
+      }
+    });
+
+    return executeTx();
   },
 
   toggleActive(id) {
@@ -341,8 +476,10 @@ const inventoryModel = {
 
   /**
    * Converts parent packaging (Carton/Drum) into child units (Can/Liter)
+   * Handles decanting cling & evaporation loss for 208L drums (~204L actual yield)
+   * Accurately rolls transferred cost into child WAC so that no inventory value is lost
    */
-  convertPackaging({ from_id, to_id, packages_to_convert, units_per_package }) {
+  convertPackaging({ from_id, to_id, packages_to_convert, units_per_package, actual_units_produced }) {
     const execute = db.transaction(() => {
       const fromItem = this.getById(from_id);
       const toItem = this.getById(to_id);
@@ -351,23 +488,54 @@ const inventoryModel = {
 
       const packages = Math.max(1, safeNum(packages_to_convert, 1));
       const unitsPerPkg = Math.max(1, safeNum(units_per_package, fromItem.carton_pack_qty || 24));
-      const totalUnitsProduced = packages * unitsPerPkg;
+      const nominalUnits = packages * unitsPerPkg;
+
+      // Handle Decanting & Clinging Loss for 208L drums (or custom actual yield)
+      // Standard Yemeni & lube market reality: a 208L drum physically yields ~204L actual usable oil.
+      const is208LBarrel = unitsPerPkg === 208 || (fromItem.pack_size && fromItem.pack_size.toUpperCase() === '208L') || (fromItem.name && fromItem.name.includes('208'));
+      
+      let totalUnitsProduced = 0;
+      let wasteUnits = 0;
+
+      if (actual_units_produced !== undefined && actual_units_produced !== null && Number(actual_units_produced) > 0) {
+        totalUnitsProduced = Math.max(1, Number(actual_units_produced));
+        wasteUnits = Math.max(0, roundMoney(nominalUnits - totalUnitsProduced));
+      } else if (is208LBarrel) {
+        // Default standard: 204 liters actual yield per 208L barrel (4L decanting loss)
+        totalUnitsProduced = packages * 204;
+        wasteUnits = packages * 4;
+      } else {
+        totalUnitsProduced = nominalUnits;
+        wasteUnits = 0;
+      }
 
       if (fromItem.stock_qty < packages) {
         throw new Error(`الرصيد المتاح من ${fromItem.name} (${fromItem.stock_qty}) أقل من الكمية المراد فكها (${packages})`);
       }
 
-      // Decrement parent
-      db.prepare('UPDATE inventory SET stock_qty = stock_qty - ? WHERE id = ?').run(packages, from_id);
-      // Increment child
-      db.prepare('UPDATE inventory SET stock_qty = stock_qty + ? WHERE id = ?').run(totalUnitsProduced, to_id);
+      // Cost Calculation: Full parent cost is transferred and absorbed by produced units
+      const totalParentCost = roundMoney(packages * fromItem.cost_price);
+      const producedUnitCost = totalUnitsProduced > 0 ? roundMoney(totalParentCost / totalUnitsProduced) : toItem.cost_price;
 
-      const fromTotalCost = roundMoney(packages * fromItem.cost_price);
-      const toTotalCost = roundMoney(totalUnitsProduced * toItem.cost_price);
+      // Recompute Child WAC defensively
+      const prevChildQty = Math.max(0, safeNum(toItem.stock_qty, 0));
+      const prevChildCost = safeNum(toItem.cost_price, 0);
+      const newChildWac = calcWAC(prevChildQty, prevChildCost, totalUnitsProduced, producedUnitCost);
+      const newToQty = roundMoney(prevChildQty + totalUnitsProduced);
       const newFromQty = roundMoney(fromItem.stock_qty - packages);
-      const newToQty = roundMoney(toItem.stock_qty + totalUnitsProduced);
 
-      // Record stock movements
+      // 1. Decrement parent stock
+      db.prepare('UPDATE inventory SET stock_qty = stock_qty - ? WHERE id = ?').run(packages, from_id);
+
+      // 2. Increment child stock and update WAC cost
+      db.prepare(`
+        UPDATE inventory 
+        SET stock_qty = stock_qty + ?, cost_price = ? 
+        WHERE id = ?
+      `).run(totalUnitsProduced, newChildWac, to_id);
+
+      // 3. Record stock movements
+      const fromNotes = `فك وتجزئة عبوة وتحويل إلى (${toItem.name})` + (wasteUnits > 0 ? ` [فاقد تفريغ وترسيب: ${wasteUnits} وحدة]` : '');
       db.prepare(`
         INSERT INTO stock_movements (
           inventory_id, movement_type, ref_type, ref_id,
@@ -378,12 +546,13 @@ const inventoryModel = {
         to_id,
         packages,
         fromItem.cost_price,
-        fromTotalCost,
+        totalParentCost,
         newFromQty,
         fromItem.cost_price,
-        `فك عبوة وتحويل إلى (${toItem.name})`
+        fromNotes
       );
 
+      const toNotes = `ناتج فك عبوات من (${fromItem.name})` + (wasteUnits > 0 ? ` [صافي فعلي بعد استبعاد هدر ${wasteUnits} وحدة]` : '');
       db.prepare(`
         INSERT INTO stock_movements (
           inventory_id, movement_type, ref_type, ref_id,
@@ -393,18 +562,23 @@ const inventoryModel = {
         to_id,
         from_id,
         totalUnitsProduced,
-        toItem.cost_price,
-        toTotalCost,
+        producedUnitCost,
+        totalParentCost, // All parent value transferred
         newToQty,
-        toItem.cost_price,
-        `ناتج فك عبوات من (${fromItem.name})`
+        newChildWac,
+        toNotes
       );
 
       return {
         from_item: this.getById(from_id),
         to_item: this.getById(to_id),
         packages_converted: packages,
+        nominal_units: nominalUnits,
         units_produced: totalUnitsProduced,
+        waste_units: wasteUnits,
+        transferred_cost: totalParentCost,
+        produced_unit_cost: producedUnitCost,
+        new_child_wac: newChildWac,
       };
     });
 

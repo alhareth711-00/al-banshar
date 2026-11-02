@@ -55,6 +55,8 @@ import {
   shouldPreventNegativeStock,
   getOilVolumePresets,
 } from '../utils/settings';
+import { getLocalTodayDate } from '../utils/dateUtils';
+import { APP_EVENTS, emitAppEvent, subscribeAppEvent } from '../utils/eventBus';
 
 const getInitialNextServiceDate = () => {
   try {
@@ -62,11 +64,11 @@ const getInitialNextServiceDate = () => {
     const months = Number(settings.defaultServiceIntervalMonths) || 2;
     const d = new Date();
     d.setMonth(d.getMonth() + months);
-    return d.toISOString().split('T')[0];
+    return getLocalTodayDate(d);
   } catch (e) {
     const d = new Date();
     d.setMonth(d.getMonth() + 2);
-    return d.toISOString().split('T')[0];
+    return getLocalTodayDate(d);
   }
 };
 
@@ -134,6 +136,7 @@ export default function PosScreen({
 
   // Odometer State (strictly 3000 km default interval for oil change mode)
   const [currentOdometer, setCurrentOdometer] = useState('');
+  const [allowOdometerReset, setAllowOdometerReset] = useState(false);
   const [kmInterval, setKmInterval] = useState(3000);
   const [manualNextOdometer, setManualNextOdometer] = useState('');
   const [serviceDateInput, setServiceDateInput] = useState(getInitialNextServiceDate());
@@ -142,6 +145,7 @@ export default function PosScreen({
   const [cartItems, setCartItems] = useState([]);
   const [specialDiscount, setSpecialDiscount] = useState('');
   const [discountType, setDiscountType] = useState('fixed'); // 'fixed' (ر.ي) | 'percent' (%)
+  const [scrapBatteryDeduction, setScrapBatteryDeduction] = useState('');
   const [invoiceNotes, setInvoiceNotes] = useState('');
 
   // Payment State
@@ -159,6 +163,9 @@ export default function PosScreen({
   // Active Bay Services State
   const [showPendingServicesModal, setShowPendingServicesModal] = useState(false);
   const [pendingServicesCount, setPendingServicesCount] = useState(0);
+  const [pendingServicesList, setPendingServicesList] = useState([]);
+  const [todayCompletedCount, setTodayCompletedCount] = useState(0);
+  const [todayTotalCarsCount, setTodayTotalCarsCount] = useState(0);
   const [pendingBayDialog, setPendingBayDialog] = useState(null);
   const [focusPendingInvoiceId, setFocusPendingInvoiceId] = useState(null);
 
@@ -257,6 +264,13 @@ export default function PosScreen({
       const data = await res.json();
       if (data.success) {
         setPendingServicesCount(data.count || (data.data ? data.data.length : 0));
+        setPendingServicesList(data.data || []);
+        if (data.today_completed_count !== undefined) {
+          setTodayCompletedCount(data.today_completed_count);
+        }
+        if (data.today_total_count !== undefined) {
+          setTodayTotalCarsCount(data.today_total_count);
+        }
       }
     } catch {
       // background error ignore
@@ -266,7 +280,11 @@ export default function PosScreen({
   useEffect(() => {
     fetchPendingServicesCount();
     const interval = setInterval(fetchPendingServicesCount, 15000);
-    return () => clearInterval(interval);
+    const unsubscribe = subscribeAppEvent(APP_EVENTS.DATA_INVALIDATED, fetchPendingServicesCount);
+    return () => {
+      clearInterval(interval);
+      unsubscribe();
+    };
   }, []);
 
   // Backup status fetcher
@@ -398,8 +416,17 @@ export default function PosScreen({
   const nextServiceDate = useMemo(() => {
     const d = new Date();
     d.setDate(d.getDate() + 60);
-    return d.toISOString().split('T')[0];
+    return getLocalTodayDate(d);
   }, []);
+
+  // Check if selected vehicle is already active in pit bay [MOD-LANE]
+  const vehicleCurrentlyInBay = useMemo(() => {
+    const effectiveId = selectedVehicle?.id || selectedVehicle?.vehicle_id;
+    if (!effectiveId || effectiveId === 'quick' || Number(effectiveId) === 1) return null;
+    return pendingServicesList.find(
+      (s) => Number(s.vehicle_id) === Number(effectiveId)
+    );
+  }, [selectedVehicle, pendingServicesList]);
 
   const isOdometerSuspicious = useMemo(() => {
     if (posMode !== 'oil') return false;
@@ -625,7 +652,30 @@ export default function PosScreen({
     return Math.round(sum * 100) / 100;
   }, [cartItems]);
 
-  const grossTotal = Math.round((goodsTotal + servicesTotal) * 100) / 100;
+  // Battery Detection & Scrap Trade-in Poka-Yoke [MOD-SCRAP]
+  const batteryCartSummary = useMemo(() => {
+    let hasBattery = false;
+    let totalBatteryGross = 0;
+    for (const item of cartItems) {
+      const inv = item.inventory_id ? inventory.find((i) => i.id === item.inventory_id) : null;
+      const isBat = (inv && (inv.category === 'battery' || (inv.name && inv.name.includes('بطار')))) ||
+                    (item.description && item.description.includes('بطار'));
+      if (isBat) {
+        hasBattery = true;
+        totalBatteryGross += (Number(item.qty) || 1) * (Number(item.unit_price) || 0);
+      }
+    }
+    return { hasBattery, totalBatteryGross: Math.round(totalBatteryGross * 100) / 100 };
+  }, [cartItems, inventory]);
+
+  const effectiveScrapDeduction = useMemo(() => {
+    if (!batteryCartSummary.hasBattery) return 0;
+    const val = Number(scrapBatteryDeduction) || 0;
+    if (val <= 0) return 0;
+    return Math.min(batteryCartSummary.totalBatteryGross, Math.round(val * 100) / 100);
+  }, [batteryCartSummary, scrapBatteryDeduction]);
+
+  const grossTotal = Math.round(Math.max(0, (goodsTotal + servicesTotal) - effectiveScrapDeduction) * 100) / 100;
 
   // Fleet discount auto-calculation
   useEffect(() => {
@@ -759,10 +809,20 @@ export default function PosScreen({
 
     if (belowCostItem) {
       const inv = inventory.find((i) => i.id === belowCostItem.inventory_id);
+      if (!isOwnerMode && onRequireOwnerAuth) {
+        onRequireOwnerAuth(
+          () => checkCreditLimitThenSubmit(),
+          'حظر بيع بأقل من التكلفة 🔒',
+          `الصنف "${belowCostItem.description}" يباع بسعر أقل من الحد الأدنى المعتمد. يلزم إدخال رمز المالك للموافقة على اعتماد البيع الاستثنائي.`
+        );
+        return;
+      }
       setTouchConfirm({
         isOpen: true,
         title: '⚠️ تنبيه: البيع بأقل من التكلفة!',
-        message: `الصنف "${belowCostItem.description}" يباع بـ (${Number(belowCostItem.unit_price).toLocaleString()} ر.ي) وهو أقل من سعر التكلفة (${Number(inv.cost_price).toLocaleString()} ر.ي).\n\nهل تؤكد اعتماد هذا البيع الاستثنائي؟`,
+        message: isOwnerMode
+          ? `الصنف "${belowCostItem.description}" يباع بـ (${Number(belowCostItem.unit_price).toLocaleString()} ر.ي) وهو أقل من سعر التكلفة (${Number(inv?.cost_price || 0).toLocaleString()} ر.ي).\n\nهل تؤكد اعتماد هذا البيع الاستثنائي؟`
+          : `الصنف "${belowCostItem.description}" يباع بسعر أقل من الحد الأدنى المعتمد للتكلفة.\n\nهل تؤكد اعتماد هذا البيع الاستثنائي؟`,
         confirmText: 'نعم، اعتماد البيع',
         onConfirm: () => checkCreditLimitThenSubmit(),
       });
@@ -824,6 +884,24 @@ export default function PosScreen({
       const hasOdo = Number(currentOdometer) > 0;
 
       const isOilService = posMode === 'oil' || (hasVehicleAttached && (hasOilOrLube || hasOdo)) || hasOilOrLube;
+
+      // MOD-LANE: Prevent submitting duplicate service if vehicle is already in pit bay
+      if (isOilService && vehicleCurrentlyInBay) {
+        setTouchAlert({
+          isOpen: true,
+          title: 'المركبة متواجدة بالفعل داخل الحفرة 🚗',
+          message: `تنبيه الحفرة [MOD-LANE]: المركبة (${selectedVehicle?.plate_number || ''}) متواجدة حالياً بالفعل داخل الحفرة قيد الخدمة بموجب الفاتورة رقم (${vehicleCurrentlyInBay.invoice_number}). يرجى إتمام فحصها وخدمتها أولاً من شاشة سيارات الحفرة أو إلغاء فاتورتها السابقة قبل فتح خدمة جديدة.`,
+          type: 'warning',
+          cancelBtnText: 'متابعة فحص الحفرة 🛠️',
+          onClose: () => {
+            setFocusPendingInvoiceId(vehicleCurrentlyInBay.id);
+            setShowPendingServicesModal(true);
+          },
+        });
+        setIsSubmittingInvoice(false);
+        return;
+      }
+
       const statusToSave = isOilService ? 'pending_service' : 'completed';
 
       const payload = {
@@ -831,11 +909,12 @@ export default function PosScreen({
         worker_id: null, // إلغاء إرفاق الفني نهائياً بناءً على طلب المالك
         service_status: statusToSave,
         current_odometer: isOilService ? (Number(currentOdometer) || 0) : 0,
+        allow_odometer_reset: allowOdometerReset,
         next_odometer: isOilService ? (Number(nextOdometer) || 0) : 0,
         next_service_date: isOilService ? (serviceDateInput || nextServiceDate) : nextServiceDate,
         items_total: goodsTotal,
         labor_total: servicesTotal,
-        scrap_battery_deduction: 0,
+        scrap_battery_deduction: effectiveScrapDeduction,
         discount: calculatedDiscount,
         payment_method: paymentMethod,
         wallet_ref_number: walletRefNumber || null,
@@ -894,6 +973,8 @@ export default function PosScreen({
 
       // Reset form for next customer
       handleResetPos();
+      fetchPendingServicesCount();
+      emitAppEvent(APP_EVENTS.INVOICE_CREATED, { invoice: completedData });
 
       if (onRefreshData) onRefreshData();
     } catch (err) {
@@ -931,6 +1012,8 @@ export default function PosScreen({
           if (completedInvoice?.id === lastSubmittedInvoice.id) {
             setCompletedInvoice(null);
           }
+          fetchPendingServicesCount();
+          emitAppEvent(APP_EVENTS.INVOICE_VOIDED, { id: lastSubmittedInvoice.id });
           if (onRefreshData) onRefreshData();
           setTimeout(() => setCartNoticeMessage(''), 5000);
         } catch (err) {
@@ -957,11 +1040,13 @@ export default function PosScreen({
       setSelectedVehicle(null);
       setLastServiceInfo(null);
       setCurrentOdometer('');
+      setAllowOdometerReset(false);
       setManualNextOdometer('');
       setServiceDateInput(getInitialNextServiceDate());
     }
     setSpecialDiscount('');
     setDiscountType('fixed');
+    setScrapBatteryDeduction('');
     setInvoiceNotes('');
     setPaymentMethod('cash');
     setPaidAmountInput('');
@@ -1122,7 +1207,7 @@ export default function PosScreen({
               </span>
             </button>
 
-            {/* 3. ACTIVE SERVICES IN BAY (سيارات قيد الخدمة حالياً) */}
+            {/* 3. ACTIVE SERVICES IN BAY (حركة سيارات اليوم والحفرة) */}
             <button
               type="button"
               onClick={() => setShowPendingServicesModal(true)}
@@ -1131,7 +1216,7 @@ export default function PosScreen({
                   ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white border-blue-400/60 shadow-lg shadow-blue-500/30 ring-1 ring-blue-400/50'
                   : 'text-slate-300 border-white/5 hover:text-white hover:bg-white/5'
               }`}
-              title="متابعة وإتمام فحص السيارات التي لا تزال تحت الخدمة في الحفرة وإرسال الواتساب"
+              title="متابعة وإتمام فحص السيارات التي لا تزال تحت الخدمة في الحفرة وعرض سيارات اليوم"
             >
               <div className="relative">
                 <Car className="w-3.5 h-3.5 stroke-[2.2]" />
@@ -1139,15 +1224,15 @@ export default function PosScreen({
                   <span className="absolute -top-1 -right-1.5 w-2 h-2 rounded-full bg-rose-400 animate-ping" />
                 )}
               </div>
-              <span>🚗 سيارات قيد الخدمة حالياً</span>
+              <span>🚗 سيارات اليوم ({todayTotalCarsCount > 0 ? todayTotalCarsCount : (todayCompletedCount + pendingServicesCount)})</span>
               <span
                 className={`text-[11px] px-2 py-0.5 rounded-md font-mono font-bold ${
                   pendingServicesCount > 0
                     ? 'bg-white/20 text-white'
-                    : 'bg-slate-800 text-slate-400'
+                    : 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
                 }`}
               >
-                {pendingServicesCount}
+                {todayCompletedCount} منجزة{pendingServicesCount > 0 ? ` • ${pendingServicesCount} بالحفرة` : ''}
               </span>
             </button>
           </div>
@@ -1389,6 +1474,26 @@ export default function PosScreen({
                       </span>
                     </span>
                   </div>
+
+                  {/* MOD-LANE: In-Bay Active Service Alert Badge */}
+                  {vehicleCurrentlyInBay && (
+                    <div className="mt-2.5 p-2 rounded-xl bg-amber-500/25 border border-amber-400/60 flex items-center justify-between gap-3 text-amber-200">
+                      <div className="flex items-center gap-2 text-xs font-bold">
+                        <AlertTriangle className="w-4 h-4 text-amber-300 shrink-0 animate-pulse" />
+                        <span>المركبة بالحفرة قيد الخدمة (فاتورة: <strong className="font-mono text-white">{vehicleCurrentlyInBay.invoice_number}</strong>)</span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setFocusPendingInvoiceId(vehicleCurrentlyInBay.id);
+                          setShowPendingServicesModal(true);
+                        }}
+                        className="px-2.5 py-1 bg-amber-400 hover:bg-amber-300 text-slate-950 font-black rounded-lg text-xs transition shrink-0 shadow-sm"
+                      >
+                        متابعة الفحص 🛠️
+                      </button>
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -1691,7 +1796,7 @@ export default function PosScreen({
 
                 {/* Suspicious Odometer Poka-Yoke Banner */}
                 {isOdometerSuspicious && (
-                  <div className="p-3 bg-amber-500/15 border border-amber-500/40 rounded-2xl flex items-center justify-between gap-3 text-amber-300 animate-in fade-in">
+                  <div className="p-3 bg-amber-500/15 border border-amber-500/40 rounded-2xl flex flex-wrap items-center justify-between gap-3 text-amber-300 animate-in fade-in">
                     <div className="flex items-center gap-2 text-xs font-bold">
                       <AlertTriangle className="w-5 h-5 text-amber-400 shrink-0" />
                       <span>
@@ -1699,15 +1804,29 @@ export default function PosScreen({
                         {Number(lastServiceInfo?.current_odometer || selectedVehicle?.last_odometer).toLocaleString()} كم)!
                       </span>
                     </div>
-                    <button
-                      type="button"
-                      onClick={() =>
-                        setCurrentOdometer(String(lastServiceInfo?.current_odometer || selectedVehicle?.last_odometer || ''))
-                      }
-                      className="px-3 py-1 bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs font-black rounded-xl shrink-0 transition active:scale-95 shadow-sm"
-                    >
-                      تصحيح
-                    </button>
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setAllowOdometerReset((prev) => !prev)}
+                        className={`px-2.5 py-1 text-xs font-bold rounded-xl transition ${
+                          allowOdometerReset
+                            ? 'bg-rose-500/80 text-white border border-rose-400'
+                            : 'bg-slate-800 text-slate-300 hover:bg-slate-700 border border-white/10'
+                        }`}
+                      >
+                        {allowOdometerReset ? '✓ تم تفعيل استثناء التصفير' : 'استثناء (تصفير/تبديل طبلون)'}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setCurrentOdometer(String(lastServiceInfo?.current_odometer || selectedVehicle?.last_odometer || ''));
+                          setAllowOdometerReset(false);
+                        }}
+                        className="px-3 py-1 bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs font-black rounded-xl shrink-0 transition active:scale-95 shadow-sm"
+                      >
+                        تصحيح
+                      </button>
+                    </div>
                   </div>
                 )}
 
@@ -2014,6 +2133,35 @@ export default function PosScreen({
                 <div className="flex justify-between text-slate-300 text-[11px]">
                   <span>بضاعة: {goodsTotal.toLocaleString()} ر.ي</span>
                   <span className="text-teal-300">خدمات: {servicesTotal.toLocaleString()} ر.ي</span>
+                </div>
+              )}
+
+              {/* Scrap Battery Trade-In Input (Only when battery is present in cart) [MOD-SCRAP] */}
+              {batteryCartSummary.hasBattery && (
+                <div className="flex items-center justify-between gap-1 pt-1 pb-1 border-t border-emerald-500/20 bg-emerald-500/10 px-2 rounded-lg">
+                  <div className="flex items-center gap-1.5 text-emerald-300">
+                    <Battery className="w-3.5 h-3.5 text-emerald-400" />
+                    <span className="font-bold text-[11px]">خصم مقايضة بطارية قديمة (سكراب):</span>
+                  </div>
+                  <div className="flex items-center gap-1 text-emerald-400">
+                    <input
+                      type="number"
+                      inputMode="decimal"
+                      placeholder="0"
+                      max={batteryCartSummary.totalBatteryGross}
+                      value={scrapBatteryDeduction}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        if (Number(val) > batteryCartSummary.totalBatteryGross) {
+                          setScrapBatteryDeduction(batteryCartSummary.totalBatteryGross);
+                        } else {
+                          setScrapBatteryDeduction(val);
+                        }
+                      }}
+                      className="w-20 px-1.5 py-0.5 rounded-lg bg-slate-900 border border-emerald-500/40 font-mono text-xs font-bold text-center text-emerald-300 focus:outline-none focus:border-emerald-400"
+                    />
+                    <span className="text-[10px] text-emerald-400 font-mono">ر.ي</span>
+                  </div>
                 </div>
               )}
 

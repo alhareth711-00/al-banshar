@@ -12,7 +12,7 @@ function getDayBriefMetrics(date) {
   const row = db.prepare(`
     SELECT 
       COUNT(*) AS total_invoices,
-      COUNT(DISTINCT vehicle_id) AS total_cars_served,
+      COUNT(*) AS total_cars_served,
       COALESCE(SUM(items_total), 0) AS goods_sales,
       COALESCE(SUM(labor_total), 0) AS services_revenue,
       COALESCE(SUM(net_total), 0) AS total_net_sales,
@@ -27,6 +27,7 @@ function getDayBriefMetrics(date) {
     total_invoices: row?.total_invoices || 0,
     total_cars_served: row?.total_cars_served || 0,
     goods_sales: row?.goods_sales || 0,
+    goods_revenue: row?.goods_sales || 0,
     services_revenue: row?.services_revenue || 0,
     total_net_sales: row?.total_net_sales || 0,
     total_paid: row?.total_paid || 0,
@@ -46,7 +47,7 @@ function getHourlyBreakdown(date) {
     SELECT 
       strftime('%H', created_at) AS hour_str,
       COUNT(*) AS invoices_count,
-      COUNT(DISTINCT vehicle_id) AS cars_count,
+      COUNT(*) AS cars_count,
       COALESCE(SUM(net_total), 0) AS total_sales,
       COALESCE(SUM(labor_total), 0) AS services_sales
     FROM invoices
@@ -103,7 +104,7 @@ const reportModel = {
     const invoicesSummary = db.prepare(`
       SELECT 
         COUNT(*) AS total_invoices,
-        COUNT(DISTINCT vehicle_id) AS total_cars_served,
+        COUNT(*) AS total_cars_served,
         COALESCE(SUM(items_total), 0) AS total_items_amount,
         COALESCE(SUM(labor_total), 0) AS total_labor_amount,
         COALESCE(SUM(scrap_battery_deduction), 0) AS total_scrap_deductions,
@@ -325,6 +326,8 @@ const reportModel = {
       '1L': 0,
       '4L': 0,
       '5L': 0,
+      '20L': 0,
+      '25L': 0,
       'bulk_liter': 0,
       'other': 0,
     };
@@ -561,9 +564,12 @@ const reportModel = {
         total_cars_served: invoicesSummary.total_cars_served,
         total_invoices: invoicesSummary.total_invoices,
         total_items_amount: invoicesSummary.total_items_amount,
+        goods_sales: invoicesSummary.total_items_amount,
+        goods_revenue: invoicesSummary.total_items_amount,
+        goods_sales_revenue: invoicesSummary.total_items_amount,
+        oil_sales: oilItemsSold.reduce((acc, curr) => acc + (curr.total_sales || 0), 0),
         total_labor_amount: invoicesSummary.total_labor_amount,
         services_revenue: invoicesSummary.total_labor_amount,
-        goods_sales_revenue: invoicesSummary.total_items_amount,
         total_scrap_deductions: invoicesSummary.total_scrap_deductions,
         total_discounts: invoicesSummary.total_discounts,
         total_net_sales: invoicesSummary.total_net_sales,

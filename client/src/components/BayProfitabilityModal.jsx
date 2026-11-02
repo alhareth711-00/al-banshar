@@ -12,6 +12,7 @@ import {
   PieChart,
   Zap,
 } from 'lucide-react';
+import { getLocalTodayDate } from '../utils/dateUtils';
 
 export default function BayProfitabilityModal({ isOpen, onClose }) {
   const [dateRange, setDateRange] = useState('month'); // 'today' | 'week' | 'month' | 'all'
@@ -21,7 +22,7 @@ export default function BayProfitabilityModal({ isOpen, onClose }) {
   const fetchBayData = async () => {
     try {
       setLoading(true);
-      const today = new Date().toISOString().split('T')[0];
+      const today = getLocalTodayDate();
       let start = '';
       let end = today;
 
@@ -30,11 +31,11 @@ export default function BayProfitabilityModal({ isOpen, onClose }) {
       } else if (dateRange === 'week') {
         const d = new Date();
         d.setDate(d.getDate() - 7);
-        start = d.toISOString().split('T')[0];
+        start = getLocalTodayDate(d);
       } else if (dateRange === 'month') {
         const d = new Date();
         d.setDate(1);
-        start = d.toISOString().split('T')[0];
+        start = getLocalTodayDate(d);
       }
 
       let url = '/api/accounting/bay-profitability';
@@ -188,17 +189,20 @@ export default function BayProfitabilityModal({ isOpen, onClose }) {
                   </div>
                 </div>
 
-                {/* Card 2: Goods Gross Profit */}
+                {/* Card 2: Goods & Oil Sales and Gross Profit */}
                 <div className="apple-glass-card rounded-2xl p-4 border border-blue-500/25">
                   <div className="flex items-center justify-between text-slate-400 text-xs font-bold mb-1">
-                    <span>مجمل ربح بيع البضاعة (الزيوت/الفلاتر):</span>
+                    <span>مبيعات وأرباح الزيوت والبضاعة:</span>
                     <TrendingUp className="w-4 h-4 text-blue-400" />
                   </div>
                   <div className="text-xl font-black font-mono text-blue-400">
-                    {summary.goods_gross_profit.toLocaleString()} <span className="text-xs font-sans text-slate-400">ر.ي</span>
+                    {(summary.oil_sales || summary.total_goods_revenue || summary.goods_sales || 0).toLocaleString()} <span className="text-xs font-sans text-slate-400">ر.ي مبيعات</span>
                   </div>
-                  <div className="text-[11px] text-slate-400 mt-1">
-                    صافي أرباح بيع الزيوت والفلاتر بعد خصم التكلفة
+                  <div className="text-[11px] text-slate-300 mt-1 flex items-center justify-between">
+                    <span>مجمل الربح: <b className="text-emerald-400 font-mono">{summary.goods_gross_profit.toLocaleString()} ر.ي</b></span>
+                    {summary.oil_packs_count > 0 && (
+                      <span className="text-blue-300 font-mono">({summary.oil_packs_count} عبوة)</span>
+                    )}
                   </div>
                 </div>
 

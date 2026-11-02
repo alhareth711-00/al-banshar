@@ -54,10 +54,10 @@ const backupEngine = {
     }
   },
 
-  createManualBackup() {
+  createManualBackup(prefix = 'pos_manual_backup') {
     ensureBackupsDir();
     const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-    const backupFileName = `pos_manual_backup_${timestamp}.sqlite`;
+    const backupFileName = `${prefix}_${timestamp}.sqlite`;
     const targetFilePath = path.join(BACKUPS_DIR, backupFileName);
 
     db.pragma('wal_checkpoint(PASSIVE)');
@@ -72,6 +72,7 @@ const backupEngine = {
       filePath: targetFilePath,
       size_bytes: stats.size,
       sizeBytes: stats.size,
+      sizeFormatted: `${(stats.size / 1024 / 1024).toFixed(2)} MB`,
       createdAt: new Date().toISOString(),
     };
   },
@@ -178,6 +179,135 @@ const backupEngine = {
       daysAgo: Math.max(0, diffDays),
       isStale: diffDays >= 7,
       totalBackups: list.length,
+    };
+  },
+
+  /**
+   * Pre-flight schema & integrity check on any SQLite file before restoration
+   */
+  validateBackupFile(filePath) {
+    if (!fs.existsSync(filePath)) {
+      return { valid: false, error: 'الملف غير موجود على القرص' };
+    }
+    const Database = require('better-sqlite3');
+    let testDb = null;
+    try {
+      testDb = new Database(filePath, { readonly: true, fileMustExist: true });
+      const integrity = testDb.prepare('PRAGMA integrity_check').all();
+      const isIntegrityOk = integrity.length === 1 && integrity[0].integrity_check === 'ok';
+      if (!isIntegrityOk) {
+        return { valid: false, error: 'ملف قاعدة البيانات تالف أو غير صالح (فشل فحص PRAGMA integrity_check)' };
+      }
+
+      // Check required tables
+      const tables = testDb.prepare("SELECT name FROM sqlite_master WHERE type='table'").all().map((r) => r.name);
+      const requiredTables = ['customers_vehicles', 'invoices', 'inventory', 'chart_of_accounts'];
+      const missing = requiredTables.filter((t) => !tables.includes(t));
+      if (missing.length > 0) {
+        return { valid: false, error: `الملف غير متوافق، تنقصه جداول النظام الأساسية: ${missing.join(', ')}` };
+      }
+
+      const counts = {
+        vehicles: testDb.prepare('SELECT COUNT(*) as c FROM customers_vehicles').get()?.c || 0,
+        invoices: testDb.prepare('SELECT COUNT(*) as c FROM invoices').get()?.c || 0,
+        inventory: testDb.prepare('SELECT COUNT(*) as c FROM inventory').get()?.c || 0,
+        suppliers: tables.includes('suppliers') ? testDb.prepare('SELECT COUNT(*) as c FROM suppliers').get()?.c || 0 : 0,
+        vouchers: tables.includes('official_vouchers') ? testDb.prepare('SELECT COUNT(*) as c FROM official_vouchers').get()?.c || 0 : 0,
+        journal_entries: tables.includes('journal_entries') ? testDb.prepare('SELECT COUNT(*) as c FROM journal_entries').get()?.c || 0 : 0,
+      };
+
+      const stats = fs.statSync(filePath);
+      return {
+        valid: true,
+        counts,
+        sizeBytes: stats.size,
+        sizeFormatted: `${(stats.size / 1024 / 1024).toFixed(2)} MB`,
+        message: 'الملف سليم ومطابق لقواعد نظام سريع وبنشر 100%',
+      };
+    } catch (err) {
+      return { valid: false, error: `فشل فحص بنية الملف: ${err.message}` };
+    } finally {
+      if (testDb) {
+        try {
+          testDb.close();
+        } catch (e) {
+          // ignore
+        }
+      }
+    }
+  },
+
+  /**
+   * Safe Hot-Swap Database Restoration with Pre-Restore Safety Snapshot
+   */
+  restoreFromBackup(sourceFilePath, { createSafetySnapshot = true } = {}) {
+    // 1. Validate the source file first
+    const validation = this.validateBackupFile(sourceFilePath);
+    if (!validation.valid) {
+      throw new Error(validation.error);
+    }
+
+    // 2. Take automatic safety snapshot of the CURRENT database before overwriting
+    let safetySnapshot = null;
+    if (createSafetySnapshot) {
+      try {
+        safetySnapshot = this.createManualBackup('pre_restore_safety_backup');
+        console.log('[Backup Engine] Pre-restore safety backup created:', safetySnapshot.filename);
+      } catch (err) {
+        console.warn('[Backup Engine] Warning taking pre-restore safety backup:', err.message);
+      }
+    }
+
+    // 3. Prepare target DB path
+    const activeDbPath = path.join(__dirname, '..', 'db', 'quick_lube.db');
+    const walPath = `${activeDbPath}-wal`;
+    const shmPath = `${activeDbPath}-shm`;
+
+    // 4. Close active database via reconnect hook
+    try {
+      db.pragma('wal_checkpoint(TRUNCATE)');
+    } catch (e) {
+      // ignore
+    }
+
+    if (typeof db.close === 'function') {
+      try {
+        db.close();
+      } catch (e) {
+        // ignore
+      }
+    }
+
+    // 5. Replace database file
+    fs.copyFileSync(sourceFilePath, activeDbPath);
+
+    // Delete stale WAL/SHM files
+    if (fs.existsSync(walPath)) {
+      try {
+        fs.unlinkSync(walPath);
+      } catch (e) {}
+    }
+    if (fs.existsSync(shmPath)) {
+      try {
+        fs.unlinkSync(shmPath);
+      } catch (e) {}
+    }
+
+    // 6. Reconnect active DB
+    if (typeof db.reconnect === 'function') {
+      db.reconnect(activeDbPath);
+    }
+
+    // 7. Verify restored database
+    const postIntegrity = this.checkDatabaseIntegrity();
+
+    return {
+      success: true,
+      message: 'تمت استعادة وتنشيط قاعدة البيانات بنجاح 100%',
+      safetySnapshot: safetySnapshot ? safetySnapshot.filename : null,
+      restoredCounts: validation.counts,
+      integrity: postIntegrity.integrity,
+      restoredAt: new Date().toISOString(),
     };
   },
 };

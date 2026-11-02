@@ -36,6 +36,7 @@ import ExpenseCategoriesModal from './ExpenseCategoriesModal';
 import CashDrawerReconciliationModal from './CashDrawerReconciliationModal';
 import { tafqeet } from '../utils/tafqeet';
 import { getShopSettings, formatYemeniWhatsAppLink } from '../utils/settings';
+import { APP_EVENTS, subscribeAppEvent } from '../utils/eventBus';
 
 export default function FinancialVaultHub({ onRefreshData, onOpenStatement }) {
   const [activeTab, setActiveTab] = useState('drawer'); // 'drawer' | 'receipts' | 'payments' | 'debts' | 'expenses'
@@ -151,6 +152,8 @@ export default function FinancialVaultHub({ onRefreshData, onOpenStatement }) {
 
   useEffect(() => {
     loadFinancialData();
+    const unsubscribe = subscribeAppEvent(APP_EVENTS.DATA_INVALIDATED, loadFinancialData);
+    return unsubscribe;
   }, [loadFinancialData, refreshTrigger]);
 
   const handleRefresh = () => {
@@ -1414,10 +1417,10 @@ export default function FinancialVaultHub({ onRefreshData, onOpenStatement }) {
               {/* Receipt Header */}
               <div className="text-center border-b-2 border-slate-900 pb-3">
                 <h2 className="text-base font-black text-slate-900">
-                  {getShopSettings().shopName || 'مركز الصقر لخدمات السيارات'}
+                  {getShopSettings().shopName || 'المركز الذهبي لخدمات السيارات وغيار الزيوت'}
                 </h2>
                 <p className="text-[11px] text-slate-600">
-                  {getShopSettings().address || 'صنعاء - اليمن'} • هاتف: {getShopSettings().shopPhone || '777000111'}
+                  {getShopSettings().address || 'صنعاء - اليمن'} • هاتف: {getShopSettings().shopPhone || '770834754'}
                 </p>
                 <div className="mt-2 inline-block px-4 py-1 rounded bg-slate-900 text-white font-bold text-sm">
                   {viewingVoucher.voucher_type === 'receipt' ? 'سند قبض نقدية' : 'سند صرف نقدية'}
@@ -1553,7 +1556,7 @@ export default function FinancialVaultHub({ onRefreshData, onOpenStatement }) {
                   <a
                     href={formatYemeniWhatsAppLink(
                       customerDebts.find((c) => c.id === viewingVoucher.party_id)?.phone || '',
-                      `*سند قبض مالي رسمي - ${getShopSettings().shopName || 'مركز الصقر'}* 🦅\nتحية طيبة أخي الكريم: *${viewingVoucher.party_name}*\nتم استلام دفعة من حسابكم بموجب:\n📄 *سند قبض رقم:* ${viewingVoucher.voucher_number}${viewingVoucher.paper_bill_number ? `\n📑 رقم السند الدفتري: ${viewingVoucher.paper_bill_number}` : ''}\n💵 *المبلغ المستلم:* ${Number(viewingVoucher.amount).toLocaleString()} ريال يمني (${tafqeet(Number(viewingVoucher.amount))})\n💳 *طريقة الدفع:* ${viewingVoucher.payment_method === 'cash' ? 'نقداً بالصندوق' : viewingVoucher.payment_method}${viewingVoucher.prev_balance > 0 ? `\n\n📊 *تفاصيل الحساب:*\n- الرصيد السابق: ${Number(viewingVoucher.prev_balance).toLocaleString()} ر.ي\n- الدفعة المقبوضة: ${Number(viewingVoucher.amount).toLocaleString()} ر.ي\n- الرصيد المتبقي عليكم: ${Number(viewingVoucher.new_balance).toLocaleString()} ر.ي` : ''}\n\nنسعد دائماً بخدمتكم وشكراً لتعاملكم معنا! 🤝`
+                      `*سند قبض مالي رسمي - ${getShopSettings().shopName || 'المركز الذهبي'}* 🌟\nتحية طيبة أخي الكريم: *${viewingVoucher.party_name}*\nتم استلام دفعة من حسابكم بموجب:\n📄 *سند قبض رقم:* ${viewingVoucher.voucher_number}${viewingVoucher.paper_bill_number ? `\n📑 رقم السند الدفتري: ${viewingVoucher.paper_bill_number}` : ''}\n💵 *المبلغ المستلم:* ${Number(viewingVoucher.amount).toLocaleString()} ريال يمني (${tafqeet(Number(viewingVoucher.amount))})\n💳 *طريقة الدفع:* ${viewingVoucher.payment_method === 'cash' ? 'نقداً بالصندوق' : viewingVoucher.payment_method}${viewingVoucher.prev_balance > 0 ? `\n\n📊 *تفاصيل الحساب:*\n- الرصيد السابق: ${Number(viewingVoucher.prev_balance).toLocaleString()} ر.ي\n- الدفعة المقبوضة: ${Number(viewingVoucher.amount).toLocaleString()} ر.ي\n- الرصيد المتبقي عليكم: ${Number(viewingVoucher.new_balance).toLocaleString()} ر.ي` : ''}\n\nنسعد دائماً بخدمتكم وشكراً لتعاملكم معنا! 🤝`
                     )}
                     target="_blank"
                     rel="noopener noreferrer"

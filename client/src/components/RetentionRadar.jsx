@@ -25,6 +25,8 @@ import {
   Zap,
 } from 'lucide-react';
 import { getShopSettings, formatYemeniWhatsAppLink, generateOilReminderMessage } from '../utils/settings';
+import { getLocalTodayDate } from '../utils/dateUtils';
+import { APP_EVENTS, subscribeAppEvent } from '../utils/eventBus';
 
 export default function RetentionRadar({ onSelectVehicleForPos }) {
   const [activeTab, setActiveTab] = useState('radar'); // 'radar' | 'fleets' | 'debts' | 'all_vehicles'
@@ -42,7 +44,7 @@ export default function RetentionRadar({ onSelectVehicleForPos }) {
   // Load reminded vehicles log from localStorage as backup (validated for today's date)
   useEffect(() => {
     try {
-      const todayStr = new Date().toISOString().split('T')[0];
+      const todayStr = getLocalTodayDate();
       const saved = localStorage.getItem('quick_lube_reminded_vehicles');
       if (saved) {
         const parsed = JSON.parse(saved);
@@ -90,12 +92,14 @@ export default function RetentionRadar({ onSelectVehicleForPos }) {
 
   useEffect(() => {
     fetchRadarData();
+    const unsubscribe = subscribeAppEvent(APP_EVENTS.DATA_INVALIDATED, fetchRadarData);
+    return unsubscribe;
   }, []);
 
   // Mark vehicle as reminded and persist to database (Upgrade 4)
   const handleSendReminder = async (item) => {
     const timeStr = new Date().toLocaleTimeString('ar-YE', { hour: '2-digit', minute: '2-digit' });
-    const todayStr = new Date().toISOString().split('T')[0];
+    const todayStr = getLocalTodayDate();
     const updated = { ...remindedVehicles, [item.vehicle_id]: timeStr };
     setRemindedVehicles(updated);
     try {
@@ -139,7 +143,7 @@ export default function RetentionRadar({ onSelectVehicleForPos }) {
 
   // Filtered radar items with urgency and search
   const filteredRadar = useMemo(() => {
-    const todayStr = new Date().toISOString().split('T')[0];
+    const todayStr = getLocalTodayDate();
     return radarItems.filter((item) => {
       // Urgency filter
       if (urgencyFilter === 'critical' && item.urgency_level !== 'critical' && !(item.days_diff !== null && item.days_diff < 0)) return false;

@@ -21,6 +21,7 @@ import {
 } from 'lucide-react';
 import ExpenseCategoriesModal from './ExpenseCategoriesModal';
 import { getShopSettings, formatYemeniWhatsAppLink } from '../utils/settings';
+import { getLocalTodayDate } from '../utils/dateUtils';
 
 export default function WorkersView({ workers = [], onRefreshData, onOpenCustomerStatement, onOpenWorkerStatement }) {
   const [activeTab, setActiveTab] = useState('workers'); // 'workers' | 'expenses' | 'debts' | 'transactions'
@@ -32,17 +33,18 @@ export default function WorkersView({ workers = [], onRefreshData, onOpenCustome
 
   // Modals state
   const [showCategoryModal, setShowCategoryModal] = useState(false);
+  const [showAddWorkerModal, setShowAddWorkerModal] = useState(false);
+  const [newWorkerName, setNewWorkerName] = useState('');
+  const [newWorkerRole, setNewWorkerRole] = useState('فني غيار زيوت وفلاتر');
+  const [newWorkerPhone, setNewWorkerPhone] = useState('');
+  const [newWorkerWage, setNewWorkerWage] = useState('');
+  const [newWorkerCommission, setNewWorkerCommission] = useState('');
+  const [addWorkerError, setAddWorkerError] = useState('');
+
   const [showAdvanceModal, setShowAdvanceModal] = useState(false);
   const [selectedWorkerForAdvance, setSelectedWorkerForAdvance] = useState(null);
   const [advanceAmount, setAdvanceAmount] = useState('');
   const [advanceNotes, setAdvanceNotes] = useState('');
-
-  const [showExpenseModal, setShowExpenseModal] = useState(false);
-  const [expenseAmount, setExpenseAmount] = useState('');
-  const [expenseCategory, setExpenseCategory] = useState('');
-  const [expenseDescription, setExpenseDescription] = useState('');
-  const [expensePaymentMethod, setExpensePaymentMethod] = useState('cash');
-  const [expensePaperBill, setExpensePaperBill] = useState('');
 
   const [showDebtPayModal, setShowDebtPayModal] = useState(false);
   const [selectedVehicleForDebt, setSelectedVehicleForDebt] = useState(null);
@@ -66,6 +68,42 @@ export default function WorkersView({ workers = [], onRefreshData, onOpenCustome
     }
   };
 
+  const handleCreateWorker = async (e) => {
+    e.preventDefault();
+    if (!newWorkerName.trim()) {
+      setAddWorkerError('يرجى كتابة اسم الفني أو العامل');
+      return;
+    }
+    setIsSubmitting(true);
+    setAddWorkerError('');
+    try {
+      const res = await fetch('/api/workers', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: newWorkerName.trim(),
+          role: newWorkerRole || 'فني غيار زيوت وفلاتر',
+          phone: newWorkerPhone.trim(),
+          daily_base_wage: Number(newWorkerWage) || 0,
+          commission_rate: Number(newWorkerCommission) || 0,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) throw new Error(data.message || 'فشل في حفظ بيانات العامل');
+      setShowAddWorkerModal(false);
+      setNewWorkerName('');
+      setNewWorkerPhone('');
+      setNewWorkerWage('');
+      setNewWorkerCommission('');
+      fetchWorkerStats();
+      if (onRefreshData) onRefreshData();
+    } catch (err) {
+      setAddWorkerError(err.message);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   // 2. Fetch Expense Categories
   const fetchExpenseCategories = async () => {
     try {
@@ -85,7 +123,7 @@ export default function WorkersView({ workers = [], onRefreshData, onOpenCustome
   // 3. Fetch Transactions (حصرها بحركات اليوم الفعلي لضبط كروت اليومية)
   const fetchTransactions = async () => {
     try {
-      const todayStr = new Date().toISOString().split('T')[0];
+      const todayStr = getLocalTodayDate();
       const res = await fetch(`/api/transactions?date=${todayStr}`);
       const data = await res.json();
       if (data.success) {
@@ -129,7 +167,6 @@ export default function WorkersView({ workers = [], onRefreshData, onOpenCustome
     const handleKeyDown = (e) => {
       if (e.key === 'Escape') {
         setShowAdvanceModal(false);
-        setShowExpenseModal(false);
         setShowDebtPayModal(false);
         setCompletedDebtReceipt(null);
         setShowCategoryModal(false);
@@ -217,49 +254,6 @@ export default function WorkersView({ workers = [], onRefreshData, onOpenCustome
     }
   };
 
-  // Handle Record Daily Expense
-  const handleRecordExpense = async (e) => {
-    e.preventDefault();
-    if (!expenseAmount || Number(expenseAmount) <= 0) {
-      alert('يرجى إدخال مبلغ صحيح');
-      return;
-    }
-    if (!expenseDescription.trim()) {
-      alert('يرجى كتابة تفاصيل أو بيان المصروف');
-      return;
-    }
-
-    try {
-      setIsSubmitting(true);
-      const categoryTag = expenseCategory ? `[${expenseCategory}] ` : '';
-      const paperTag = expensePaperBill.trim() ? ` [دفتر:${expensePaperBill.trim()}]` : '';
-      const res = await fetch('/api/transactions', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          tx_type: 'expense',
-          amount: Number(expenseAmount),
-          description: `${categoryTag}${expenseDescription.trim()}${paperTag}`,
-          payment_method: expensePaymentMethod,
-        }),
-      });
-
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.message || 'حدث خطأ أثناء تسجيل المصروف');
-
-      setShowExpenseModal(false);
-      setExpenseAmount('');
-      setExpenseDescription('');
-      setExpensePaperBill('');
-      await loadAllData();
-      if (onRefreshData) onRefreshData();
-    } catch (err) {
-      alert(err.message);
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
-
   // Handle Record Customer Debt Collection
   const handleRecordDebtPayment = async (e) => {
     e.preventDefault();
@@ -322,9 +316,9 @@ export default function WorkersView({ workers = [], onRefreshData, onOpenCustome
             <Users className="w-6 h-6 stroke-[2.2]" />
           </div>
           <div>
-            <h2 className="text-xl font-extrabold text-white tracking-tight">إدارة الفنيين والمصاريف والديون</h2>
+            <h2 className="text-xl font-extrabold text-white tracking-tight">إدارة الفنيين والعمال والديون</h2>
             <p className="text-xs text-slate-400">
-              مستحقات العمال اليومية، ضبط المصاريف التشغيلية، ومتابعة الديون الآجلة وسندات القبض
+              مستحقات العمال اليومية، السلف والمسحوبات، ومتابعة الديون الآجلة وسندات القبض
             </p>
           </div>
         </div>
@@ -333,21 +327,14 @@ export default function WorkersView({ workers = [], onRefreshData, onOpenCustome
         <div className="flex flex-wrap items-center gap-2">
           <button
             type="button"
-            onClick={() => setShowCategoryModal(true)}
-            className="min-h-[46px] px-3.5 rounded-2xl bg-white/5 hover:bg-white/10 text-slate-300 hover:text-white font-bold text-xs border border-white/10 flex items-center gap-2 transition active:scale-95"
-            title="تعديل وإضافة تصنيفات المصاريف"
+            onClick={() => {
+              setAddWorkerError('');
+              setShowAddWorkerModal(true);
+            }}
+            className="min-h-[42px] px-4 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-bold text-xs flex items-center gap-2 shadow-lg shadow-purple-950/30 transition active:scale-95"
           >
-            <Settings className="w-4 h-4 text-purple-400" />
-            <span>تصنيفات المصاريف ⚙️</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setShowExpenseModal(true)}
-            className="min-h-[46px] px-4 rounded-2xl bg-rose-500/20 hover:bg-rose-500/30 text-rose-300 font-extrabold text-xs border border-rose-500/30 flex items-center gap-2 transition active:scale-95"
-          >
-            <Plus className="w-4 h-4 stroke-[3]" />
-            <span>تسجيل مصروف تشغيلي 💸</span>
+            <Plus className="w-4 h-4 stroke-[2.5]" />
+            <span>+ إضافة فني / عامل جديد 👷</span>
           </button>
         </div>
       </div>
@@ -503,7 +490,27 @@ export default function WorkersView({ workers = [], onRefreshData, onOpenCustome
       {/* 4. Tab 1: Technicians and Daily Wages - الشريط التكتيكي السريع (الخيار 1 المعتمد) */}
       {activeTab === 'workers' && (
         <div className="flex-1 overflow-y-auto space-y-2.5 pr-1">
-          {workerStats.map((w) => {
+          {workerStats.length === 0 ? (
+            <div className="p-12 text-center text-slate-400 bg-slate-900/60 rounded-2xl border border-white/10">
+              <Users className="w-12 h-12 mx-auto text-slate-600 mb-3" />
+              <p className="font-bold text-sm text-slate-200">لا يوجد فنيون أو عمال مسجلون حالياً</p>
+              <p className="text-xs text-slate-400 mt-1 max-w-md mx-auto">
+                يمكنك إضافة فنيي وغسالي المركز وتحديد مسمياتهم ورواتبهم أو نسب عمولاتهم لبدء تتبع أدائهم الميداني.
+              </p>
+              <button
+                type="button"
+                onClick={() => {
+                  setAddWorkerError('');
+                  setShowAddWorkerModal(true);
+                }}
+                className="mt-4 px-5 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-bold text-xs inline-flex items-center gap-2 shadow-lg transition active:scale-95"
+              >
+                <Plus className="w-4 h-4 stroke-[2.5]" />
+                <span>إضافة أول فني الآن</span>
+              </button>
+            </div>
+          ) : (
+            workerStats.map((w) => {
             const isFullyPaid = w.net_due_today <= 0;
 
             return (
@@ -585,7 +592,7 @@ export default function WorkersView({ workers = [], onRefreshData, onOpenCustome
                 </div>
               </div>
             );
-          })}
+          }))}
         </div>
       )}
 
@@ -596,6 +603,9 @@ export default function WorkersView({ workers = [], onRefreshData, onOpenCustome
             <div className="flex items-center gap-2">
               <span className="w-2.5 h-2.5 rounded-full bg-rose-400 animate-pulse" />
               <span className="font-extrabold text-sm text-white">المصاريف التشغيلية المسجلة اليوم:</span>
+              <span className="text-[11px] text-slate-400 mr-2 font-normal hidden sm:inline">
+                (💡 يتم تسجيل واعتماد سندات الصرف والمصروفات رسمياً من شاشة الخزينة)
+              </span>
             </div>
             <span className="text-xs px-3 py-1 rounded-xl bg-rose-500/15 text-rose-300 border border-rose-500/30 font-mono font-black">
               إجمالي اليوم: {totalExpensesToday.toLocaleString()} ر.ي
@@ -908,154 +918,7 @@ export default function WorkersView({ workers = [], onRefreshData, onOpenCustome
         </div>
       )}
 
-      {/* Modal 2: Record Operating Expense */}
-      {showExpenseModal && (
-        <div
-          onClick={(e) => {
-            if (e.target === e.currentTarget) setShowExpenseModal(false);
-          }}
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md cursor-pointer"
-        >
-          <div className="apple-glass border border-white/20 rounded-3xl w-full max-w-md overflow-hidden shadow-2xl animate-in fade-in zoom-in-95 cursor-default">
-            <div className="px-6 py-4 border-b border-white/10 flex items-center justify-between bg-white/5">
-              <h3 className="font-extrabold text-white text-base">تسجيل مصروف تشغيلي جديد</h3>
-              <button onClick={() => setShowExpenseModal(false)} className="text-slate-400 hover:text-white">
-                &times;
-              </button>
-            </div>
-
-            <form onSubmit={handleRecordExpense} className="p-6 space-y-4 text-xs">
-              {/* Category selector */}
-              <div>
-                <div className="flex items-center justify-between mb-1.5">
-                  <label className="text-slate-300 font-bold">بند / تصنيف المصروف:</label>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setShowExpenseModal(false);
-                      setShowCategoryModal(true);
-                    }}
-                    className="text-purple-400 hover:underline text-[11px] font-bold"
-                  >
-                    + إضافة أو تعديل تصنيف
-                  </button>
-                </div>
-                <select
-                  value={expenseCategory}
-                  onChange={(e) => setExpenseCategory(e.target.value)}
-                  className="w-full min-h-[44px] px-3.5 rounded-xl bg-slate-900 border border-white/15 text-white text-xs cursor-pointer"
-                >
-                  {expensesCategories.map((c) => (
-                    <option key={c.id} value={c.name}>
-                      {c.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              {/* Amount */}
-              <div>
-                <label className="block text-slate-300 font-bold mb-1.5">المبلغ (ريال يمني):</label>
-                <input
-                  type="number"
-                  placeholder="مثال: 4000"
-                  value={expenseAmount}
-                  onChange={(e) => setExpenseAmount(e.target.value)}
-                  className="w-full min-h-[44px] px-3.5 rounded-xl bg-slate-900 border border-white/15 text-white font-mono text-base font-extrabold"
-                  required
-                />
-              </div>
-
-              {/* Description */}
-              <div>
-                <label className="block text-slate-300 font-bold mb-1.5">البيان / تفاصيل المصروف:</label>
-                <input
-                  type="text"
-                  placeholder="مثال: فاتورة كهرباء، صابون ومنظفات مغسلة، تصليح ماطور..."
-                  value={expenseDescription}
-                  onChange={(e) => setExpenseDescription(e.target.value)}
-                  className="w-full min-h-[44px] px-3.5 rounded-xl bg-slate-900 border border-white/15 text-white text-xs"
-                  required
-                />
-              </div>
-
-              {/* Paper Booklet Number */}
-              <div>
-                <label className="block text-slate-300 font-bold mb-1.5">رقم السند اليدوي / الدفتر الورقي (اختياري):</label>
-                <input
-                  type="text"
-                  placeholder="مثال: 1045"
-                  value={expensePaperBill}
-                  onChange={(e) => setExpensePaperBill(e.target.value)}
-                  className="w-full min-h-[44px] px-3.5 rounded-xl bg-slate-900 border border-white/15 text-white font-mono text-xs"
-                />
-              </div>
-
-              {/* Payment Method */}
-              <div>
-                <label className="block text-slate-300 font-bold mb-1.5">وسيلة وطريقة الدفع:</label>
-                <div className="grid grid-cols-3 gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setExpensePaymentMethod('cash')}
-                    className={`py-2 px-2 rounded-xl font-bold text-xs transition border flex flex-col items-center justify-center gap-1 ${
-                      expensePaymentMethod === 'cash'
-                        ? 'bg-rose-500 text-white border-rose-400 shadow-md shadow-rose-500/20'
-                        : 'bg-slate-900 text-slate-400 border-white/10 hover:text-white'
-                    }`}
-                  >
-                    <span>💵 كاش</span>
-                    <span className="text-[10px] font-mono opacity-80">(الدرج 1101)</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setExpensePaymentMethod('kuraimi')}
-                    className={`py-2 px-2 rounded-xl font-bold text-xs transition border flex flex-col items-center justify-center gap-1 ${
-                      expensePaymentMethod === 'kuraimi'
-                        ? 'bg-purple-500 text-white border-purple-400 shadow-md shadow-purple-500/20'
-                        : 'bg-slate-900 text-slate-400 border-white/10 hover:text-white'
-                    }`}
-                  >
-                    <span>🏦 الكريمي</span>
-                    <span className="text-[10px] font-mono opacity-80">(1102)</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setExpensePaymentMethod('jeeb')}
-                    className={`py-2 px-2 rounded-xl font-bold text-xs transition border flex flex-col items-center justify-center gap-1 ${
-                      expensePaymentMethod === 'jeeb'
-                        ? 'bg-emerald-500 text-white border-emerald-400 shadow-md shadow-emerald-500/20'
-                        : 'bg-slate-900 text-slate-400 border-white/10 hover:text-white'
-                    }`}
-                  >
-                    <span>📱 جيب</span>
-                    <span className="text-[10px] font-mono opacity-80">(1103)</span>
-                  </button>
-                </div>
-              </div>
-
-              <div className="pt-2 flex gap-2">
-                <button
-                  type="button"
-                  onClick={() => setShowExpenseModal(false)}
-                  className="flex-1 min-h-[44px] rounded-xl bg-white/5 text-slate-300 font-bold"
-                >
-                  إلغاء
-                </button>
-                <button
-                  type="submit"
-                  disabled={isSubmitting}
-                  className="flex-1 min-h-[44px] rounded-xl bg-rose-500 hover:bg-rose-400 text-white font-extrabold shadow-lg shadow-rose-500/20"
-                >
-                  {isSubmitting ? 'جاري الحفظ...' : 'تأكيد تسجيل المصروف'}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* Modal 3: Debt Payment Modal + Instant WhatsApp Receipt Generator */}
+      {/* Modal 2: Debt Payment Modal + Instant WhatsApp Receipt Generator */}
       {showDebtPayModal && selectedVehicleForDebt && (
         <div
           onClick={(e) => {
@@ -1228,6 +1091,125 @@ export default function WorkersView({ workers = [], onRefreshData, onOpenCustome
                 })()}
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* Modal: Add Worker */}
+      {showAddWorkerModal && (
+        <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4">
+          <div className="bg-slate-900 border-2 border-purple-500/40 rounded-3xl w-full max-w-md overflow-hidden shadow-2xl animate-in fade-in zoom-in-95 duration-200">
+            <div className="p-5 border-b border-white/10 flex items-center justify-between bg-slate-950">
+              <div className="flex items-center gap-2.5">
+                <div className="w-10 h-10 rounded-2xl bg-purple-500/20 text-purple-400 flex items-center justify-center">
+                  <Users className="w-5 h-5 stroke-[2.5]" />
+                </div>
+                <div>
+                  <h3 className="font-extrabold text-white text-base">إضافة فني / عامل جديد</h3>
+                  <p className="text-xs text-slate-400">تسجيل بيانات الفني وأجره اليومي ونسبة عمولته</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowAddWorkerModal(false)}
+                className="w-8 h-8 rounded-xl bg-white/5 hover:bg-white/10 text-slate-400 hover:text-white flex items-center justify-center"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <form onSubmit={handleCreateWorker} className="p-5 space-y-4 text-xs">
+              {addWorkerError && (
+                <div className="p-3 rounded-xl bg-rose-500/20 border border-rose-500/40 text-rose-300 font-bold flex items-center gap-2">
+                  <AlertCircle className="w-4 h-4 flex-shrink-0" />
+                  <span>{addWorkerError}</span>
+                </div>
+              )}
+
+              <div>
+                <label className="block text-slate-300 font-bold mb-1.5">اسم الفني / العامل: <span className="text-rose-400">*</span></label>
+                <input
+                  type="text"
+                  required
+                  placeholder="مثال: يحيى الريمي"
+                  value={newWorkerName}
+                  onChange={(e) => setNewWorkerName(e.target.value)}
+                  className="w-full min-h-[44px] px-3.5 rounded-xl bg-slate-950 border border-white/15 text-white font-bold focus:outline-none focus:border-purple-400"
+                />
+              </div>
+
+              <div>
+                <label className="block text-slate-300 font-bold mb-1.5">المسمى والوظيفة:</label>
+                <select
+                  value={newWorkerRole}
+                  onChange={(e) => setNewWorkerRole(e.target.value)}
+                  className="w-full min-h-[44px] px-3.5 rounded-xl bg-slate-950 border border-white/15 text-white font-bold focus:outline-none focus:border-purple-400"
+                >
+                  <option value="فني غيار زيوت وفلاتر">فني غيار زيوت وفلاتر</option>
+                  <option value="فني بنشر وترصيص كفرات">فني بنشر وترصيص كفرات</option>
+                  <option value="كهربائي بطاريات وفحص كمبيوتر">كهربائي بطاريات وفحص كمبيوتر</option>
+                  <option value="كاشير ومسؤول صندوق">كاشير ومسؤول صندوق</option>
+                  <option value="عامل غسيل وتشحيم">عامل غسيل وتشحيم</option>
+                  <option value="مشرف عام وخدمات">مشرف عام وخدمات</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-slate-300 font-bold mb-1.5">رقم الهاتف (اختياري):</label>
+                <input
+                  type="tel"
+                  placeholder="مثال: 771234567"
+                  value={newWorkerPhone}
+                  onChange={(e) => setNewWorkerPhone(e.target.value)}
+                  className="w-full min-h-[44px] px-3.5 rounded-xl bg-slate-950 border border-white/15 text-white font-mono font-bold focus:outline-none focus:border-purple-400"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-slate-300 font-bold mb-1.5">الأجر اليومي الأساسي (ر.ي):</label>
+                  <input
+                    type="number"
+                    min="0"
+                    placeholder="0"
+                    value={newWorkerWage}
+                    onChange={(e) => setNewWorkerWage(e.target.value)}
+                    className="w-full min-h-[44px] px-3.5 rounded-xl bg-slate-950 border border-white/15 text-white font-mono font-bold focus:outline-none focus:border-purple-400"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-slate-300 font-bold mb-1.5">نسبة العمولة (%):</label>
+                  <input
+                    type="number"
+                    min="0"
+                    max="100"
+                    step="0.5"
+                    placeholder="0"
+                    value={newWorkerCommission}
+                    onChange={(e) => setNewWorkerCommission(e.target.value)}
+                    className="w-full min-h-[44px] px-3.5 rounded-xl bg-slate-950 border border-white/15 text-white font-mono font-bold focus:outline-none focus:border-purple-400"
+                  />
+                </div>
+              </div>
+
+              <div className="pt-3 border-t border-white/10 flex items-center justify-end gap-2.5">
+                <button
+                  type="button"
+                  onClick={() => setShowAddWorkerModal(false)}
+                  className="px-4 py-2.5 rounded-xl bg-white/10 hover:bg-white/15 text-slate-300 font-bold text-xs"
+                >
+                  إلغاء
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSubmitting}
+                  className="px-6 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-black text-xs shadow-lg shadow-purple-950/30 disabled:opacity-50"
+                >
+                  {isSubmitting ? 'جاري الحفظ...' : 'حفظ الفني'}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

@@ -18,6 +18,7 @@ import {
   Tag,
 } from 'lucide-react';
 import { normalizeArabic } from './SearchableCombobox';
+import { formatPackSize } from './InventoryView';
 
 export default function GlobalCommandPalette({
   isOpen,
@@ -423,7 +424,7 @@ export default function GlobalCommandPalette({
                       <div className="truncate">
                         <div className="text-xs font-bold text-white flex items-center gap-2">
                           <span>{inv.name}</span>
-                          {inv.viscosity && (
+                          {inv.category === 'oil' && inv.viscosity && (
                             <span className="px-1.5 py-0.5 rounded text-[10px] bg-sky-500/20 text-sky-300 font-mono">
                               {inv.viscosity}
                             </span>
@@ -431,7 +432,9 @@ export default function GlobalCommandPalette({
                         </div>
                         <div className="text-[11px] text-slate-400 flex items-center gap-2 mt-0.5">
                           {inv.brand && <span>{inv.brand}</span>}
-                          {inv.pack_size && <span>• {inv.pack_size}</span>}
+                          {inv.category === 'oil' && inv.pack_size && <span>• {formatPackSize(inv.pack_size)}</span>}
+                          {inv.category === 'tire' && inv.tire_battery_spec && <span>• {inv.tire_battery_spec}</span>}
+                          {inv.category === 'battery' && inv.battery_capacity_ah && <span>• {inv.battery_capacity_ah}</span>}
                           {inv.barcode && <span className="font-mono text-[10px]">[{inv.barcode}]</span>}
                         </div>
                       </div>

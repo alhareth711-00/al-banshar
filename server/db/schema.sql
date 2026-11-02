@@ -53,7 +53,9 @@ CREATE TABLE IF NOT EXISTS inventory (
     viscosity TEXT,
     oil_type TEXT,
     api_grade TEXT,
-    pack_size TEXT CHECK(pack_size IN ('1L', '4L', '5L', 'bulk_liter', 'unit', 'carton')),
+    pack_size TEXT CHECK(pack_size IN ('1L', '4L', '5L', '20L', '25L', 'bulk_liter', 'unit', 'carton')),
+    retail_unit TEXT NOT NULL DEFAULT 'حبة',
+    bulk_unit TEXT NOT NULL DEFAULT 'كرتون',
     carton_pack_qty REAL DEFAULT 1,
     tire_battery_spec TEXT,
     country_of_origin TEXT,
@@ -112,10 +114,21 @@ CREATE TABLE IF NOT EXISTS invoices (
     safety_inspection_data TEXT,
     inspection_completed_at TEXT,
     shift_id INTEGER REFERENCES cash_shifts(id) ON UPDATE CASCADE,
+    is_voided INTEGER NOT NULL DEFAULT 0 CHECK(is_voided IN (0, 1)),
+    void_reason TEXT,
+    voided_at TEXT,
     created_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime'))
 );
 
+CREATE TABLE IF NOT EXISTS document_sequences (
+    doc_type TEXT NOT NULL,
+    seq_date TEXT NOT NULL,
+    last_seq INTEGER NOT NULL DEFAULT 0,
+    PRIMARY KEY (doc_type, seq_date)
+);
+
 CREATE INDEX IF NOT EXISTS idx_invoices_service_status ON invoices(service_status);
+CREATE INDEX IF NOT EXISTS idx_invoices_is_voided ON invoices(is_voided);
 CREATE INDEX IF NOT EXISTS idx_invoices_vehicle ON invoices(vehicle_id);
 CREATE INDEX IF NOT EXISTS idx_invoices_veh_id_desc ON invoices(vehicle_id, id DESC);
 CREATE INDEX IF NOT EXISTS idx_invoices_worker ON invoices(worker_id);
@@ -126,11 +139,12 @@ CREATE INDEX IF NOT EXISTS idx_invoices_number ON invoices(invoice_number);
 CREATE TABLE IF NOT EXISTS invoice_items (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     invoice_id INTEGER NOT NULL REFERENCES invoices(id) ON DELETE CASCADE ON UPDATE CASCADE,
-    inventory_id INTEGER REFERENCES inventory(id) ON UPDATE CASCADE,
+    inventory_id INTEGER REFERENCES inventory(id) ON DELETE RESTRICT ON UPDATE CASCADE,
     item_type TEXT NOT NULL CHECK(item_type IN ('product', 'service')),
     description TEXT NOT NULL,
     qty REAL NOT NULL DEFAULT 1,
     unit_price REAL NOT NULL DEFAULT 0,
+    cost_price REAL NOT NULL DEFAULT 0,
     labor_fee REAL NOT NULL DEFAULT 0,
     warranty_serial TEXT,
     subtotal REAL NOT NULL DEFAULT 0
@@ -197,7 +211,7 @@ CREATE INDEX IF NOT EXISTS idx_purchases_number ON purchases(purchase_number);
 CREATE TABLE IF NOT EXISTS purchase_items (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     purchase_id INTEGER NOT NULL REFERENCES purchases(id) ON DELETE CASCADE ON UPDATE CASCADE,
-    inventory_id INTEGER NOT NULL REFERENCES inventory(id) ON UPDATE CASCADE,
+    inventory_id INTEGER NOT NULL REFERENCES inventory(id) ON DELETE RESTRICT ON UPDATE CASCADE,
     qty REAL NOT NULL DEFAULT 1,
     unit_cost REAL NOT NULL DEFAULT 0,
     unit_sell REAL,
@@ -300,7 +314,7 @@ CREATE TABLE IF NOT EXISTS purchase_returns (
 CREATE TABLE IF NOT EXISTS purchase_return_items (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     return_id INTEGER NOT NULL REFERENCES purchase_returns(id) ON DELETE CASCADE ON UPDATE CASCADE,
-    inventory_id INTEGER NOT NULL REFERENCES inventory(id) ON UPDATE CASCADE,
+    inventory_id INTEGER NOT NULL REFERENCES inventory(id) ON DELETE RESTRICT ON UPDATE CASCADE,
     qty REAL NOT NULL DEFAULT 1,
     unit_cost REAL NOT NULL DEFAULT 0,
     subtotal REAL NOT NULL DEFAULT 0
@@ -348,7 +362,8 @@ CREATE TABLE IF NOT EXISTS journal_entries (
     ref_type TEXT NOT NULL CHECK(ref_type IN (
         'invoice', 'purchase', 'sale_return', 'purchase_return',
         'expense', 'worker_advance', 'debt_collection', 'supplier_payment',
-        'wage_payout', 'capital_deposit', 'inventory_adjustment', 'closing_entry'
+        'wage_payout', 'capital_deposit', 'inventory_adjustment', 'closing_entry',
+        'opening_balance', 'balance_adjustment'
     )),
     ref_id INTEGER,
     ref_number TEXT,
@@ -383,7 +398,7 @@ CREATE INDEX IF NOT EXISTS idx_jl_party ON journal_lines(party_type, party_id);
 -- 4. Stock Movement & Weighted Average Cost Tracking (حركات المخزون ومتوسط التكلفة المرجح WAC)
 CREATE TABLE IF NOT EXISTS stock_movements (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    inventory_id INTEGER NOT NULL REFERENCES inventory(id) ON UPDATE CASCADE,
+    inventory_id INTEGER NOT NULL REFERENCES inventory(id) ON DELETE RESTRICT ON UPDATE CASCADE,
     movement_type TEXT NOT NULL CHECK(movement_type IN (
         'purchase', 'sale', 'purchase_return', 'sale_return',
         'adjustment_in', 'adjustment_out', 'opening_balance'
@@ -436,5 +451,90 @@ CREATE TABLE IF NOT EXISTS financial_audit_logs (
 );
 
 CREATE INDEX IF NOT EXISTS idx_audit_created ON financial_audit_logs(created_at);
+
+-- =========================================================================
+-- Enterprise Poka-Yoke Triggers: Hard Delete Restrictions on Inventory
+-- =========================================================================
+CREATE TRIGGER IF NOT EXISTS trg_restrict_inventory_delete_invoice_items
+BEFORE DELETE ON inventory
+FOR EACH ROW
+WHEN (SELECT COUNT(*) FROM invoice_items WHERE inventory_id = OLD.id) > 0
+BEGIN
+  SELECT RAISE(ABORT, 'حظر محاسبي: لا يمكن حذف الصنف لوجود فواتير مبيعات سابقة مسجلة عليه في النظام.');
+END;
+
+CREATE TRIGGER IF NOT EXISTS trg_restrict_inventory_delete_purchase_items
+BEFORE DELETE ON inventory
+FOR EACH ROW
+WHEN (SELECT COUNT(*) FROM purchase_items WHERE inventory_id = OLD.id) > 0
+BEGIN
+  SELECT RAISE(ABORT, 'حظر محاسبي: لا يمكن حذف الصنف لوجود فواتير توريد ومشتريات مسجلة عليه.');
+END;
+
+CREATE TRIGGER IF NOT EXISTS trg_restrict_inventory_delete_purchase_return_items
+BEFORE DELETE ON inventory
+FOR EACH ROW
+WHEN (SELECT COUNT(*) FROM purchase_return_items WHERE inventory_id = OLD.id) > 0
+BEGIN
+  SELECT RAISE(ABORT, 'حظر محاسبي: لا يمكن حذف الصنف لوجود سندات مردودات مشتريات مرتبطة به.');
+END;
+
+CREATE TRIGGER IF NOT EXISTS trg_restrict_inventory_delete_stock_movements
+BEFORE DELETE ON inventory
+FOR EACH ROW
+WHEN (SELECT COUNT(*) FROM stock_movements WHERE inventory_id = OLD.id) > 0
+BEGIN
+  SELECT RAISE(ABORT, 'حظر محاسبي: لا يمكن حذف الصنف لوجود حركات أستاذ مخزني رسمية مسجلة له.');
+END;
+
+CREATE TRIGGER IF NOT EXISTS trg_restrict_inventory_delete_positive_stock
+BEFORE DELETE ON inventory
+FOR EACH ROW
+WHEN OLD.stock_qty > 0 AND OLD.category != 'service' AND OLD.item_type != 'service'
+BEGIN
+  SELECT RAISE(ABORT, 'حظر مالي: لا يمكن حذف صنف يحتوي على رصيد كمية فعلي بالمستودع. يرجى تصفير أو تسوية الرصيد أولاً.');
+END;
+
+CREATE TRIGGER IF NOT EXISTS trg_prevent_invoice_hard_delete
+BEFORE DELETE ON invoices
+FOR EACH ROW
+BEGIN
+  SELECT RAISE(ABORT, 'حظر محاسبي صارم [MOD-GAPLESS]: يُمنع حذف الفواتير نهائياً من قاعدة البيانات. يجب استخدام الإلغاء المحاسبي (Void) لحفظ التسلسل.');
+END;
+
+CREATE TRIGGER IF NOT EXISTS trg_prevent_duplicate_in_service
+BEFORE INSERT ON invoices
+FOR EACH ROW
+WHEN NEW.service_status = 'pending_service'
+  AND NEW.vehicle_id IS NOT NULL
+  AND NEW.vehicle_id != 1
+  AND EXISTS (
+    SELECT 1 FROM invoices
+    WHERE vehicle_id = NEW.vehicle_id
+      AND service_status = 'pending_service'
+      AND is_voided = 0
+  )
+BEGIN
+  SELECT RAISE(ABORT, 'قيد الحفرة الحتمي [TRG-LANE-LOCK]: لا يمكن إدخال نفس المركبة إلى الحفرة مرتين في وقت واحد وهي قيد الخدمة.');
+END;
+
+CREATE TRIGGER IF NOT EXISTS trg_prevent_duplicate_in_service_update
+BEFORE UPDATE OF service_status ON invoices
+FOR EACH ROW
+WHEN NEW.service_status = 'pending_service'
+  AND NEW.vehicle_id IS NOT NULL
+  AND NEW.vehicle_id != 1
+  AND NEW.is_voided = 0
+  AND EXISTS (
+    SELECT 1 FROM invoices
+    WHERE vehicle_id = NEW.vehicle_id
+      AND service_status = 'pending_service'
+      AND is_voided = 0
+      AND id != NEW.id
+  )
+BEGIN
+  SELECT RAISE(ABORT, 'قيد الحفرة الحتمي [TRG-LANE-LOCK]: لا يمكن تحويل الفاتورة إلى قيد الخدمة لوجود خدمة نشطة أخرى لنفس المركبة داخل الحفرة.');
+END;
+
 
 

@@ -25,6 +25,7 @@ export default function GeneralPaymentVoucherModal({
   const [partyType, setPartyType] = useState('owner'); // 'owner' | 'supplier' | 'worker' | 'expense' | 'other'
   const [selectedPartyId, setSelectedPartyId] = useState('');
   const [partyName, setPartyName] = useState('');
+  const [expenseCategoryCode, setExpenseCategoryCode] = useState('6101');
   const [amount, setAmount] = useState('');
   const [paymentMethod, setPaymentMethod] = useState('cash'); // 'cash' | 'kuraimi' | 'jeeb'
   const [paperBillNumber, setPaperBillNumber] = useState('');
@@ -98,6 +99,7 @@ export default function GeneralPaymentVoucherModal({
         party_type: partyType,
         party_id: selectedPartyId ? Number(selectedPartyId) : null,
         party_name: finalPartyName || 'مستفيد عام',
+        offset_account_code: partyType === 'expense' ? expenseCategoryCode : undefined,
         amount: numAmount,
         payment_method: paymentMethod,
         paper_bill_number: paperBillNumber.trim() || null,
@@ -467,14 +469,38 @@ export default function GeneralPaymentVoucherModal({
               )}
 
               {partyType === 'expense' && (
-                <input
-                  type="text"
-                  placeholder="اسم المستلم أو جهة الصرف (مثال: محطة الديزل، مالك العقار، فواتير الكهرباء)..."
-                  value={partyName}
-                  onChange={(e) => setPartyName(e.target.value)}
-                  className="w-full min-h-[44px] px-3.5 rounded-xl bg-slate-900 border border-white/15 text-white text-xs font-bold"
-                  required
-                />
+                <div className="space-y-3">
+                  <div>
+                    <label className="block text-slate-300 font-bold mb-1.5">بند / تصنيف المصروف المحاسبي:</label>
+                    <select
+                      value={expenseCategoryCode}
+                      onChange={(e) => setExpenseCategoryCode(e.target.value)}
+                      className="w-full min-h-[44px] px-3.5 rounded-xl bg-slate-900 border border-white/15 text-white font-bold text-xs"
+                    >
+                      <option value="6101">🏢 6101 - إيجار المحل والمركز</option>
+                      <option value="6102">⚡ 6102 - فواتير الكهرباء والماء والماطور</option>
+                      <option value="6103">🍲 6103 - غداء وضيافة العمال</option>
+                      <option value="6104">🔧 6104 - أدوات وعدد ومستلزمات بنشر</option>
+                      <option value="6105">🚚 6105 - نقل ومشاوير وتنزيل بضاعة</option>
+                      <option value="6106">⚙️ 6106 - صيانة رافعات وأجهزة المركز</option>
+                      <option value="6107">🧹 6107 - نظافة وعوائد بلدية ورسوم</option>
+                      <option value="6108">👷 6108 - أجور ورواتب أخرى</option>
+                      <option value="6109">📑 6109 - مصاريف تشغيلية ونثرية عامة</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-slate-300 font-bold mb-1.5">اسم المستلم أو جهة الصرف:</label>
+                    <input
+                      type="text"
+                      placeholder="مثال: مالك العقار، محطة الديزل، مؤسسة الكهرباء..."
+                      value={partyName}
+                      onChange={(e) => setPartyName(e.target.value)}
+                      className="w-full min-h-[44px] px-3.5 rounded-xl bg-slate-900 border border-white/15 text-white text-xs font-bold"
+                      required
+                    />
+                  </div>
+                </div>
               )}
             </div>
 

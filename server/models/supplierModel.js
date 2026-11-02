@@ -131,6 +131,20 @@ const supplierModel = {
     });
 
     const newSupplier = this.getById(result.lastInsertRowid);
+    if (newSupplier && Number(newSupplier.balance_due) > 0) {
+      try {
+        const { postOpeningBalance } = require('../utils/accountingEngine');
+        postOpeningBalance(db, {
+          party_type: 'supplier',
+          party_id: newSupplier.id,
+          amount: Number(newSupplier.balance_due),
+          date: newSupplier.created_at ? newSupplier.created_at.slice(0, 10) : null,
+          description: `رصيد مستحقات سابقة مرحلة للمورد (${newSupplier.company_name || newSupplier.name})`,
+        });
+      } catch (err) {
+        console.warn(`[SupplierModel] Failed to post opening balance for supplier ${newSupplier.id}:`, err.message);
+      }
+    }
     logAudit('CREATE_SUPPLIER', 'supplier', result.lastInsertRowid, null, newSupplier);
     return newSupplier;
   },
@@ -138,6 +152,9 @@ const supplierModel = {
   update(id, data) {
     const existing = this.getById(id);
     if (!existing) return null;
+
+    const oldBalance = Number(existing.balance_due) || 0;
+    const newBalance = data.balance_due !== undefined ? Number(data.balance_due) : oldBalance;
 
     const stmt = db.prepare(`
       UPDATE suppliers SET
@@ -161,10 +178,25 @@ const supplierModel = {
       agency_brand: data.agency_brand !== undefined ? data.agency_brand : existing.agency_brand,
       commercial_reg: data.commercial_reg !== undefined ? data.commercial_reg : existing.commercial_reg,
       credit_days: data.credit_days !== undefined ? Number(data.credit_days) : existing.credit_days,
-      balance_due: data.balance_due !== undefined ? Number(data.balance_due) : existing.balance_due,
+      balance_due: newBalance,
       is_active: data.is_active !== undefined ? (Number(data.is_active) ? 1 : 0) : existing.is_active,
       notes: data.notes !== undefined ? data.notes : existing.notes,
     });
+
+    if (!isNaN(newBalance) && Math.abs(newBalance - oldBalance) >= 0.01) {
+      try {
+        const { postBalanceAdjustment } = require('../utils/accountingEngine');
+        postBalanceAdjustment(db, {
+          party_type: 'supplier',
+          party_id: id,
+          old_balance: oldBalance,
+          new_balance: newBalance,
+          reason: `تعديل يدوي لمستحقات المورد (${existing.name}) من شاشة التعديل`,
+        });
+      } catch (err) {
+        console.warn(`[SupplierModel] Failed to post balance adjustment for supplier ${id}:`, err.message);
+      }
+    }
 
     const updated = this.getById(id);
     logAudit('UPDATE_SUPPLIER', 'supplier', id, existing, updated);

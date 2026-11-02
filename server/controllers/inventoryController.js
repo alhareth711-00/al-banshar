@@ -217,7 +217,7 @@ const inventoryController = {
   }),
 
   convertPackaging: asyncHandler(async (req, res) => {
-    const { from_id, to_id, packages_to_convert, units_per_package } = req.body;
+    const { from_id, to_id, packages_to_convert, units_per_package, actual_units_produced } = req.body;
 
     if (!from_id || !to_id) {
       throw new AppError('يجب تحديد الصنف المصدر (الكرتون/البرميل) والصنف الهدف (العلبة/اللتر)', 400);
@@ -233,11 +233,12 @@ const inventoryController = {
         to_id: parseInt(to_id, 10),
         packages_to_convert: Number(packages_to_convert || 1),
         units_per_package: units_per_package ? Number(units_per_package) : undefined,
+        actual_units_produced: actual_units_produced !== undefined && actual_units_produced !== null ? Number(actual_units_produced) : undefined,
       });
 
       res.json({
         success: true,
-        message: `تم فك وتحويل ${result.packages_converted} عبوة إلى ${result.units_produced} وحدة بنجاح`,
+        message: `تم فك وتحويل ${result.packages_converted} عبوة إلى ${result.units_produced} وحدة بنجاح${result.waste_units > 0 ? ` (احتساب فاقد تفريغ وترسيب: ${result.waste_units} وحدة)` : ''}`,
         data: result,
       });
     } catch (err) {

@@ -3,11 +3,11 @@
  */
 
 const DEFAULT_SETTINGS = {
-  shopName: 'مركز الصقر لخدمات الإطارات وتغيير الزيوت والبطاريات',
-  shopPhone: '777000111',
-  ownerPhone: '776309771', // المالك المعتمد للمركز
+  shopName: 'المركز الذهبي لخدمات السيارات وغيار الزيوت',
+  shopPhone: '770834754',
+  ownerPhone: '770834754', // المالك المعتمد للمركز
   supervisorPhone: '', // Optional: Second WhatsApp recipient (e.g. general supervisor/partner)
-  address: 'اليمن - صنعاء - جولة عمران',
+  address: 'اليمن - صنعاء - شارع الزبيري',
   enableShiftsMode: false, // Default is disabled (Direct daily closing without cashier shifts friction)
   openingHour: 7, // Daily operating start hour (7 AM)
   closingHour: 24, // Daily operating close hour (12 AM midnight)
@@ -28,8 +28,17 @@ export function getShopSettings() {
     const saved = localStorage.getItem('quick_lube_settings');
     if (saved) {
       const parsed = JSON.parse(saved);
-      if (parsed.ownerPhone === '777123456') {
-        parsed.ownerPhone = '776309771';
+      if (parsed.ownerPhone === '777123456' || parsed.ownerPhone === '776309771') {
+        parsed.ownerPhone = '770834754';
+      }
+      if (parsed.shopPhone === '777000111') {
+        parsed.shopPhone = '770834754';
+      }
+      if (parsed.shopName === 'مركز الصقر لخدمات الإطارات وتغيير الزيوت والبطاريات') {
+        parsed.shopName = 'المركز الذهبي لخدمات السيارات وغيار الزيوت';
+      }
+      if (parsed.address === 'اليمن - صنعاء - جولة عمران') {
+        parsed.address = 'اليمن - صنعاء - شارع الزبيري';
       }
       return { ...DEFAULT_SETTINGS, ...parsed };
     }
@@ -79,8 +88,18 @@ export function getAutoLockMinutes() {
 
 export function formatYemeniWhatsAppLink(phone, messageText) {
   if (!phone) return '#';
-  const cleanPhone = String(phone).trim().replace(/^0+/, '').replace(/[\s\-\+]/g, '');
-  const internationalPhone = cleanPhone.startsWith('967') ? cleanPhone : `967${cleanPhone}`;
+  const raw = String(phone).trim();
+  if (raw === '---' || raw === 'بدون' || raw === 'null' || raw === 'undefined') return '#';
+
+  const cleanPhone = raw.replace(/^0+/, '').replace(/[\s\-\+]/g, '');
+  const digitsOnly = cleanPhone.replace(/\D/g, '');
+  if (!digitsOnly || digitsOnly.length < 9) return '#';
+
+  const local9 = digitsOnly.slice(-9);
+  // Ensure valid Yemeni mobile operator prefix (70, 71, 73, 77, 78)
+  if (!local9.startsWith('7')) return '#';
+
+  const internationalPhone = `967${local9}`;
   return `https://api.whatsapp.com/send?phone=${internationalPhone}&text=${encodeURIComponent(messageText || '')}`;
 }
 

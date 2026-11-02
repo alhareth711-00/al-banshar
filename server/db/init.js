@@ -8,9 +8,17 @@ const {
   postExpense,
   postDebtCollection,
   postWorkerAdvance,
+  reconcileAllOpeningBalances,
 } = require('../utils/accountingEngine');
 
 function reconcileHistoricalLedger() {
+  // Always verify and reconcile any debtor vehicles or suppliers lacking opening balances
+  try {
+    reconcileAllOpeningBalances(db);
+  } catch (err) {
+    console.warn('[Accounting] Opening balance reconciliation warning:', err.message);
+  }
+
   const jvCount = db.prepare('SELECT COUNT(*) as count FROM journal_entries').get().count;
   if (jvCount > 0) return; // Already populated
 
@@ -69,6 +77,8 @@ function initDb() {
       if (!colNames.includes('oil_type')) db.exec("ALTER TABLE inventory ADD COLUMN oil_type TEXT");
       if (!colNames.includes('api_grade')) db.exec("ALTER TABLE inventory ADD COLUMN api_grade TEXT");
       if (!colNames.includes('carton_pack_qty')) db.exec("ALTER TABLE inventory ADD COLUMN carton_pack_qty REAL DEFAULT 1");
+      if (!colNames.includes('retail_unit')) db.exec("ALTER TABLE inventory ADD COLUMN retail_unit TEXT NOT NULL DEFAULT 'حبة'");
+      if (!colNames.includes('bulk_unit')) db.exec("ALTER TABLE inventory ADD COLUMN bulk_unit TEXT NOT NULL DEFAULT 'كرتون'");
       if (!colNames.includes('country_of_origin')) db.exec("ALTER TABLE inventory ADD COLUMN country_of_origin TEXT");
       if (!colNames.includes('dot_code')) db.exec("ALTER TABLE inventory ADD COLUMN dot_code TEXT");
       if (!colNames.includes('battery_capacity_ah')) db.exec("ALTER TABLE inventory ADD COLUMN battery_capacity_ah TEXT");
@@ -78,6 +88,84 @@ function initDb() {
       if (!colNames.includes('is_active')) db.exec("ALTER TABLE inventory ADD COLUMN is_active INTEGER NOT NULL DEFAULT 1");
       if (!colNames.includes('notes')) db.exec("ALTER TABLE inventory ADD COLUMN notes TEXT");
       if (!colNames.includes('created_at')) db.exec("ALTER TABLE inventory ADD COLUMN created_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime'))");
+      // Normalize oil_type: migrate 'معدني تقليدي' to 'معدني'
+      db.exec("UPDATE inventory SET oil_type = 'معدني' WHERE oil_type = 'معدني تقليدي'");
+
+      // Sanitize and isolate non-oil items from oil specifications
+      db.exec("UPDATE inventory SET viscosity = NULL, oil_type = NULL, api_grade = NULL WHERE category != 'oil'");
+
+      // Clean existing inventory items 1 through 6
+      db.exec(`
+        UPDATE inventory SET retail_unit = 'علبة', bulk_unit = 'كرتون', carton_pack_qty = 24 WHERE id = 1;
+        UPDATE inventory SET category = 'filter', brand = 'تويوتا', viscosity = NULL, oil_type = NULL, api_grade = NULL, pack_size = 'unit', retail_unit = 'حبة', bulk_unit = 'شدة', carton_pack_qty = 10 WHERE id = 2;
+        UPDATE inventory SET category = 'battery', brand = 'إنديكو', viscosity = NULL, oil_type = NULL, api_grade = NULL, pack_size = 'unit', retail_unit = 'حبة', bulk_unit = 'حبة', carton_pack_qty = 1, battery_capacity_ah = '50Ah' WHERE id = 3;
+        UPDATE inventory SET category = 'tire', brand = 'سيلون', viscosity = NULL, oil_type = NULL, api_grade = NULL, pack_size = 'unit', retail_unit = 'إطار', bulk_unit = 'إطار', carton_pack_qty = 1 WHERE id = 4;
+        UPDATE inventory SET category = 'service', brand = 'خدمات المركز', viscosity = NULL, oil_type = NULL, api_grade = NULL, pack_size = 'unit', retail_unit = 'خدمة', bulk_unit = 'خدمة', cost_price = 0 WHERE id = 5;
+        UPDATE inventory SET category = 'accessory', brand = 'عام', viscosity = NULL, oil_type = NULL, api_grade = NULL, pack_size = 'unit', retail_unit = 'قطعة', bulk_unit = 'شدة', carton_pack_qty = 10 WHERE id = 6;
+      `);
+
+      // Upgrade inventory table CHECK constraint to support 20L and 25L pack sizes
+      const invTableSql = db.prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='inventory'").get()?.sql || '';
+      if (invTableSql && !invTableSql.includes('20L')) {
+        db.exec("PRAGMA foreign_keys=OFF;");
+        db.exec(`
+          CREATE TABLE inventory_new (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            sku TEXT UNIQUE NOT NULL,
+            barcode TEXT,
+            name TEXT NOT NULL,
+            category TEXT NOT NULL CHECK(category IN ('oil', 'filter', 'tire', 'battery', 'accessory', 'service')),
+            item_type TEXT NOT NULL DEFAULT 'product' CHECK(item_type IN ('product', 'service')),
+            brand TEXT NOT NULL,
+            viscosity TEXT,
+            oil_type TEXT,
+            api_grade TEXT,
+            pack_size TEXT CHECK(pack_size IN ('1L', '4L', '5L', '20L', '25L', 'bulk_liter', 'unit', 'carton')),
+            carton_pack_qty REAL DEFAULT 1,
+            tire_battery_spec TEXT,
+            country_of_origin TEXT,
+            dot_code TEXT,
+            battery_capacity_ah TEXT,
+            warranty_months INTEGER NOT NULL DEFAULT 0,
+            cost_price REAL NOT NULL DEFAULT 0,
+            sell_price REAL NOT NULL DEFAULT 0,
+            stock_qty REAL NOT NULL DEFAULT 0,
+            min_stock_alert REAL NOT NULL DEFAULT 5,
+            location_shelf TEXT,
+            is_consignment INTEGER NOT NULL DEFAULT 0 CHECK(is_consignment IN (0, 1)),
+            consignment_supplier_name TEXT,
+            is_active INTEGER NOT NULL DEFAULT 1 CHECK(is_active IN (0, 1)),
+            notes TEXT,
+            created_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime'))
+          );
+          INSERT INTO inventory_new (
+            id, sku, barcode, name, category, item_type, brand, viscosity, oil_type, api_grade,
+            pack_size, carton_pack_qty, tire_battery_spec, country_of_origin, dot_code,
+            battery_capacity_ah, warranty_months, cost_price, sell_price, stock_qty,
+            min_stock_alert, location_shelf, is_consignment, consignment_supplier_name,
+            is_active, notes, created_at
+          )
+          SELECT 
+            id, sku, barcode, name, category, item_type, brand, viscosity, oil_type, api_grade,
+            pack_size, carton_pack_qty, tire_battery_spec, country_of_origin, dot_code,
+            battery_capacity_ah, warranty_months, cost_price, sell_price, stock_qty,
+            min_stock_alert, location_shelf, is_consignment, consignment_supplier_name,
+            is_active, notes, created_at
+          FROM inventory;
+          DROP TABLE inventory;
+          ALTER TABLE inventory_new RENAME TO inventory;
+          CREATE INDEX IF NOT EXISTS idx_inventory_sku ON inventory(sku);
+          CREATE INDEX IF NOT EXISTS idx_inventory_barcode ON inventory(barcode);
+          CREATE INDEX IF NOT EXISTS idx_inventory_category ON inventory(category);
+          CREATE INDEX IF NOT EXISTS idx_inventory_brand ON inventory(brand);
+          CREATE INDEX IF NOT EXISTS idx_inventory_viscosity ON inventory(viscosity);
+          CREATE INDEX IF NOT EXISTS idx_inventory_item_type ON inventory(item_type);
+          CREATE INDEX IF NOT EXISTS idx_inventory_active ON inventory(is_active);
+          PRAGMA foreign_keys=ON;
+        `);
+        console.log('[DB] Upgraded inventory CHECK constraint to include 20L and 25L.');
+      }
+
       console.log('[DB] Pre-schema migration applied: upgraded inventory schema.');
     }
   } catch (err) {
@@ -101,7 +189,26 @@ function initDb() {
       if (!invCols.includes('shift_id')) {
         db.exec("ALTER TABLE invoices ADD COLUMN shift_id INTEGER REFERENCES cash_shifts(id)");
       }
-      console.log('[DB] Pre-schema migration applied: upgraded invoices schema with shift_id.');
+      if (!invCols.includes('is_voided')) {
+        db.exec("ALTER TABLE invoices ADD COLUMN is_voided INTEGER NOT NULL DEFAULT 0");
+      }
+      if (!invCols.includes('void_reason')) {
+        db.exec("ALTER TABLE invoices ADD COLUMN void_reason TEXT");
+      }
+      if (!invCols.includes('voided_at')) {
+        db.exec("ALTER TABLE invoices ADD COLUMN voided_at TEXT");
+      }
+      console.log('[DB] Pre-schema migration applied: upgraded invoices schema with shift_id, is_voided, and audit columns.');
+    }
+
+    // Pre-schema migration: invoice_items cost_price [MOD-CATALOG-RETRO]
+    const iiTableCheck = db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='invoice_items'").get();
+    if (iiTableCheck) {
+      const iiCols = db.prepare("PRAGMA table_info(invoice_items)").all().map(c => c.name);
+      if (!iiCols.includes('cost_price')) {
+        db.exec("ALTER TABLE invoice_items ADD COLUMN cost_price REAL NOT NULL DEFAULT 0");
+        console.log('[DB] Pre-schema migration applied: upgraded invoice_items with frozen historical cost_price [MOD-CATALOG-RETRO].');
+      }
     }
   } catch (err) {
     console.warn('[DB] Pre-migration warning on invoices:', err.message);
@@ -128,6 +235,110 @@ function initDb() {
     }
   } catch (err) {
     console.warn('[DB] Pre-migration warning on official_vouchers:', err.message);
+  }
+
+  // Pre-schema migration: upgrade official_vouchers CHECK constraint to support waste_oil & scrap_battery [MOD-RECLAMATION]
+  try {
+    const ovTableSql = db.prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='official_vouchers'").get()?.sql || '';
+    if (ovTableSql && !ovTableSql.includes('waste_oil')) {
+      db.exec("PRAGMA foreign_keys=OFF;");
+      db.exec(`
+        CREATE TABLE official_vouchers_new (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          voucher_number TEXT UNIQUE NOT NULL,
+          voucher_type TEXT NOT NULL CHECK(voucher_type IN ('receipt', 'payment')),
+          party_type TEXT CHECK(party_type IN ('customer', 'supplier', 'worker', 'owner', 'expense', 'waste_oil', 'scrap_battery', 'other')),
+          party_id INTEGER,
+          party_name TEXT NOT NULL,
+          amount REAL NOT NULL CHECK(amount > 0),
+          payment_method TEXT NOT NULL CHECK(payment_method IN ('cash', 'kuraimi', 'jeeb', 'bank', 'jawali', 'onecash')),
+          cash_account_code TEXT NOT NULL DEFAULT '1101',
+          offset_account_code TEXT NOT NULL,
+          paper_bill_number TEXT,
+          description TEXT NOT NULL,
+          notes TEXT,
+          prev_balance REAL NOT NULL DEFAULT 0,
+          new_balance REAL NOT NULL DEFAULT 0,
+          status TEXT NOT NULL DEFAULT 'posted',
+          void_reason TEXT,
+          voided_at TEXT,
+          is_multiline INTEGER NOT NULL DEFAULT 0,
+          created_by TEXT DEFAULT 'أمين الصندوق',
+          created_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime'))
+        );
+
+        INSERT INTO official_vouchers_new (
+          id, voucher_number, voucher_type, party_type, party_id, party_name,
+          amount, payment_method, cash_account_code, offset_account_code,
+          paper_bill_number, description, notes, prev_balance, new_balance,
+          status, void_reason, voided_at, is_multiline, created_by, created_at
+        )
+        SELECT 
+          id, voucher_number, voucher_type, party_type, party_id, party_name,
+          amount, payment_method, cash_account_code, offset_account_code,
+          paper_bill_number, description, notes, prev_balance, new_balance,
+          COALESCE(status, 'posted'), void_reason, voided_at, COALESCE(is_multiline, 0), created_by, created_at
+        FROM official_vouchers;
+
+        DROP TABLE official_vouchers;
+        ALTER TABLE official_vouchers_new RENAME TO official_vouchers;
+
+        CREATE INDEX IF NOT EXISTS idx_vouchers_type ON official_vouchers(voucher_type);
+        CREATE INDEX IF NOT EXISTS idx_vouchers_party ON official_vouchers(party_type, party_id);
+        CREATE INDEX IF NOT EXISTS idx_vouchers_date ON official_vouchers(created_at);
+        CREATE INDEX IF NOT EXISTS idx_vouchers_cash_acc ON official_vouchers(cash_account_code);
+        CREATE INDEX IF NOT EXISTS idx_vouchers_offset_acc ON official_vouchers(offset_account_code);
+      `);
+      db.exec("PRAGMA foreign_keys=ON;");
+      console.log('[DB] Pre-schema migration applied: upgraded official_vouchers party_type to support waste_oil & scrap_battery.');
+    }
+  } catch (err) {
+    console.warn('[DB] Pre-migration warning on official_vouchers party_type upgrade:', err.message);
+  }
+
+  // Pre-schema migration: upgrade journal_entries CHECK constraint to include 'opening_balance' and 'balance_adjustment'
+  try {
+    const jvTableSql = db.prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='journal_entries'").get()?.sql || '';
+    if (jvTableSql && !jvTableSql.includes('opening_balance')) {
+      db.exec("PRAGMA foreign_keys=OFF;");
+      db.exec(`
+        CREATE TABLE journal_entries_new (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          entry_number TEXT UNIQUE NOT NULL,
+          entry_date TEXT NOT NULL,
+          ref_type TEXT NOT NULL CHECK(ref_type IN (
+              'invoice', 'purchase', 'sale_return', 'purchase_return',
+              'expense', 'worker_advance', 'debt_collection', 'supplier_payment',
+              'wage_payout', 'capital_deposit', 'inventory_adjustment', 'closing_entry',
+              'opening_balance', 'balance_adjustment'
+          )),
+          ref_id INTEGER,
+          ref_number TEXT,
+          description TEXT NOT NULL,
+          total_debit REAL NOT NULL DEFAULT 0,
+          total_credit REAL NOT NULL DEFAULT 0,
+          is_balanced INTEGER NOT NULL DEFAULT 1 CHECK(is_balanced IN (0, 1)),
+          created_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime'))
+        );
+        INSERT INTO journal_entries_new (
+          id, entry_number, entry_date, ref_type, ref_id, ref_number,
+          description, total_debit, total_credit, is_balanced, created_at
+        )
+        SELECT 
+          id, entry_number, entry_date, ref_type, ref_id, ref_number,
+          description, total_debit, total_credit, is_balanced, created_at
+        FROM journal_entries;
+        DROP TABLE journal_entries;
+        ALTER TABLE journal_entries_new RENAME TO journal_entries;
+        CREATE INDEX IF NOT EXISTS idx_jv_entry_number ON journal_entries(entry_number);
+        CREATE INDEX IF NOT EXISTS idx_jv_entry_date ON journal_entries(entry_date);
+        CREATE INDEX IF NOT EXISTS idx_jv_ref ON journal_entries(ref_type, ref_id);
+        PRAGMA foreign_keys=ON;
+      `);
+      console.log('[DB] Upgraded journal_entries CHECK constraint to include opening_balance and balance_adjustment.');
+    }
+  } catch (err) {
+    console.warn('[DB] Pre-migration warning on journal_entries:', err.message);
   }
 
   const schemaPath = path.join(__dirname, 'schema.sql');
@@ -302,7 +513,7 @@ function initDb() {
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         voucher_number TEXT UNIQUE NOT NULL,
         voucher_type TEXT NOT NULL CHECK(voucher_type IN ('receipt', 'payment')),
-        party_type TEXT CHECK(party_type IN ('customer', 'supplier', 'worker', 'owner', 'expense', 'other')),
+        party_type TEXT CHECK(party_type IN ('customer', 'supplier', 'worker', 'owner', 'expense', 'waste_oil', 'scrap_battery', 'other')),
         party_id INTEGER,
         party_name TEXT NOT NULL,
         amount REAL NOT NULL CHECK(amount > 0),
@@ -483,6 +694,58 @@ function initDb() {
     console.log('[DB] Migration applied: Radar and Vehicle performance indexes verified.');
   } catch (err) {
     console.warn('[DB] Migration warning on radar vehicle performance indexes:', err.message);
+  }
+
+  // Migration: Reconcile daily expenses into official_vouchers for unified Treasury audit
+  try {
+    const expensesWithoutVoucher = db.prepare(`
+      SELECT dt.*
+      FROM daily_transactions dt
+      WHERE dt.tx_type = 'expense'
+        AND dt.description NOT LIKE '%سداد فاتورة مشتريات%'
+        AND dt.description NOT LIKE '%سند صرف%'
+        AND NOT EXISTS (
+          SELECT 1 FROM official_vouchers ov 
+          WHERE ov.amount = dt.amount 
+            AND date(ov.created_at) = date(dt.created_at)
+            AND ov.voucher_type = 'payment'
+        )
+    `).all();
+
+    for (const exp of expensesWithoutVoucher) {
+      const desc = exp.description || '';
+      let partyName = 'مصروف تشغيلي';
+      let offsetCode = '6109';
+      if (desc.includes('إيجار') || desc.includes('ايجار')) {
+        partyName = 'إيجار المحل والمركز';
+        offsetCode = '6101';
+      } else if (desc.includes('كهرباء') || desc.includes('ماء') || desc.includes('ديزل')) {
+        partyName = 'فواتير الكهرباء والماء';
+        offsetCode = '6102';
+      } else if (desc.includes('غداء') || desc.includes('شاي') || desc.includes('ضيافة')) {
+        partyName = 'ضيافة وغداء';
+        offsetCode = '6103';
+      }
+
+      const datePart = (exp.created_at || '').split(' ')[0].replace(/-/g, '') || '20261101';
+      const seq = db.prepare(`SELECT COUNT(*) + 1 AS nextSeq FROM official_vouchers WHERE voucher_type = 'payment'`).get().nextSeq;
+      const vNum = `PV-${datePart}-${String(seq).padStart(3, '0')}`;
+
+      db.prepare(`
+        INSERT INTO official_vouchers (
+          voucher_number, voucher_type, party_type, party_name,
+          amount, payment_method, cash_account_code, offset_account_code,
+          description, status, created_by, created_at
+        ) VALUES (
+          ?, 'payment', 'expense', ?,
+          ?, ?, '1101', ?,
+          ?, 'posted', 'المدير المالي', ?
+        )
+      `).run(vNum, partyName, exp.amount, exp.payment_method || 'cash', offsetCode, desc, exp.created_at);
+      console.log(`[DB] Reconciled expense transaction #${exp.id} (${exp.amount} YER) into official voucher ${vNum}`);
+    }
+  } catch (err) {
+    console.warn('[DB] Migration warning on expenses to vouchers reconciliation:', err.message);
   }
 
   // Seed standard Chart of Accounts

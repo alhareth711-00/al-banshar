@@ -12,7 +12,7 @@ function seedDatabase(force = false) {
   seedExpenseCategories();
   seedSuppliersAndPurchases();
 
-  if (!force && vehicleCount > 0 && inventoryCount > 0) {
+  if (!force && (vehicleCount > 0 || inventoryCount > 0)) {
     console.log(`[Seed] Database already contains ${vehicleCount} vehicles and ${inventoryCount} inventory items. Skipping vehicle/inventory seed.`);
     return;
   }

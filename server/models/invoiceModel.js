@@ -1,5 +1,5 @@
 const db = require('../db/database');
-const { generateInvoiceNumber, calculateRecommendedKm, addDaysToDate } = require('../utils/helpers');
+const { generateInvoiceNumber, calculateRecommendedKm, addDaysToDate, formatDate, validateSystemClock } = require('../utils/helpers');
 const { roundMoney, safeNum, calcLineSubtotal, calcNetTotal } = require('../utils/mathPrecision');
 const { postInvoice, checkInvoiceSafeguards } = require('../utils/accountingEngine');
 
@@ -36,6 +36,13 @@ const invoiceModel = {
       LEFT JOIN inventory inv ON ii.inventory_id = inv.id
       WHERE ii.invoice_id = ?
     `).all(id);
+
+    // Compute frozen historical line margins [MOD-CATALOG-RETRO]
+    for (const item of invoice.items) {
+      item.line_cost = roundMoney((item.qty || 1) * (item.cost_price || 0));
+      item.line_gross_profit = roundMoney((item.subtotal || 0) - item.line_cost);
+      item.line_margin_percent = item.line_cost > 0 ? roundMoney((item.line_gross_profit / item.line_cost) * 100) : 100;
+    }
 
     return invoice;
   },
@@ -75,6 +82,9 @@ const invoiceModel = {
   },
 
   create(data) {
+    // [MOD-CHRONO-GUARD]: Verify that system clock has not been rolled back (Executed before transaction so audit log persists)
+    validateSystemClock(db, data.created_at);
+
     // Execute inside an atomic transaction
     const executeTransaction = db.transaction(() => {
       // 1. Verify vehicle exists
@@ -85,12 +95,22 @@ const invoiceModel = {
 
       // 2. Validate and calculate items (separating goods sales from services)
       const items = Array.isArray(data.items) ? data.items : [];
+      if (items.length === 0) {
+        throw new Error('يجب إدراج صنف أو خدمة واحدة على الأقل في الفاتورة');
+      }
+
       let calculatedItemsTotal = 0;
       let calculatedServicesTotal = 0;
 
       for (const item of items) {
-        const qty = Math.max(0.1, safeNum(item.qty, 1));
-        const unitPrice = Math.max(0, safeNum(item.unit_price, 0));
+        const qty = safeNum(item.qty, 1);
+        if (qty <= 0) {
+          throw new Error(`الكمية المدخلة للصنف "${item.description || item.inventory_id || ''}" غير صالحة (${qty}). يجب أن تكون أكبر من الصفر.`);
+        }
+        const unitPrice = safeNum(item.unit_price, 0);
+        if (unitPrice < 0) {
+          throw new Error(`سعر الوحدة للصنف "${item.description || item.inventory_id || ''}" لا يمكن أن يكون سالباً.`);
+        }
         const laborFee = Math.max(0, safeNum(item.labor_fee, 0));
         const isService = item.item_type === 'service';
         const lineTotal = roundMoney(qty * unitPrice + laborFee);
@@ -109,9 +129,39 @@ const invoiceModel = {
 
       const itemsTotal = data.items_total !== undefined ? roundMoney(safeNum(data.items_total, 0)) : calculatedItemsTotal;
       const laborTotal = data.labor_total !== undefined ? roundMoney(safeNum(data.labor_total, 0)) : calculatedServicesTotal;
-      // Scrap battery deduction is discontinued/zeroed unless historical
+
+      // MOD-SCRAP Poka-Yoke Validation
       const scrapDeduction = roundMoney(Math.max(0, safeNum(data.scrap_battery_deduction, 0)));
+      if (scrapDeduction > 0) {
+        // 1. Verify that there is at least one battery item in the invoice
+        let batteryItemsGross = 0;
+        for (const item of items) {
+          let isBattery = (item.category === 'battery') || (item.product_category === 'battery');
+          if (!isBattery && item.inventory_id) {
+            const inv = db.prepare('SELECT category FROM inventory WHERE id = ?').get(item.inventory_id);
+            isBattery = inv && inv.category === 'battery';
+          }
+          if (isBattery) {
+            batteryItemsGross = roundMoney(batteryItemsGross + safeNum(item._subtotal, 0));
+          }
+        }
+
+        if (batteryItemsGross <= 0) {
+          throw new Error(`حظر أمني [MOD-SCRAP]: لا يمكن تطبيق خصم مقايضة البطارية الرجيع (${scrapDeduction.toLocaleString()} ر.ي) على فاتورة لا تحتوي على بيع بطارية جديدة.`);
+        }
+
+        if (scrapDeduction > batteryItemsGross) {
+          throw new Error(`حظر أمني [MOD-SCRAP]: قيمة خصم البطارية الرجيع (${scrapDeduction.toLocaleString()} ر.ي) تتجاوز إجمالي قيمة البطاريات الجديدة في الفاتورة (${batteryItemsGross.toLocaleString()} ر.ي). يُمنع صرف نقدية من الصندوق كبدل سكراب.`);
+        }
+      }
+
       const discount = roundMoney(Math.max(0, safeNum(data.discount, 0)));
+      const grossTotal = roundMoney(itemsTotal + laborTotal - scrapDeduction);
+
+      if (discount > grossTotal) {
+        throw new Error(`قيمة الخصم (${discount.toLocaleString()} ر.ي) لا يمكن أن تتجاوز إجمالي الفاتورة (${grossTotal.toLocaleString()} ر.ي). تم إيقاف المعاملة لحماية الإيرادات ومنع الفروق المحاسبية.`);
+      }
+
       const netTotal = calcNetTotal(itemsTotal, laborTotal, scrapDeduction, discount);
 
       let paidAmount = data.paid_amount !== undefined && data.paid_amount !== null && data.paid_amount !== ''
@@ -121,18 +171,68 @@ const invoiceModel = {
       // Remaining debt cannot be negative
       const remainingDebt = roundMoney(Math.max(0, netTotal - paidAmount));
 
-      // Determine next odometer: default delta is 3,000 km
-      const currentOdo = Math.max(0, safeNum(data.current_odometer, vehicle.last_odometer || 0));
+      // Guard: Disallow credit sale for anonymous or quick walk-in customers [MOD-CREDIT-PARTIES]
+      const isQuickOrAnonymous = vehicle.id === 1 ||
+                                  vehicle.plate_number === 'فاتورة سريعة' ||
+                                  vehicle.customer_name === 'عميل عام (نقدي)' ||
+                                  vehicle.customer_name === 'عميل نقدي سريع' ||
+                                  vehicle.customer_name === 'عميل غير مسمى' ||
+                                  vehicle.plate_number.startsWith('بدون-') ||
+                                  !vehicle.phone ||
+                                  vehicle.phone.trim() === '' ||
+                                  vehicle.phone.trim() === '---';
+
+      if (data.payment_method === 'credit' && isQuickOrAnonymous) {
+        throw new Error(`حظر ائتماني صارم [MOD-CREDIT-PARTIES]: يُمنع اختيار طريقة الدفع "آجل" للعميل العابر السريع (${vehicle.customer_name}). يجب السداد نقداً أو عبر المحافظ الإلكترونية.`);
+      }
+
+      if (remainingDebt > 0 && (isQuickOrAnonymous || Number(vehicle.credit_limit) <= 0)) {
+        throw new Error(`حظر ائتماني صارم [MOD-CREDIT-PARTIES]: لا يمكن البيع بالآجل أو تسجيل متبقي دين (${remainingDebt.toLocaleString()} ر.ي) للعميل العابر السريع (${vehicle.customer_name} - ${vehicle.plate_number}) أو لأي حساب لا يمتلك رقم هاتف معتمد وسقفاً ائتمانياً موثقاً.`);
+      }
+
+      const isQuickCustomer = vehicle.plate_number === 'فاتورة سريعة';
+
+      // MOD-LANE: Enforce Pit Bay Single-Vehicle Invariant (Empty ➔ In-Service ➔ Invoiced)
+      if (data.service_status === 'pending_service' && data.vehicle_id && Number(data.vehicle_id) !== 1 && !isQuickCustomer) {
+        const existingPending = db.prepare(`
+          SELECT invoice_number FROM invoices 
+          WHERE vehicle_id = ? AND service_status = 'pending_service' AND is_voided = 0 
+          LIMIT 1
+        `).get(data.vehicle_id);
+        if (existingPending) {
+          throw new Error(`تنبيه الحفرة [MOD-LANE]: المركبة (${vehicle.plate_number}) متواجدة حالياً بالفعل داخل الحفرة بموجب الفاتورة رقم (${existingPending.invoice_number}). يجب إتمام فحصها وخدمتها أو إلغاء فاتورتها السابقة أولاً.`);
+        }
+      }
+
+      // Determine next odometer: default delta is service_interval_km (default 3,000 km)
+      const lastRecordedOdo = Number(vehicle.last_odometer) || 0;
+      let enteredOdo = 0;
+      if (data.current_odometer !== undefined && data.current_odometer !== null && data.current_odometer !== '') {
+        enteredOdo = Math.max(0, safeNum(data.current_odometer, 0));
+      }
+
+      // Non-regression odometer validation [MOD-LANE Poka-Yoke]
+      if (!isQuickCustomer && lastRecordedOdo > 0 && enteredOdo > 0 && enteredOdo < lastRecordedOdo) {
+        if (!data.allow_odometer_reset) {
+          throw new Error(`تنبيه Poka-Yoke: قراءة العداد المدخلة (${enteredOdo.toLocaleString()} كم) أقل من القراءة المسجلة في الزيارة السابقة (${lastRecordedOdo.toLocaleString()} كم). يرجى التأكد من عداد السيارة أو تفعيل خيار تصفير العداد الاستثنائي.`);
+        }
+      }
+
+      const currentOdo = enteredOdo > 0
+        ? (data.allow_odometer_reset ? enteredOdo : Math.max(lastRecordedOdo, enteredOdo))
+        : (!isQuickCustomer ? lastRecordedOdo : 0);
+
+      const serviceInterval = Number(vehicle.service_interval_km) || 3000;
       let nextOdo = safeNum(data.next_odometer, 0);
       if (!nextOdo || nextOdo <= currentOdo) {
-        nextOdo = currentOdo + 3000;
+        nextOdo = currentOdo > 0 ? currentOdo + serviceInterval : 0;
       }
 
       // Determine next service date
       const nextServiceDate = data.next_service_date || addDaysToDate(new Date(), 60);
 
-      // Generate invoice number
-      const invoiceNumber = data.invoice_number || generateInvoiceNumber(db);
+      // Generate invoice number authoritative on server [MOD-GAPLESS]
+      const invoiceNumber = data._system_override_number || generateInvoiceNumber(db);
       const activeShift = db.prepare("SELECT id FROM cash_shifts WHERE status = 'open' LIMIT 1").get();
       const shiftId = data.shift_id ? Number(data.shift_id) : (activeShift?.id || null);
 
@@ -188,9 +288,9 @@ const invoiceModel = {
       const insertItemStmt = db.prepare(`
         INSERT INTO invoice_items (
           invoice_id, inventory_id, item_type, description,
-          qty, unit_price, labor_fee, warranty_serial, subtotal
+          qty, unit_price, cost_price, labor_fee, warranty_serial, subtotal
         ) VALUES (
-          ?, ?, ?, ?, ?, ?, ?, ?, ?
+          ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
         )
       `);
 
@@ -201,6 +301,21 @@ const invoiceModel = {
       `);
 
       for (const item of items) {
+        let frozenCostPrice = 0;
+        if (item.inventory_id) {
+          const invItem = db.prepare('SELECT id, name, item_type, category, cost_price, stock_qty FROM inventory WHERE id = ?').get(item.inventory_id);
+          if (invItem) {
+            if (invItem.item_type !== 'service' && invItem.category !== 'service') {
+              frozenCostPrice = roundMoney(safeNum(invItem.cost_price, 0));
+              if (data.prevent_negative_stock !== false && invItem.stock_qty < item._qty) {
+                throw new Error(`نفد المخزون أو لا يكفي للصنف "${invItem.name}". الرصيد المتوفر بالمخزن: (${invItem.stock_qty})، الكمية المطلوبة: (${item._qty}). تم منع البيع بالسالب.`);
+              }
+              decrementStockStmt.run(item._qty, item.inventory_id);
+            }
+          }
+        }
+        item.cost_price = frozenCostPrice;
+
         insertItemStmt.run(
           invoiceId,
           item.inventory_id || null,
@@ -208,33 +323,35 @@ const invoiceModel = {
           item.description || 'خدمة سريعة',
           item._qty,
           item._unitPrice,
+          frozenCostPrice, // [MOD-CATALOG-RETRO]: Frozen historical unit cost at time of sale
           item._laborFee,
           item.warranty_serial || null,
           item._subtotal
         );
-
-        if (item.inventory_id) {
-          const invItem = db.prepare('SELECT id, name, item_type, category, stock_qty FROM inventory WHERE id = ?').get(item.inventory_id);
-          if (invItem && invItem.item_type !== 'service' && invItem.category !== 'service') {
-            if (data.prevent_negative_stock !== false && invItem.stock_qty < item._qty) {
-              throw new Error(`نفد المخزون أو لا يكفي للصنف "${invItem.name}". الرصيد المتوفر بالمخزن: (${invItem.stock_qty})، الكمية المطلوبة: (${item._qty}). تم منع البيع بالسالب.`);
-            }
-            decrementStockStmt.run(item._qty, item.inventory_id);
-          }
-        }
       }
 
-      // 5. Update vehicle odometer and next due visit (with Odometer Rollback protection)
-      if (currentOdo > 0) {
-        db.prepare(`
-          UPDATE customers_vehicles SET
-            last_odometer = MAX(COALESCE(last_odometer, 0), ?),
-            next_due_odometer = ?,
-            next_due_date = ?,
-            balance_due = balance_due + ?
-          WHERE id = ?
-        `).run(currentOdo, nextOdo, nextServiceDate, remainingDebt, data.vehicle_id);
+      // 5. Update vehicle odometer and next due visit (with Odometer Rollback & Quick Customer Isolation)
+      if (!isQuickCustomer) {
+        if (currentOdo > 0) {
+          const finalLastOdo = data.allow_odometer_reset ? currentOdo : Math.max(lastRecordedOdo, currentOdo);
+          const finalNextOdo = Math.max(finalLastOdo + 100, nextOdo);
+          db.prepare(`
+            UPDATE customers_vehicles SET
+              last_odometer = ?,
+              next_due_odometer = ?,
+              next_due_date = ?,
+              balance_due = balance_due + ?
+            WHERE id = ?
+          `).run(finalLastOdo, finalNextOdo, nextServiceDate, remainingDebt, data.vehicle_id);
+        } else {
+          db.prepare(`
+            UPDATE customers_vehicles SET
+              balance_due = balance_due + ?
+            WHERE id = ?
+          `).run(remainingDebt, data.vehicle_id);
+        }
       } else {
+        // Quick customer generic entity: preserve zeroed mileage, only update debt if any
         db.prepare(`
           UPDATE customers_vehicles SET
             balance_due = balance_due + ?
@@ -294,18 +411,22 @@ const invoiceModel = {
     return this.getById(newInvoiceId);
   },
 
-  voidInvoice(id) {
+  voidInvoice(id, reason = 'إلغاء رسمي من الكاشير') {
     const executeTransaction = db.transaction(() => {
       const invoice = this.getById(id);
       if (!invoice) {
         throw new Error(`الفاتورة رقم ${id} غير موجودة`);
       }
 
+      if (invoice.is_voided) {
+        throw new Error(`الفاتورة (${invoice.invoice_number}) ملغاة ومبطلة مسبقاً.`);
+      }
+
       // Shift Freezing Check: Prevent voiding invoices belonging to closed shifts to ensure audit integrity
       if (invoice.shift_id) {
         const shift = db.prepare('SELECT status, shift_code FROM cash_shifts WHERE id = ?').get(invoice.shift_id);
         if (shift && shift.status === 'closed') {
-          throw new Error(`لا يمكن إلغاء أو حذف الفاتورة (${invoice.invoice_number}) لأنها تتبع وردية تم إغلاقها وترحيلها (${shift.shift_code})، وذلك لضمان النزاهة والمطابقة المحاسبية.`);
+          throw new Error(`لا يمكن إلغاء الفاتورة (${invoice.invoice_number}) لأنها تتبع وردية تم إغلاقها وترحيلها (${shift.shift_code})، وذلك لضمان النزاهة والمطابقة المحاسبية.`);
         }
       }
 
@@ -331,22 +452,82 @@ const invoiceModel = {
         `).run(invoice.remaining_debt, invoice.vehicle_id);
       }
 
-      // 3. Remove accounting journal entry lines & entry
+      // 3. Smart Odometer & Retention Radar Rollback
+      if (invoice.vehicle_id) {
+        const prevInvoice = db.prepare(`
+          SELECT current_odometer, next_odometer, next_service_date 
+          FROM invoices 
+          WHERE vehicle_id = ? AND id != ? AND is_voided = 0
+          ORDER BY id DESC LIMIT 1
+        `).get(invoice.vehicle_id, id);
+
+        if (prevInvoice) {
+          db.prepare(`
+            UPDATE customers_vehicles SET
+              last_odometer = ?,
+              next_due_odometer = ?,
+              next_due_date = ?
+            WHERE id = ?
+          `).run(
+            prevInvoice.current_odometer || 0,
+            prevInvoice.next_odometer || 0,
+            prevInvoice.next_service_date || null,
+            invoice.vehicle_id
+          );
+        } else {
+          db.prepare(`
+            UPDATE customers_vehicles SET
+              last_odometer = 0,
+              next_due_odometer = 0,
+              next_due_date = NULL
+            WHERE id = ?
+          `).run(invoice.vehicle_id);
+        }
+      }
+
+      // 4. Create Reversal Journal Entry [MOD-GAPLESS Audit Parity]
       try {
-        const jv = db.prepare("SELECT id FROM journal_entries WHERE ref_type = 'invoice' AND ref_id = ?").get(id);
+        const jv = db.prepare("SELECT * FROM journal_entries WHERE ref_type = 'invoice' AND ref_id = ?").get(id);
         if (jv) {
-          db.prepare("DELETE FROM journal_lines WHERE journal_entry_id = ?").run(jv.id);
-          db.prepare("DELETE FROM journal_entries WHERE id = ?").run(jv.id);
+          const lines = db.prepare("SELECT * FROM journal_lines WHERE journal_entry_id = ?").all(jv.id);
+          const reversalLines = lines.map(line => ({
+            account_code: line.account_code,
+            debit: line.credit, // Invert debit and credit
+            credit: line.debit,
+            party_type: line.party_type,
+            party_id: line.party_id,
+            description: `قيد عكسي لتسوية وإلغاء الفاتورة (${invoice.invoice_number}): ${reason}`,
+          }));
+
+          const { createJournalEntry } = require('../utils/accountingEngine');
+          createJournalEntry(db, {
+            entry_date: formatDate(),
+            ref_type: 'closing_entry',
+            ref_id: invoice.id,
+            ref_number: `REV-${invoice.invoice_number}`,
+            description: `قيد عكسي لتسوية وإلغاء الفاتورة (${invoice.invoice_number}) - السبب: ${reason}`,
+            lines: reversalLines,
+          });
+
+          // Reconcile consignment supplier sub-ledger if this invoice credited suppliers (2101) [MOD-CONSIGNMENT]
+          for (const line of lines) {
+            if (line.account_code === '2101' && line.credit > 0 && line.party_type === 'supplier' && line.party_id) {
+              db.prepare('UPDATE suppliers SET balance_due = MAX(0, balance_due - ?) WHERE id = ?').run(line.credit, line.party_id);
+            }
+          }
         }
       } catch (jvErr) {
         console.warn('[Void] Reversing journal entry warning:', jvErr.message);
       }
 
-      // 4. Delete invoice items and invoice
-      db.prepare("DELETE FROM invoice_items WHERE invoice_id = ?").run(id);
-      db.prepare("DELETE FROM invoices WHERE id = ?").run(id);
+      // 5. Soft-Void the invoice record and clear from pit bay [MOD-GAPLESS + MOD-LANE]
+      db.prepare(`
+        UPDATE invoices 
+        SET is_voided = 1, service_status = 'completed', void_reason = ?, voided_at = datetime('now', 'localtime')
+        WHERE id = ?
+      `).run(reason, id);
 
-      // 5. Audit log
+      // 6. Audit log
       try {
         db.prepare(`
           INSERT INTO financial_audit_logs (
@@ -355,8 +536,17 @@ const invoiceModel = {
         `).run(
           'INVOICE_VOIDED',
           id,
-          JSON.stringify({ invoice_number: invoice.invoice_number, net_total: invoice.net_total, customer_name: invoice.customer_name }),
-          JSON.stringify({ status: 'voided_and_restocked' })
+          JSON.stringify({
+            invoice_number: invoice.invoice_number,
+            net_total: invoice.net_total,
+            customer_name: invoice.customer_name,
+            scrap_battery_deduction: invoice.scrap_battery_deduction || 0,
+          }),
+          JSON.stringify({
+            status: 'voided_and_restocked',
+            reason,
+            reverse_tradein: invoice.scrap_battery_deduction > 0 ? 'RETURNED_IN_KIND_NO_CASH_REFUND' : 'NONE',
+          })
         );
       } catch (auditErr) {
         // Non-fatal
@@ -365,7 +555,10 @@ const invoiceModel = {
       return {
         id,
         invoice_number: invoice.invoice_number,
-        message: 'تم إلغاء الفاتورة واسترجاع المخزون وتسوية الحسابات بنجاح',
+        is_voided: 1,
+        message: invoice.scrap_battery_deduction > 0
+          ? `تم إلغاء الفاتورة واسترجاع المخزون وتسوية الحسابات بنجاح. بروتوكول المقايضة العكسية [MOD-SCRAP]: تم إلغاء خصم السكراب (${invoice.scrap_battery_deduction.toLocaleString()} ر.ي) وتُعاد البطارية التالفة للعميل عيناً - يُحظر صرف قيمتها نقداً.`
+          : 'تم إلغاء الفاتورة واسترجاع المخزون وتسوية الحسابات بنجاح دون حذف السجل (حفظ التسلسل المحاسبي)',
       };
     });
 
@@ -385,7 +578,7 @@ const invoiceModel = {
       FROM invoices inv
       JOIN customers_vehicles cv ON inv.vehicle_id = cv.id
       LEFT JOIN workers w ON inv.worker_id = w.id
-      WHERE inv.service_status = 'pending_service'
+      WHERE inv.service_status = 'pending_service' AND inv.is_voided = 0
       ORDER BY inv.id ASC
     `;
     const rows = db.prepare(query).all();
@@ -422,6 +615,14 @@ const invoiceModel = {
       throw new Error(`الفاتورة بالرقم ${id} غير موجودة في النظام`);
     }
 
+    if (invoice.is_voided) {
+      throw new Error(`لا يمكن إتمام خدمة فاتورة تم إلغاؤها وإبطالها مسبقاً (${invoice.invoice_number}).`);
+    }
+
+    if (invoice.service_status === 'completed') {
+      throw new Error(`الخدمة بالفاتورة رقم (${invoice.invoice_number}) معتمدة ومنجزة مسبقاً.`);
+    }
+
     const safetyDataStr = safety_points ? JSON.stringify(safety_points) : null;
     const workerIdToSave = worker_id || invoice.worker_id || null;
 
@@ -436,6 +637,23 @@ const invoiceModel = {
     `).run(workerIdToSave, safetyDataStr, id);
 
     return this.getById(id);
+  },
+
+  getTodayServicesStats() {
+    const today = formatDate();
+    const row = db.prepare(`
+      SELECT 
+        COUNT(*) AS total_invoices,
+        SUM(CASE WHEN service_status = 'completed' THEN 1 ELSE 0 END) AS cars_completed,
+        SUM(CASE WHEN service_status = 'pending_service' THEN 1 ELSE 0 END) AS cars_in_service
+      FROM invoices
+      WHERE date(created_at) = date(?) AND is_voided = 0
+    `).get(today);
+    return {
+      total_invoices: row?.total_invoices || 0,
+      cars_completed: row?.cars_completed || 0,
+      cars_in_service: row?.cars_in_service || 0,
+    };
   },
 };
 

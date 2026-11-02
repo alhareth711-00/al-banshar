@@ -31,10 +31,12 @@ import {
   ShieldCheck,
 } from 'lucide-react';
 import { getShopSettings, formatYemeniWhatsAppLink } from '../utils/settings';
+import { getLocalTodayDate } from '../utils/dateUtils';
 import ShiftHandoverModal from './ShiftHandoverModal';
+import { APP_EVENTS, subscribeAppEvent } from '../utils/eventBus';
 
 export default function ClosingReport({ onOpenBayProfitability }) {
-  const [reportDate, setReportDate] = useState(new Date().toISOString().split('T')[0]);
+  const [reportDate, setReportDate] = useState(getLocalTodayDate());
   const [reportData, setReportData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [copied, setCopied] = useState(false);
@@ -80,6 +82,13 @@ export default function ClosingReport({ onOpenBayProfitability }) {
     if (enableShiftsMode) {
       fetchCurrentShift();
     }
+    const unsubscribe = subscribeAppEvent(APP_EVENTS.DATA_INVALIDATED, () => {
+      fetchReport(reportDate);
+      if (enableShiftsMode) {
+        fetchCurrentShift();
+      }
+    });
+    return unsubscribe;
   }, [reportDate, enableShiftsMode]);
 
   const handleStartNewShift = async () => {
@@ -157,7 +166,7 @@ export default function ClosingReport({ onOpenBayProfitability }) {
     else oilFiltersCount += f.qty_sold;
   }
 
-  const goodsRev = summary.goods_sales_revenue || summary.total_items_amount || 0;
+  const goodsRev = summary.goods_sales_revenue || summary.goods_sales || summary.goods_revenue || summary.total_items_amount || 0;
   const servRev = summary.services_revenue || summary.total_labor_amount || 0;
   const ownerDrawings = transactions_summary?.owner_drawings_total || 0;
   const liveDrawerBal = cash_register?.live_drawer_balance ?? cash_register?.net_drawer_cash ?? 0;
@@ -258,13 +267,13 @@ export default function ClosingReport({ onOpenBayProfitability }) {
   };
 
   const setDateToday = () => {
-    setReportDate(new Date().toISOString().split('T')[0]);
+    setReportDate(getLocalTodayDate());
   };
 
   const setDateYesterday = () => {
     const y = new Date();
     y.setDate(y.getDate() - 1);
-    setReportDate(y.toISOString().split('T')[0]);
+    setReportDate(getLocalTodayDate(y));
   };
 
   const renderGrowthBadge = (pct, label) => {
@@ -312,7 +321,7 @@ export default function ClosingReport({ onOpenBayProfitability }) {
               type="button"
               onClick={setDateToday}
               className={`px-3 py-1.5 rounded-xl font-bold text-xs transition ${
-                reportDate === new Date().toISOString().split('T')[0]
+                reportDate === getLocalTodayDate()
                   ? 'bg-blue-500 text-white shadow-md'
                   : 'text-slate-400 hover:text-white'
               }`}

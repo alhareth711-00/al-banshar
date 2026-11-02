@@ -60,9 +60,13 @@ const invoiceController = {
 
   getPendingServices: asyncHandler(async (req, res) => {
     const pending = invoiceModel.getPendingServices();
+    const stats = invoiceModel.getTodayServicesStats();
     res.json({
       success: true,
       count: pending.length,
+      today_completed_count: stats.cars_completed,
+      today_total_count: stats.total_invoices,
+      today_in_service_count: stats.cars_in_service,
       data: pending,
     });
   }),

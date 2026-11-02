@@ -1,6 +1,7 @@
 const db = require('../db/database');
 const { roundMoney, safeNum } = require('../utils/mathPrecision');
 const { postExpense, postDebtCollection, postWorkerAdvance } = require('../utils/accountingEngine');
+const { formatDate } = require('../utils/helpers');
 
 const transactionModel = {
   getAll(filters = {}) {
@@ -18,7 +19,7 @@ const transactionModel = {
     const params = [];
 
     if (filters.date) {
-      const targetDate = filters.date === 'today' ? new Date().toISOString().split('T')[0] : filters.date;
+      const targetDate = filters.date === 'today' ? formatDate() : filters.date;
       query += ' AND date(dt.created_at) = date(?)';
       params.push(targetDate);
     }
