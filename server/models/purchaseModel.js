@@ -145,6 +145,14 @@ const purchaseModel = {
       // Calculate items total with support for Carton Unpacking
       let calculatedTotal = 0;
       for (const item of items) {
+        const invId = item.inventory_id || item.product_id || item.item_id;
+        if (invId) {
+          const invItem = db.prepare('SELECT id, name, is_consignment, consignment_supplier_name FROM inventory WHERE id = ?').get(invId);
+          if (invItem && invItem.is_consignment) {
+            throw new Error(`حظر محاسبي صارم [MOD-CONSIGNMENT]: الصنف "${invItem.name}" مسجل كبضاعة أمانة وتصريف (برسم البيع لمورد: ${invItem.consignment_supplier_name || 'عام'}). لا يمكن شراؤه عبر فواتير المشتريات التجارية لتجنب تدبيل مديونية المورد وتشويه حسابات رأس المال. يرجى توريده عبر زر "استلام دفعة أمانة" من شاشة بضاعة الأمانات.`);
+          }
+        }
+
         // If purchased by carton, unpack and compute total units and unit cost
         if (item.is_carton || (item.carton_qty && Number(item.carton_qty) > 0)) {
           const cartonQty = Math.max(1, safeNum(item.carton_qty, 1));

@@ -92,9 +92,11 @@ export default function PurchaseInvoiceModal({
     return suppliers.slice(0, 6);
   }, [suppliers]);
 
-  // Active items for line items combobox (excluding services)
+  // Active items for line items combobox (excluding services and consignment stock)
   const eligibleInventory = useMemo(() => {
-    return inventory.filter((i) => i.is_active === 1 && i.category !== 'service' && i.item_type !== 'service');
+    return inventory.filter(
+      (i) => i.is_active === 1 && i.category !== 'service' && i.item_type !== 'service' && !i.is_consignment
+    );
   }, [inventory]);
 
   // Handle supplier selection from Combobox or Chip

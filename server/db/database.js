@@ -1,10 +1,12 @@
 const Database = require('better-sqlite3');
 const path = require('path');
+const fs = require('fs');
 
-const dbPath = process.env.DB_PATH || path.join(__dirname, 'quick_lube.db');
+let activeFilePath = process.env.DB_PATH || path.join(__dirname, 'quick_lube.db');
 let currentDb = null;
 
-function connect(filePath = dbPath) {
+function connect(filePath = activeFilePath) {
+  activeFilePath = filePath;
   if (currentDb) {
     try {
       if (currentDb.open) {
@@ -14,6 +16,12 @@ function connect(filePath = dbPath) {
     } catch (e) {
       console.warn('[DB] Warning closing current DB instance:', e.message);
     }
+  }
+
+  // Ensure target folder exists (crucial for %APPDATA% desktop isolation)
+  const dir = path.dirname(filePath);
+  if (!fs.existsSync(dir)) {
+    fs.mkdirSync(dir, { recursive: true });
   }
 
   currentDb = new Database(filePath);
@@ -34,7 +42,7 @@ const proxy = new Proxy({}, {
       return connect;
     }
     if (prop === 'getDbPath') {
-      return () => dbPath;
+      return () => activeFilePath;
     }
     if (prop === 'isDatabaseOpen') {
       return () => currentDb && currentDb.open;

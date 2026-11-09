@@ -16,7 +16,13 @@ const DEFAULT_SETTINGS = {
   demoMode: false, // Training Mode (الجزء الثالث: وضع التدريب وتجربة البيع)
   defaultServiceIntervalMonths: 2, // المدة الافتراضية لموعد غيار الزيت القادم (شهران)
   preventNegativeStock: true, // منع البيع بالسالب في الكاشير عند نفاد رصيد المخزن
+  receiptPaperSize: '80mm', // مقاس ورق الطابعة الحرارية: '80mm' القياسي أو '58mm' المدمج
 };
+
+export function getReceiptPaperSize() {
+  const settings = getShopSettings();
+  return settings.receiptPaperSize === '58mm' ? '58mm' : '80mm';
+}
 
 export function shouldPreventNegativeStock() {
   const settings = getShopSettings();

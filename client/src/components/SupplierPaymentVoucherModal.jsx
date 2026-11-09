@@ -1,6 +1,7 @@
 import React from 'react';
 import { Printer, CheckCircle, X, Building2, Calendar, FileText, ArrowDownRight } from 'lucide-react';
 import { tafqeet } from '../utils/tafqeet';
+import { printThermalVoucherSilently } from '../utils/voucherThermalPrinter';
 
 export default function SupplierPaymentVoucherModal({ isOpen, onClose, voucherData }) {
   if (!isOpen || !voucherData) return null;
@@ -27,7 +28,18 @@ export default function SupplierPaymentVoucherModal({ isOpen, onClose, voucherDa
   }[payment_method] || payment_method;
 
   const handlePrint = () => {
-    window.print();
+    printThermalVoucherSilently({
+      voucher_type: 'payment',
+      party_type: 'supplier',
+      party_name: supplier_company ? `${supplier_name} (${supplier_company})` : supplier_name,
+      amount,
+      voucher_number,
+      created_at: date,
+      payment_method,
+      description: notes,
+      prev_balance: previous_balance,
+      new_balance: remaining_balance,
+    });
   };
 
   return (

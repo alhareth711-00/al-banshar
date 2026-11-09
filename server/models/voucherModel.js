@@ -245,13 +245,29 @@ const voucherModel = {
         }
       } else if (partyType === 'supplier') {
         offsetAccountCode = '2101'; // Supplier Payables
-        if (partyId) {
-          const supp = db.prepare('SELECT name, company_name, balance_due FROM suppliers WHERE id = ?').get(partyId);
+        let effectivePartyId = partyId;
+        if (!effectivePartyId && partyName && partyName.trim()) {
+          const cleanName = partyName.trim();
+          let supp = db.prepare('SELECT id, name, balance_due FROM suppliers WHERE name = ? OR company_name = ? LIMIT 1').get(cleanName, cleanName);
+          if (!supp) {
+            const newSup = db.prepare('INSERT INTO suppliers (name, company_name, balance_due, notes) VALUES (?, ?, 0, ?)').run(
+              cleanName,
+              cleanName,
+              'مورد تم إنشاؤه آلياً بموجب سند صرف'
+            );
+            supp = { id: newSup.lastInsertRowid, name: cleanName, balance_due: 0 };
+          }
+          effectivePartyId = supp.id;
+        }
+
+        if (effectivePartyId) {
+          const supp = db.prepare('SELECT id, name, company_name, balance_due FROM suppliers WHERE id = ?').get(effectivePartyId);
           if (supp) {
+            partyId = supp.id;
             if (!partyName) partyName = supp.name;
             prevBalance = Number(supp.balance_due) || 0;
-            newBalance = Math.max(0, prevBalance - amount);
-            db.prepare('UPDATE suppliers SET balance_due = ? WHERE id = ?').run(newBalance, partyId);
+            newBalance = voucherType === 'payment' ? roundMoney(prevBalance - amount) : roundMoney(prevBalance + amount);
+            db.prepare('UPDATE suppliers SET balance_due = ? WHERE id = ?').run(newBalance, supp.id);
           }
         }
       } else if (partyType === 'owner') {
@@ -259,7 +275,7 @@ const voucherModel = {
         offsetAccountCode = '3101';
         if (!partyName) partyName = 'مالك المركز (مسحوبات شخصية)';
       } else if (partyType === 'worker') {
-        offsetAccountCode = '1202'; // Worker advances
+        offsetAccountCode = data.offset_account_code || '1202'; // '6108' for wage settlement, '1202' for advance
         if (partyId) {
           const worker = db.prepare('SELECT name FROM workers WHERE id = ?').get(partyId);
           if (worker && !partyName) partyName = worker.name;
@@ -346,7 +362,7 @@ const voucherModel = {
       // 2. Insert into daily_transactions if cash to keep drawer balance aligned (exclude owner equity drawings)
       if (paymentMethod === 'cash' && partyType !== 'owner') {
         if (voucherType === 'payment') {
-          const txType = partyType === 'worker' ? 'worker_advance' : 'expense';
+          const txType = partyType === 'worker' ? (offsetAccountCode === '6108' ? 'expense' : 'worker_advance') : 'expense';
           db.prepare(`
             INSERT INTO daily_transactions (
               tx_type, worker_id, vehicle_id, amount, payment_method, description, created_at
@@ -503,7 +519,7 @@ const voucherModel = {
             if (supp) {
               if (!newPartyName || data.party_id) newPartyName = supp.name;
               newPrevBalance = Number(supp.balance_due) || 0;
-              newBalance = Math.max(0, newPrevBalance - newAmount);
+              newBalance = roundMoney(newPrevBalance - newAmount);
               db.prepare('UPDATE suppliers SET balance_due = ? WHERE id = ?').run(newBalance, newPartyId);
             }
           }
@@ -574,7 +590,7 @@ const voucherModel = {
       // 4. RE-INSERT DAILY_TRANSACTIONS IF CASH
       if (newPaymentMethod === 'cash' && newPartyType !== 'owner') {
         if (existing.voucher_type === 'payment') {
-          const txType = newPartyType === 'worker' ? 'worker_advance' : 'expense';
+          const txType = newPartyType === 'worker' ? (newOffsetAccountCode === '6108' ? 'expense' : 'worker_advance') : 'expense';
           db.prepare(`
             INSERT INTO daily_transactions (
               tx_type, worker_id, vehicle_id, amount, payment_method, description, created_at

@@ -26,6 +26,9 @@ import {
   FileUp,
   FileCheck,
   History,
+  Copy,
+  ExternalLink,
+  Printer,
 } from 'lucide-react';
 import {
   getShopSettings,
@@ -69,6 +72,20 @@ export default function SettingsModal({ isOpen, onClose, onSettingsUpdated }) {
   const [isResetting, setIsResetting] = useState(false);
   const [resetError, setResetError] = useState('');
   const [resetSuccessNotice, setResetSuccessNotice] = useState('');
+
+  // License & Subscription State (نظام التراخيص والاشتراك السنوي)
+  const [licenseData, setLicenseData] = useState(null);
+  const [licenseKeyInput, setLicenseKeyInput] = useState('');
+  const [isActivatingLicense, setIsActivatingLicense] = useState(false);
+  const [licenseFeedback, setLicenseFeedback] = useState({ text: '', type: '' });
+  const [copiedMidSettings, setCopiedMidSettings] = useState(false);
+
+  // Software Hot-Patch Updater State (تحديث وترقية النظام)
+  const [systemVersion, setSystemVersion] = useState({ version: '1.0.0', releaseDate: '', channel: 'stable' });
+  const [updateFile, setUpdateFile] = useState(null);
+  const [updateConfirmWord, setUpdateConfirmWord] = useState('');
+  const [isApplyingUpdate, setIsApplyingUpdate] = useState(false);
+  const [updateFeedback, setUpdateFeedback] = useState({ text: '', type: '' });
 
   // Dynamic Oil Brands, Viscosities, and Volume Presets State
   const [brandsList, setBrandsList] = useState(getCustomOilBrands());
@@ -152,6 +169,123 @@ export default function SettingsModal({ isOpen, onClose, onSettingsUpdated }) {
     }
   };
 
+  const fetchLicenseData = async () => {
+    try {
+      const res = await fetch('/api/system/license/status');
+      const data = await res.json();
+      if (data.success) {
+        setLicenseData(data.data);
+      }
+    } catch (e) {
+      console.error('Error fetching license status:', e);
+    }
+  };
+
+  const fetchSystemVersion = async () => {
+    try {
+      const res = await fetch('/api/system/version');
+      const data = await res.json();
+      if (data.success && data.data) {
+        setSystemVersion(data.data);
+      }
+    } catch (e) {
+      console.error('Error fetching system version:', e);
+    }
+  };
+
+  const handleApplySoftwareUpdate = async (e) => {
+    if (e) e.preventDefault();
+    if (!updateFile) {
+      setUpdateFeedback({ text: 'يرجى اختيار ملف التحديث (.zip) أولاً', type: 'error' });
+      return;
+    }
+    if (updateConfirmWord !== 'تحديث') {
+      setUpdateFeedback({ text: 'يرجى كتابة كلمة "تحديث" بدقة لتأكيد العملية', type: 'error' });
+      return;
+    }
+
+    setIsApplyingUpdate(true);
+    setUpdateFeedback({ text: 'جاري قراءة حزمة التحديث...', type: 'info' });
+
+    try {
+      const reader = new FileReader();
+      reader.onload = async () => {
+        try {
+          const base64 = reader.result.split(',')[1];
+          setUpdateFeedback({ text: 'جاري أخذ لقطة أمان لقاعدة البيانات وتطبيق التحديث...', type: 'info' });
+
+          const res = await fetch('/api/system/apply-update', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              fileBase64: base64,
+              confirmation_word: 'تحديث',
+            }),
+          });
+
+          const data = await res.json();
+          if (!res.ok || !data.success) {
+            throw new Error(data.message || 'فشل تطبيق التحديث البرمجي');
+          }
+
+          const newVer = data.data?.new_version || data.data?.version || 'الجديد';
+          setUpdateFeedback({
+            text: `تم تطبيق التحديث بنجاح إلى الإصدار (v${newVer})! جاري إعادة تشغيل النظام لتطبيق التحديثات... 🎉`,
+            type: 'success',
+          });
+
+          setTimeout(() => {
+            if (window.electronAPI && typeof window.electronAPI.relaunch === 'function') {
+              window.electronAPI.relaunch();
+            } else {
+              window.location.reload();
+            }
+          }, 2200);
+        } catch (err) {
+          setUpdateFeedback({ text: err.message || 'فشل تطبيق التحديث', type: 'error' });
+          setIsApplyingUpdate(false);
+        }
+      };
+      reader.readAsDataURL(updateFile);
+    } catch (err) {
+      setUpdateFeedback({ text: 'تعذر قراءة ملف التحديث: ' + err.message, type: 'error' });
+      setIsApplyingUpdate(false);
+    }
+  };
+
+  const handleActivateLicenseInSettings = async (e) => {
+    if (e) e.preventDefault();
+    if (!licenseKeyInput.trim()) return;
+
+    setIsActivatingLicense(true);
+    setLicenseFeedback({ text: '', type: '' });
+
+    try {
+      const res = await fetch('/api/system/license/activate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          licenseKey: licenseKeyInput.trim().toUpperCase(),
+          shopName: formData.shopName,
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        throw new Error(data.message || 'فشل تفعيل المفتاح');
+      }
+
+      setLicenseData(data.data);
+      setLicenseKeyInput('');
+      setLicenseFeedback({ text: 'تم تفعيل وتجديد الترخيص بنجاح تام 🛡️🎉', type: 'success' });
+      window.dispatchEvent(new Event('al_banshar_license_updated'));
+    } catch (err) {
+      setLicenseFeedback({ text: err.message || 'كود غير صحيح أو لا يطابق هذا الجهاز', type: 'error' });
+    } finally {
+      setIsActivatingLicense(false);
+    }
+  };
+
   useEffect(() => {
     if (isOpen) {
       setFormData(getShopSettings());
@@ -161,6 +295,13 @@ export default function SettingsModal({ isOpen, onClose, onSettingsUpdated }) {
       setSavedSuccess(false);
       fetchBackupStatus();
       fetchLocalBackupsList();
+      fetchLicenseData();
+      fetchSystemVersion();
+      setUpdateFile(null);
+      setUpdateConfirmWord('');
+      setUpdateFeedback({ text: '', type: '' });
+      setLicenseKeyInput('');
+      setLicenseFeedback({ text: '', type: '' });
       setRestoreFile(null);
       setRestoreValidation(null);
       setRestoreError('');
@@ -417,6 +558,77 @@ export default function SettingsModal({ isOpen, onClose, onSettingsUpdated }) {
                   onChange={(e) => setFormData({ ...formData, address: e.target.value })}
                   className="w-full min-h-[44px] px-3.5 rounded-xl bg-slate-950 border border-white/15 text-white font-bold focus:outline-none focus:border-amber-400"
                 />
+              </div>
+            </div>
+
+            {/* PRINTER & RECEIPT SETTINGS (مقاس ورق الفاتورة الحرارية) */}
+            <div className="p-4 rounded-2xl bg-slate-900/90 border-2 border-sky-500/40 space-y-3 shadow-lg">
+              <div className="font-extrabold text-sky-300 flex items-center justify-between text-xs border-b border-white/10 pb-2">
+                <span className="flex items-center gap-1.5">
+                  <Printer className="w-4 h-4 text-sky-400" />
+                  <span>طابعة الإيصالات الحرارية ومقاس الورق (Receipt Paper Size):</span>
+                </span>
+                <span className="text-[10px] text-sky-300 bg-sky-500/20 px-2.5 py-0.5 rounded-full font-mono font-bold border border-sky-500/30">
+                  {formData.receiptPaperSize === '58mm' ? 'ورق 58mm مدمج' : 'ورق 80mm عريض'}
+                </span>
+              </div>
+
+              <p className="text-[11px] text-slate-400 leading-relaxed">
+                حدد مقاس رول الورق الحراري لطابعة الكاشير لضبط أبعاد الفاتورة تلقائياً بدون اقتصاص النصوص:
+              </p>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                <label
+                  className={`flex items-start gap-3 p-3 rounded-xl border cursor-pointer transition ${
+                    (formData.receiptPaperSize || '80mm') === '80mm'
+                      ? 'bg-sky-500/15 border-sky-400/80 text-white shadow-sm ring-1 ring-sky-400/30'
+                      : 'bg-slate-950 border-white/10 text-slate-400 hover:border-white/25'
+                  }`}
+                >
+                  <input
+                    type="radio"
+                    name="receiptPaperSize"
+                    value="80mm"
+                    checked={(formData.receiptPaperSize || '80mm') === '80mm'}
+                    onChange={() => setFormData({ ...formData, receiptPaperSize: '80mm' })}
+                    className="w-4 h-4 mt-0.5 accent-sky-400 cursor-pointer"
+                  />
+                  <div>
+                    <div className="text-xs font-black text-white flex items-center gap-1.5">
+                      <span>مقاس 80mm (القياسي العريض)</span>
+                      <span className="text-[9px] px-1.5 py-0.2 rounded bg-sky-500/20 text-sky-300 font-normal">الأكثر استخداماً</span>
+                    </div>
+                    <div className="text-[10px] text-slate-400 mt-0.5 leading-normal">
+                      مناسب لطابعات الكاشير القياسية الثابتة (EPSON, Xprinter 80, Bixolon, وغيرها).
+                    </div>
+                  </div>
+                </label>
+
+                <label
+                  className={`flex items-start gap-3 p-3 rounded-xl border cursor-pointer transition ${
+                    formData.receiptPaperSize === '58mm'
+                      ? 'bg-sky-500/15 border-sky-400/80 text-white shadow-sm ring-1 ring-sky-400/30'
+                      : 'bg-slate-950 border-white/10 text-slate-400 hover:border-white/25'
+                  }`}
+                >
+                  <input
+                    type="radio"
+                    name="receiptPaperSize"
+                    value="58mm"
+                    checked={formData.receiptPaperSize === '58mm'}
+                    onChange={() => setFormData({ ...formData, receiptPaperSize: '58mm' })}
+                    className="w-4 h-4 mt-0.5 accent-sky-400 cursor-pointer"
+                  />
+                  <div>
+                    <div className="text-xs font-black text-white flex items-center gap-1.5">
+                      <span>مقاس 58mm (مدمج صغير)</span>
+                      <span className="text-[9px] px-1.5 py-0.2 rounded bg-amber-500/20 text-amber-300 font-normal">صغيرة / محمولة</span>
+                    </div>
+                    <div className="text-[10px] text-slate-400 mt-0.5 leading-normal">
+                      مناسب للطابعات الحرارية المدمجة والصغيرة وبلوتوث / USB ذات الورق الرفيع.
+                    </div>
+                  </div>
+                </label>
               </div>
             </div>
 
@@ -996,12 +1208,277 @@ export default function SettingsModal({ isOpen, onClose, onSettingsUpdated }) {
               </div>
             </div>
 
-            {/* 7. DANGER ZONE & FACTORY RESET */}
+            {/* 7. LICENSE & SUBSCRIPTION SENTINEL */}
+            <div className="p-4 rounded-2xl bg-slate-900/95 border-2 border-amber-500/30 space-y-3.5 shadow-xl">
+              <div className="flex items-center justify-between border-b border-white/10 pb-2">
+                <div className="flex items-center gap-1.5 text-xs font-black text-amber-400">
+                  <KeyRound className="w-4 h-4" />
+                  <span>7. إدارة الاشتراك وتراخيص النظام (License & Subscription):</span>
+                </div>
+
+                {licenseData && (
+                  <span
+                    className={`font-mono text-[10px] px-2.5 py-0.5 rounded-full font-black border ${
+                      licenseData.status === 'active'
+                        ? 'bg-emerald-950 text-emerald-300 border-emerald-500/40'
+                        : licenseData.status === 'trial'
+                        ? 'bg-cyan-950 text-cyan-300 border-cyan-500/40'
+                        : 'bg-rose-950 text-rose-300 border-rose-500/40'
+                    }`}
+                  >
+                    {licenseData.status === 'active'
+                      ? 'اشتراك سنوي ساري 🛡️'
+                      : licenseData.status === 'trial'
+                      ? `نسخة تجريبية (${licenseData.daysRemaining} يوم متبقي) ⏱️`
+                      : `مهلة سماح (${licenseData.graceDaysRemaining} يوم متبقي) ⚠️`}
+                  </span>
+                )}
+              </div>
+
+              {/* Machine Fingerprint & WhatsApp */}
+              {licenseData && (
+                <div className="p-3.5 bg-slate-950/80 rounded-xl border border-white/10 space-y-3">
+                  <div className="flex items-center justify-between text-xs text-slate-300">
+                    <span className="font-bold">كود جهاز الورشة المعتمد (Machine ID):</span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        navigator.clipboard?.writeText(licenseData.machineId || '');
+                        setCopiedMidSettings(true);
+                        setTimeout(() => setCopiedMidSettings(false), 2000);
+                      }}
+                      className="px-2.5 py-1 rounded-lg bg-white/10 hover:bg-white/20 text-white text-[11px] font-bold transition flex items-center gap-1"
+                    >
+                      {copiedMidSettings ? (
+                        <>
+                          <Check className="w-3.5 h-3.5 text-emerald-400" />
+                          <span className="text-emerald-300">تم النسخ</span>
+                        </>
+                      ) : (
+                        <>
+                          <Copy className="w-3.5 h-3.5" />
+                          <span>نسخ الكود</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
+
+                  <div className="font-mono text-sm sm:text-base font-black text-cyan-300 text-center bg-slate-900 border border-white/10 py-2 rounded-xl tracking-wider select-all">
+                    {licenseData.machineId}
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2 text-[11px]">
+                    <div className="p-2 rounded-lg bg-slate-900 border border-white/5">
+                      <span className="text-slate-400 block">تاريخ الانتهاء:</span>
+                      <strong className="text-white font-mono">{licenseData.expiresAt}</strong>
+                    </div>
+                    <div className="p-2 rounded-lg bg-slate-900 border border-white/5">
+                      <span className="text-slate-400 block">الأيام المتبقية:</span>
+                      <strong className="text-amber-300 font-mono">
+                        {licenseData.daysRemaining} يوماً
+                      </strong>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center justify-between text-[11px] pt-1 border-t border-white/5">
+                    <span className="text-slate-400">للتجديد السريع، تواصل عبر الواتساب:</span>
+                    <a
+                      href={`https://wa.me/967${licenseData.supportPhone || '770834754'}?text=${encodeURIComponent(
+                        `طلب تجديد اشتراك نظام سريع وبنشر PRO\nكود جهازي: ${licenseData.machineId}`
+                      )}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-emerald-400 hover:text-emerald-300 font-bold flex items-center gap-1 underline"
+                    >
+                      <span>واتساب الدعم ({licenseData.supportPhone || '770834754'})</span>
+                      <ExternalLink className="w-3 h-3" />
+                    </a>
+                  </div>
+                </div>
+              )}
+
+              {/* Renewal / Activation Input */}
+              <div className="space-y-2 pt-1">
+                <label className="block text-xs font-bold text-slate-300">
+                  تفعيل أو تجديد الاشتراك بمفتاح جديد:
+                </label>
+                <div className="flex flex-col sm:flex-row gap-2">
+                  <input
+                    type="text"
+                    dir="ltr"
+                    value={licenseKeyInput}
+                    onChange={(e) => setLicenseKeyInput(e.target.value.toUpperCase())}
+                    placeholder="ALB-XXXX-XXXX-XXXX-XXXX-XXXX"
+                    className="flex-1 min-h-[40px] px-3 rounded-xl bg-slate-950 border border-white/20 text-amber-300 font-mono text-xs font-bold placeholder:text-slate-600 focus:outline-none focus:border-amber-400 text-center tracking-widest"
+                  />
+                  <button
+                    type="button"
+                    disabled={isActivatingLicense || !licenseKeyInput.trim()}
+                    onClick={handleActivateLicenseInSettings}
+                    className="min-h-[40px] px-4 rounded-xl bg-amber-500 hover:bg-amber-400 disabled:opacity-40 text-slate-950 font-black text-xs shadow-md transition active:scale-95 flex items-center justify-center gap-1.5 shrink-0"
+                  >
+                    {isActivatingLicense ? (
+                      <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                    ) : (
+                      <KeyRound className="w-3.5 h-3.5" />
+                    )}
+                    <span>تأكيد وتفعيل المفتاح ⚡</span>
+                  </button>
+                </div>
+
+                {licenseFeedback.text && (
+                  <div
+                    className={`p-2.5 rounded-xl text-xs font-bold flex items-center gap-2 ${
+                      licenseFeedback.type === 'success'
+                        ? 'bg-emerald-500/20 border border-emerald-500/40 text-emerald-300'
+                        : 'bg-rose-500/20 border border-rose-500/40 text-rose-300'
+                    }`}
+                  >
+                    {licenseFeedback.type === 'success' ? (
+                      <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                    ) : (
+                      <AlertTriangle className="w-4 h-4 text-rose-400 shrink-0" />
+                    )}
+                    <span>{licenseFeedback.text}</span>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* 8. SOFTWARE UPDATE ENGINE (ترقية وتحديث النظام عبر الواتساب) */}
+            <div id="section-software-update" className="p-4 rounded-2xl bg-indigo-500/10 border-2 border-indigo-500/40 space-y-3.5 shadow-xl">
+              <div className="flex items-center justify-between flex-wrap gap-2">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-indigo-600 to-indigo-500 text-white flex items-center justify-center font-bold shadow-md shadow-indigo-500/30">
+                    <RefreshCw className="w-5 h-5 animate-[spin_6s_linear_infinite]" />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <h4 className="font-black text-indigo-300 text-sm">
+                        8. تحديث وترقية النظام البرمجي (Software Update)
+                      </h4>
+                      <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 text-[10px] font-black">
+                        📲 عبر الواتساب
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-slate-300">
+                      تطبيق التحديثات والتحسينات البرمجية من ملف Zip دون الحاجة للإنترنت
+                    </p>
+                  </div>
+                </div>
+
+                <div className="px-3 py-1.5 rounded-xl bg-indigo-950/80 border border-indigo-400/50 text-indigo-200 text-xs font-mono font-black flex items-center gap-2 shadow-inner">
+                  <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                  <span>الإصدار الحالي: v{systemVersion.version}</span>
+                </div>
+              </div>
+
+              {/* Version & Safety Badge */}
+              <div className="p-3 rounded-xl bg-slate-950/80 border border-emerald-500/30 flex flex-wrap items-center justify-between text-xs text-slate-300 gap-2">
+                <div className="flex items-center gap-2">
+                  <ShieldCheck className="w-4 h-4 text-emerald-400 shrink-0" />
+                  <span className="font-medium text-emerald-200">
+                    أمان تام: يتم أخذ لقطة احتياطية فورية لقاعدة البيانات قبل الترقية تلقائياً دون المساس ببياناتك.
+                  </span>
+                </div>
+                {systemVersion.releaseDate && (
+                  <span className="text-[10px] text-slate-400 font-mono">تاريخ البناء: {systemVersion.releaseDate}</span>
+                )}
+              </div>
+
+              {/* Upload Input */}
+              <div className="space-y-2">
+                <label className="block text-xs font-bold text-slate-200">
+                  اختر ملف حزمة التحديث المستلمة عبر الواتساب (.zip):
+                </label>
+                <div className="flex flex-col sm:flex-row items-center gap-2">
+                  <input
+                    type="file"
+                    accept=".zip"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) {
+                        setUpdateFile(file);
+                        setUpdateFeedback({ text: '', type: '' });
+                      }
+                    }}
+                    className="w-full text-xs text-slate-400 file:mr-0 file:ml-3 file:py-2 file:px-3 file:rounded-xl file:border-0 file:text-xs file:font-bold file:bg-indigo-600/30 file:text-indigo-300 hover:file:bg-indigo-600/50 file:cursor-pointer bg-slate-950/80 p-1.5 rounded-xl border border-white/10"
+                  />
+                </div>
+                {updateFile && (
+                  <div className="text-[11px] text-indigo-300 font-bold flex items-center gap-1.5">
+                    <FileCheck className="w-3.5 h-3.5 text-indigo-400" />
+                    <span>الملف المحدد: {updateFile.name} ({(updateFile.size / 1024 / 1024).toFixed(2)} ميجابايت)</span>
+                  </div>
+                )}
+              </div>
+
+              {/* Confirmation and Action Button */}
+              {updateFile && (
+                <div className="p-3 bg-slate-950/80 rounded-xl border border-indigo-500/30 space-y-2.5">
+                  <div>
+                    <label className="block text-slate-300 font-bold mb-1 text-[11px]">
+                      اكتب كلمة <span className="text-indigo-400 underline font-black">"تحديث"</span> لتأكيد التثبيت:
+                    </label>
+                    <input
+                      type="text"
+                      placeholder='اكتب: تحديث'
+                      value={updateConfirmWord}
+                      onChange={(e) => setUpdateConfirmWord(e.target.value.trim())}
+                      className="w-full min-h-[38px] px-3 rounded-xl bg-slate-900 border border-indigo-500/40 text-indigo-300 text-center text-xs font-black focus:outline-none focus:border-indigo-400"
+                    />
+                  </div>
+
+                  <button
+                    type="button"
+                    disabled={isApplyingUpdate || updateConfirmWord !== 'تحديث'}
+                    onClick={handleApplySoftwareUpdate}
+                    className="w-full min-h-[42px] rounded-xl bg-indigo-600 hover:bg-indigo-500 disabled:opacity-40 text-white font-black text-xs shadow-lg shadow-indigo-600/30 flex items-center justify-center gap-2 transition active:scale-95"
+                  >
+                    {isApplyingUpdate ? (
+                      <>
+                        <RefreshCw className="w-4 h-4 animate-spin" />
+                        <span>جاري التحقق وتطبيق التحديث...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Upload className="w-4 h-4" />
+                        <span>تثبيت وتطبيق التحديث الآن ⚡</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+              )}
+
+              {/* Feedback messages */}
+              {updateFeedback.text && (
+                <div
+                  className={`p-2.5 rounded-xl text-xs font-bold flex items-center gap-2 ${
+                    updateFeedback.type === 'success'
+                      ? 'bg-emerald-500/20 border border-emerald-500/40 text-emerald-300'
+                      : updateFeedback.type === 'info'
+                      ? 'bg-indigo-500/20 border border-indigo-500/40 text-indigo-300'
+                      : 'bg-rose-500/20 border border-rose-500/40 text-rose-300'
+                  }`}
+                >
+                  {updateFeedback.type === 'success' ? (
+                    <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                  ) : updateFeedback.type === 'info' ? (
+                    <RefreshCw className="w-4 h-4 text-indigo-400 shrink-0 animate-spin" />
+                  ) : (
+                    <AlertTriangle className="w-4 h-4 text-rose-400 shrink-0" />
+                  )}
+                  <span>{updateFeedback.text}</span>
+                </div>
+              )}
+            </div>
+
+            {/* 9. DANGER ZONE & FACTORY RESET */}
             <div className="p-4 rounded-2xl bg-rose-500/10 border-2 border-rose-500/30 space-y-2.5 shadow-lg">
               <div className="flex items-center justify-between text-xs">
                 <div className="font-extrabold text-rose-300 flex items-center gap-1.5">
                   <Trash2 className="w-4 h-4 text-rose-400" />
-                  <span>7. منطقة الخطر وإعادة تهيئة النظام (Factory Reset):</span>
+                  <span>9. منطقة الخطر وإعادة تهيئة النظام (Factory Reset):</span>
                 </div>
                 <button
                   type="button"

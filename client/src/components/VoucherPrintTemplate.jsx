@@ -49,14 +49,14 @@ export default function VoucherPrintTemplate({ voucher, mode = 'thermal' }) {
 
   if (mode === 'thermal') {
     return (
-      <div className="w-[80mm] max-w-[80mm] mx-auto p-4 bg-white text-black font-sans text-xs leading-relaxed print:p-0 print:m-0 print:w-full">
+      <div className="w-[72mm] max-w-[72mm] mx-auto p-2 bg-white text-black font-sans text-xs leading-relaxed print:p-0 print:m-0 print:w-full">
         {/* Header */}
         <div className="text-center border-b-2 border-dashed border-gray-400 pb-3 mb-3">
           <h2 className="text-base font-black tracking-wide">{settings.shopName}</h2>
-          <p className="text-[10px] text-gray-600 mt-0.5">{settings.address}</p>
-          <p className="text-[10px] font-mono font-bold text-gray-700 mt-0.5">
-            هاتف المركز: {settings.shopPhone}
-          </p>
+          <div className="flex justify-between items-center text-[10px] font-bold mt-1 px-1 text-black">
+            <span>📍 {settings.address}</span>
+            <span>📞 {settings.shopPhone}</span>
+          </div>
           <div className="mt-2 inline-block px-3 py-1 bg-black text-white font-black text-xs rounded">
             {isReceipt ? 'سند قبض نقدية (رسمي)' : 'سند صرف نقدية (رسمي)'}
           </div>
@@ -150,22 +150,9 @@ export default function VoucherPrintTemplate({ voucher, mode = 'thermal' }) {
           )}
         </div>
 
-        {/* Signatures */}
-        <div className="grid grid-cols-2 gap-2 text-center text-[10px] pt-2 mb-4 border-t border-gray-200">
-          <div>
-            <span className="text-gray-500 block">أمين الصندوق</span>
-            <span className="font-bold block mt-3">{voucher.created_by || 'الكاشير'}</span>
-          </div>
-          <div>
-            <span className="text-gray-500 block">توقيع المستلم / الطرف</span>
-            <div className="h-6 border-b border-gray-300 mt-1"></div>
-          </div>
-        </div>
-
-        {/* Footer */}
-        <div className="text-center text-[9px] text-gray-500 border-t border-dashed border-gray-300 pt-2 font-mono">
+        {/* Clean Thermal Footer */}
+        <div className="text-center text-[10px] text-gray-700 border-t border-dashed border-gray-400 pt-2 font-bold">
           <p>شكراً لتعاملكم مع {settings.shopName}</p>
-          <p className="mt-0.5">نظام سريع وبنشر PRO — إصدار سحابي محلي</p>
         </div>
       </div>
     );

@@ -35,6 +35,7 @@ import {
   X,
   ExternalLink,
   Printer,
+  BarChart3,
 } from 'lucide-react';
 
 import NewVehicleModal from './NewVehicleModal';
@@ -57,6 +58,7 @@ import {
 } from '../utils/settings';
 import { getLocalTodayDate } from '../utils/dateUtils';
 import { APP_EVENTS, emitAppEvent, subscribeAppEvent } from '../utils/eventBus';
+import { printThermalReceiptSilently } from '../utils/thermalReceiptPrinter';
 
 const getInitialNextServiceDate = () => {
   try {
@@ -84,6 +86,8 @@ const GENERAL_QUICK_CUSTOMER = {
   customer_type: 'individual',
 };
 
+const DRAFT_STORAGE_KEY = 'albanshar_pos_active_draft';
+
 export default function PosScreen({
   inventory = [],
   workers = [],
@@ -92,6 +96,8 @@ export default function PosScreen({
   onOpenStatement,
   isOwnerMode = false,
   onRequireOwnerAuth,
+  showFinancialPulse = false,
+  onToggleFinancialPulse,
 }) {
   // Dual-Mode State: 'quick' (فاتورة سريعة) | 'oil' (فاتورة غيار زيت)
   const [posMode, setPosMode] = useState('quick');
@@ -160,6 +166,10 @@ export default function PosScreen({
   const [cartNoticeMessage, setCartNoticeMessage] = useState('');
   const [clearCartConfirmPending, setClearCartConfirmPending] = useState(false);
 
+  // Active Draft Recovery State (حماية واستعادة الفواتير المعلقة عند الطوارئ)
+  const [pendingDraft, setPendingDraft] = useState(null);
+  const isInitialDraftMount = useRef(true);
+
   // Active Bay Services State
   const [showPendingServicesModal, setShowPendingServicesModal] = useState(false);
   const [pendingServicesCount, setPendingServicesCount] = useState(0);
@@ -218,6 +228,9 @@ export default function PosScreen({
     }
   };
 
+  const searchResultsRef = useRef(searchResults);
+  searchResultsRef.current = searchResults;
+
   // Click Outside to Dismiss Autocomplete Dropdown & Keyboard Shortcuts
   useEffect(() => {
     const handleClickOutside = (e) => {
@@ -235,12 +248,15 @@ export default function PosScreen({
         e.preventDefault();
         customerSearchInputRef.current?.focus();
       } else if (e.key === 'Enter') {
-        const tag = (e.target && e.target.tagName) ? e.target.tagName.toLowerCase() : '';
-        // If not typing in input, textarea, or button
-        if (tag !== 'input' && tag !== 'textarea' && tag !== 'select') {
+        // 1. If customer search dropdown is active with results, choose the top match
+        if (searchResultsRef.current && searchResultsRef.current.length > 0) {
           e.preventDefault();
-          submitInvoiceRef.current?.();
+          handleSelectVehicle(searchResultsRef.current[0]);
+          return;
         }
+        // 2. Direct Enter key triggers instant invoice submission & silent print
+        e.preventDefault();
+        submitInvoiceRef.current?.();
       } else if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
         e.preventDefault();
         submitInvoiceRef.current?.();
@@ -354,6 +370,105 @@ export default function PosScreen({
     }
   }, [initialVehicle]);
 
+  // 1. Check for unsaved POS draft on mount
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem(DRAFT_STORAGE_KEY);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (parsed && Array.isArray(parsed.cartItems) && parsed.cartItems.length > 0) {
+          setPendingDraft(parsed);
+        } else {
+          localStorage.removeItem(DRAFT_STORAGE_KEY);
+        }
+      }
+    } catch (e) {
+      console.error('Error loading POS draft:', e);
+    }
+  }, []);
+
+  // 2. Auto-save active POS draft whenever cart or invoice inputs change
+  useEffect(() => {
+    if (isInitialDraftMount.current) {
+      isInitialDraftMount.current = false;
+      return;
+    }
+    if (cartItems.length > 0) {
+      const draft = {
+        timestamp: Date.now(),
+        posMode,
+        cartItems,
+        selectedVehicle,
+        quickCustomerOverride,
+        customerNameNote,
+        currentOdometer,
+        kmInterval,
+        manualNextOdometer,
+        serviceDateInput,
+        specialDiscount,
+        discountType,
+        scrapBatteryDeduction,
+        invoiceNotes,
+        paymentMethod,
+        paidAmountInput,
+      };
+      try {
+        localStorage.setItem(DRAFT_STORAGE_KEY, JSON.stringify(draft));
+      } catch (e) {
+        console.error('Error auto-saving POS draft:', e);
+      }
+    } else {
+      try {
+        localStorage.removeItem(DRAFT_STORAGE_KEY);
+      } catch (e) {}
+    }
+  }, [
+    cartItems,
+    posMode,
+    selectedVehicle,
+    quickCustomerOverride,
+    customerNameNote,
+    currentOdometer,
+    kmInterval,
+    manualNextOdometer,
+    serviceDateInput,
+    specialDiscount,
+    discountType,
+    scrapBatteryDeduction,
+    invoiceNotes,
+    paymentMethod,
+    paidAmountInput,
+  ]);
+
+  const handleRestoreDraft = () => {
+    if (!pendingDraft) return;
+    if (pendingDraft.posMode) setPosMode(pendingDraft.posMode);
+    if (pendingDraft.cartItems) setCartItems(pendingDraft.cartItems);
+    if (pendingDraft.selectedVehicle) setSelectedVehicle(pendingDraft.selectedVehicle);
+    if (pendingDraft.quickCustomerOverride) setQuickCustomerOverride(pendingDraft.quickCustomerOverride);
+    if (pendingDraft.customerNameNote) setCustomerNameNote(pendingDraft.customerNameNote);
+    if (pendingDraft.currentOdometer) setCurrentOdometer(pendingDraft.currentOdometer);
+    if (pendingDraft.kmInterval) setKmInterval(pendingDraft.kmInterval);
+    if (pendingDraft.manualNextOdometer) setManualNextOdometer(pendingDraft.manualNextOdometer);
+    if (pendingDraft.serviceDateInput) setServiceDateInput(pendingDraft.serviceDateInput);
+    if (pendingDraft.specialDiscount) setSpecialDiscount(pendingDraft.specialDiscount);
+    if (pendingDraft.discountType) setDiscountType(pendingDraft.discountType);
+    if (pendingDraft.scrapBatteryDeduction) setScrapBatteryDeduction(pendingDraft.scrapBatteryDeduction);
+    if (pendingDraft.invoiceNotes) setInvoiceNotes(pendingDraft.invoiceNotes);
+    if (pendingDraft.paymentMethod) setPaymentMethod(pendingDraft.paymentMethod);
+    if (pendingDraft.paidAmountInput) setPaidAmountInput(pendingDraft.paidAmountInput);
+    setPendingDraft(null);
+    setCartNoticeMessage('تمت استعادة مسودة الفاتورة السابقة بنجاح ⚡');
+    setTimeout(() => setCartNoticeMessage(''), 4000);
+  };
+
+  const handleDismissDraft = () => {
+    try {
+      localStorage.removeItem(DRAFT_STORAGE_KEY);
+    } catch (e) {}
+    setPendingDraft(null);
+  };
+
 
 
   // Search vehicles & customers (searches by Plate, Name, Phone)
@@ -390,15 +505,17 @@ export default function PosScreen({
     };
     setSelectedVehicle(normalized);
     setQuickCustomerOverride(normalized);
-    setPosMode('oil');
-    fetchVehicleLastService(normalized.id);
-    if (normalized.last_odometer) {
-      setCurrentOdometer(String(normalized.last_odometer));
-    } else {
-      setCurrentOdometer('');
+    // Preserve current posMode (never force-switch to oil mode if cashier is in quick invoice mode)
+    if (posMode === 'oil') {
+      fetchVehicleLastService(normalized.id);
+      if (normalized.last_odometer) {
+        setCurrentOdometer(String(normalized.last_odometer));
+      } else {
+        setCurrentOdometer('');
+      }
+      setKmInterval(3000);
+      setManualNextOdometer('');
     }
-    setKmInterval(3000);
-    setManualNextOdometer('');
     setSearchQuery('');
     setSearchResults([]);
   };
@@ -478,13 +595,6 @@ export default function PosScreen({
           return;
         }
       }
-    }
-
-    const isOilProduct = (item.category === 'oil' || (item.description || '').includes('زيت'));
-    if (isOilProduct && posMode === 'quick') {
-      setPosMode('oil');
-      setCartNoticeMessage('تم تفعيل وضع غيار الزيت لإدخال قراءة العداد وتتبع السيارة في الحفرة 🛢️');
-      setTimeout(() => setCartNoticeMessage(''), 4500);
     }
 
     setCartItems((prev) => {
@@ -588,6 +698,10 @@ export default function PosScreen({
       setClearCartConfirmPending(true);
       setTimeout(() => setClearCartConfirmPending(false), 4000);
     } else {
+      try {
+        localStorage.removeItem(DRAFT_STORAGE_KEY);
+      } catch (e) {}
+      setPendingDraft(null);
       setCartItems([]);
       setClearCartConfirmPending(false);
       setCartNoticeMessage('تم تفريغ بنود السلة بالكامل.');
@@ -789,17 +903,20 @@ export default function PosScreen({
       setTouchConfirm({
         isOpen: true,
         title: '⚠️ تنبيه عداد الكيلومترات',
-        message: `قراءة العداد المدخلة (${Number(currentOdometer).toLocaleString()} كم) أقل من القراءة السابقة المسجلة (${Number(lastServiceInfo?.current_odometer || selectedVehicle?.last_odometer).toLocaleString()} كم)!\n\nهل تؤكد صحة القراءة الحالية واستمرار الحفظ؟`,
+        message: `قراءة العداد المدخلة (${Number(currentOdometer).toLocaleString()} كم) أقل من القراءة السابقة المسجلة (${Number(lastServiceInfo?.current_odometer || selectedVehicle?.last_odometer).toLocaleString()} كم)!\n\nهل تؤكد صحة القراءة الحالية (تغيير طبلون/تصفير) واستمرار الحفظ؟`,
         confirmText: 'نعم، القراءة صحيحة واستمرار',
-        onConfirm: () => checkPriceAndCreditLimitThenSubmit(),
+        onConfirm: () => {
+          setAllowOdometerReset(true);
+          checkPriceAndCreditLimitThenSubmit(true);
+        },
       });
       return;
     }
 
-    checkPriceAndCreditLimitThenSubmit();
+    checkPriceAndCreditLimitThenSubmit(allowOdometerReset);
   };
 
-  const checkPriceAndCreditLimitThenSubmit = () => {
+  const checkPriceAndCreditLimitThenSubmit = (confirmOdometerReset = false) => {
     // Below Cost Protection (Can be approved by owner or authorized cashier)
     const belowCostItem = cartItems.find((ci) => {
       if (!ci.inventory_id || ci.item_type === 'service') return false;
@@ -811,7 +928,7 @@ export default function PosScreen({
       const inv = inventory.find((i) => i.id === belowCostItem.inventory_id);
       if (!isOwnerMode && onRequireOwnerAuth) {
         onRequireOwnerAuth(
-          () => checkCreditLimitThenSubmit(),
+          () => checkCreditLimitThenSubmit(true, confirmOdometerReset),
           'حظر بيع بأقل من التكلفة 🔒',
           `الصنف "${belowCostItem.description}" يباع بسعر أقل من الحد الأدنى المعتمد. يلزم إدخال رمز المالك للموافقة على اعتماد البيع الاستثنائي.`
         );
@@ -824,15 +941,15 @@ export default function PosScreen({
           ? `الصنف "${belowCostItem.description}" يباع بـ (${Number(belowCostItem.unit_price).toLocaleString()} ر.ي) وهو أقل من سعر التكلفة (${Number(inv?.cost_price || 0).toLocaleString()} ر.ي).\n\nهل تؤكد اعتماد هذا البيع الاستثنائي؟`
           : `الصنف "${belowCostItem.description}" يباع بسعر أقل من الحد الأدنى المعتمد للتكلفة.\n\nهل تؤكد اعتماد هذا البيع الاستثنائي؟`,
         confirmText: 'نعم، اعتماد البيع',
-        onConfirm: () => checkCreditLimitThenSubmit(),
+        onConfirm: () => checkCreditLimitThenSubmit(true, confirmOdometerReset),
       });
       return;
     }
 
-    checkCreditLimitThenSubmit();
+    checkCreditLimitThenSubmit(false, confirmOdometerReset);
   };
 
-  const checkCreditLimitThenSubmit = () => {
+  const checkCreditLimitThenSubmit = (confirmBelowCost = false, confirmOdometerReset = false) => {
     if (paymentMethod === 'credit' && activeCustomer && activeCustomer.id !== 'quick') {
       const currentDebt = Number(activeCustomer.balance_due) || 0;
       const creditLimit = Number(activeCustomer.credit_limit) || 50000;
@@ -843,17 +960,19 @@ export default function PosScreen({
           title: '⚠️ تنبيه سقف المديونية',
           message: `إجمالي دين العميل المتوقع (${projected.toLocaleString()} ر.ي) سيتجاوز سقف الائتمان (${creditLimit.toLocaleString()} ر.ي).\n\nهل تؤكد منح هذا الائتمان الاستثنائي؟`,
           confirmText: 'تأكيد منح الائتمان',
-          onConfirm: () => executeSubmitInvoice(),
+          onConfirm: () => executeSubmitInvoice(confirmBelowCost, confirmOdometerReset),
         });
         return;
       }
     }
-    executeSubmitInvoice();
+    executeSubmitInvoice(confirmBelowCost, confirmOdometerReset);
   };
 
-  const executeSubmitInvoice = async () => {
+  const executeSubmitInvoice = async (confirmBelowCost = false, confirmOdometerReset = false) => {
     try {
       setIsSubmittingInvoice(true);
+
+      const effectiveAllowReset = Boolean(confirmOdometerReset || allowOdometerReset);
 
       // Determine vehicle_id for backend
       let vehicleIdToSubmit = activeCustomer?.id || activeCustomer?.vehicle_id;
@@ -869,21 +988,18 @@ export default function PosScreen({
         }
       }
 
-      const noteToSave = customerNameNote.trim()
+      const resetNote = (effectiveAllowReset && isOilService) ? '[استثناء: تم اعتماد تصفير/تغيير عداد الطبلون]' : '';
+      const baseNote = customerNameNote.trim()
         ? `العميل: ${customerNameNote.trim()} ${invoiceNotes ? `| ${invoiceNotes}` : ''}`
-        : invoiceNotes || null;
+        : invoiceNotes || '';
+      const noteToSave = [baseNote, resetNote].filter(Boolean).join(' | ') || null;
 
-      // Auto-detect oil service that belongs in the pit bay
-      const hasOilOrLube = cartItems.some((item) => {
-        const desc = (item.description || '').toLowerCase();
-        const cat = (item.category || item.product_category || '').toLowerCase();
-        return desc.includes('زيت') || desc.includes('oil') || desc.includes('سيفون') || cat.includes('oil');
-      });
       const effectiveVehicleId = selectedVehicle?.id || selectedVehicle?.vehicle_id;
       const hasVehicleAttached = selectedVehicle && effectiveVehicleId && effectiveVehicleId !== 'quick';
-      const hasOdo = Number(currentOdometer) > 0;
 
-      const isOilService = posMode === 'oil' || (hasVehicleAttached && (hasOilOrLube || hasOdo)) || hasOilOrLube;
+      // Pit bay service only applies when explicitly in Oil Service mode with an attached vehicle.
+      // In Quick Mode (فاتورة سريعة), all sales complete immediately at counter even if purchasing oil bottles.
+      const isOilService = posMode === 'oil' && Boolean(hasVehicleAttached);
 
       // MOD-LANE: Prevent submitting duplicate service if vehicle is already in pit bay
       if (isOilService && vehicleCurrentlyInBay) {
@@ -893,7 +1009,7 @@ export default function PosScreen({
           message: `تنبيه الحفرة [MOD-LANE]: المركبة (${selectedVehicle?.plate_number || ''}) متواجدة حالياً بالفعل داخل الحفرة قيد الخدمة بموجب الفاتورة رقم (${vehicleCurrentlyInBay.invoice_number}). يرجى إتمام فحصها وخدمتها أولاً من شاشة سيارات الحفرة أو إلغاء فاتورتها السابقة قبل فتح خدمة جديدة.`,
           type: 'warning',
           cancelBtnText: 'متابعة فحص الحفرة 🛠️',
-          onClose: () => {
+          onCancel: () => {
             setFocusPendingInvoiceId(vehicleCurrentlyInBay.id);
             setShowPendingServicesModal(true);
           },
@@ -909,7 +1025,7 @@ export default function PosScreen({
         worker_id: null, // إلغاء إرفاق الفني نهائياً بناءً على طلب المالك
         service_status: statusToSave,
         current_odometer: isOilService ? (Number(currentOdometer) || 0) : 0,
-        allow_odometer_reset: allowOdometerReset,
+        allow_odometer_reset: effectiveAllowReset,
         next_odometer: isOilService ? (Number(nextOdometer) || 0) : 0,
         next_service_date: isOilService ? (serviceDateInput || nextServiceDate) : nextServiceDate,
         items_total: goodsTotal,
@@ -923,6 +1039,8 @@ export default function PosScreen({
           cash: Number(splitCashAmount) || 0,
           [splitElectronicMethod]: Number(splitElectronicAmount) || 0,
         } : null,
+        confirm_below_cost: Boolean(confirmBelowCost),
+        client_token: 'pos_' + Date.now() + '_' + Math.random().toString(36).substring(2, 9),
         prevent_negative_stock: shouldPreventNegativeStock(),
         notes: noteToSave,
         items: cartItems.map((item) => ({
@@ -968,10 +1086,13 @@ export default function PosScreen({
           carModel: selectedVehicle?.car_make_model || '',
         });
       } else {
-        setCompletedInvoice(completedData);
+        // Silent background thermal printing without opening popup modal
+        printThermalReceiptSilently(completedData).catch((err) => {
+          console.log('[Silent Print handled safely]:', err);
+        });
       }
 
-      // Reset form for next customer
+      // Reset form immediately for next customer
       handleResetPos();
       fetchPendingServicesCount();
       emitAppEvent(APP_EVENTS.INVOICE_CREATED, { invoice: completedData });
@@ -1032,10 +1153,15 @@ export default function PosScreen({
   };
 
   const handleResetPos = () => {
+    try {
+      localStorage.removeItem(DRAFT_STORAGE_KEY);
+    } catch (e) {}
+    setPendingDraft(null);
     setCartItems([]);
     if (posMode === 'quick') {
       setQuickCustomerOverride(null);
       setCustomerNameNote('');
+      setSelectedVehicle(null);
     } else {
       setSelectedVehicle(null);
       setLastServiceInfo(null);
@@ -1097,7 +1223,7 @@ export default function PosScreen({
   }, [inventory, quickActiveCategory]);
 
   return (
-    <div className="min-h-full flex flex-col gap-3 select-none pb-8">
+    <div className="flex-1 min-h-0 h-full flex flex-col gap-1.5 select-none overflow-hidden pb-0.5">
       {/* 0. TRAINING / DEMO MODE ALERT BANNER */}
       {demoMode && (
         <div className="p-3 rounded-2xl bg-gradient-to-r from-amber-500/20 via-orange-500/20 to-amber-500/20 border-2 border-amber-500/50 flex flex-wrap items-center justify-between gap-3 text-xs shadow-lg animate-in fade-in flex-shrink-0">
@@ -1170,15 +1296,79 @@ export default function PosScreen({
         </div>
       )}
 
+      {/* 0.2 POS ACTIVE DRAFT RECOVERY BANNER (درع استعادة الفاتورة المعلقة عند الطوارئ) */}
+      {pendingDraft && (
+        <div className="p-3 sm:p-3.5 rounded-2xl bg-gradient-to-r from-cyan-950/70 via-slate-900 to-blue-950/70 border-2 border-cyan-400/60 flex flex-wrap items-center justify-between gap-3 text-xs shadow-2xl animate-in fade-in flex-shrink-0">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-xl bg-cyan-500/20 text-cyan-300 border border-cyan-400/40 flex items-center justify-center text-lg shadow">
+              ⚡
+            </div>
+            <div>
+              <div className="text-cyan-300 font-extrabold text-xs sm:text-sm flex items-center gap-2">
+                <span>تم العثور على مسودة فاتورة غير مكتملة محفوظة تلقائياً!</span>
+                <span className="text-[10px] px-2 py-0.5 rounded-full bg-cyan-500/20 text-cyan-200 border border-cyan-500/40 font-mono font-bold">
+                  {pendingDraft.cartItems?.length || 0} أصناف
+                </span>
+              </div>
+              <div className="text-slate-300 text-[11px] mt-0.5 flex items-center gap-2 flex-wrap">
+                <span>
+                  العميل:{' '}
+                  <strong className="text-white">
+                    {pendingDraft.selectedVehicle?.car_make_model ||
+                      pendingDraft.selectedVehicle?.customer_name ||
+                      pendingDraft.customerNameNote ||
+                      'عميل عام'}
+                  </strong>
+                </span>
+                <span>•</span>
+                <span>
+                  إجمالي المسودة:{' '}
+                  <strong className="text-amber-400 font-mono">
+                    {Number(
+                      pendingDraft.cartItems?.reduce(
+                        (acc, it) => acc + (Number(it.qty) || 1) * (Number(it.unit_price) || 0),
+                        0
+                      ) || 0
+                    ).toLocaleString()}{' '}
+                    ر.ي
+                  </strong>
+                </span>
+                <span>•</span>
+                <span className="text-cyan-200/80 text-[10px]">
+                  (حماية ذكية من إغلاق الشاشة بالخطأ أو انقطاع الكهرباء)
+                </span>
+              </div>
+            </div>
+          </div>
+          <div className="flex items-center gap-2 shrink-0">
+            <button
+              type="button"
+              onClick={handleRestoreDraft}
+              className="min-h-[38px] px-4 rounded-xl bg-gradient-to-r from-cyan-400 to-blue-500 hover:from-cyan-300 hover:to-blue-400 text-slate-950 font-black text-xs transition active:scale-95 shadow-lg shadow-cyan-500/25 flex items-center gap-1.5"
+            >
+              <RotateCcw className="w-3.5 h-3.5 stroke-[2.5]" />
+              <span>استعادة المسودة ومتابعة البيع ⚡</span>
+            </button>
+            <button
+              type="button"
+              onClick={handleDismissDraft}
+              className="min-h-[38px] px-3 rounded-xl bg-white/5 hover:bg-white/10 text-slate-400 hover:text-white text-xs font-bold transition active:scale-95"
+            >
+              تجاهل وبدء جديد ✕
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* 1. TOP HEADER: DUAL-MODE SWITCHER & SEARCH & ADD CUSTOMER */}
-      <div className="apple-glass rounded-3xl p-3.5 border border-white/10 flex-shrink-0 space-y-3">
-        <div className="flex flex-col lg:flex-row gap-3 items-stretch lg:items-center justify-between">
+      <div className="apple-glass rounded-2xl p-2 sm:p-2.5 border border-white/10 flex-shrink-0 space-y-1.5">
+        <div className="flex flex-col lg:flex-row gap-2 items-stretch lg:items-center justify-between">
           {/* Dual-Mode Selector Tabs */}
-          <div className="flex items-center gap-1.5 p-1 rounded-2xl bg-slate-950/90 border border-white/10 flex-shrink-0">
+          <div className="flex items-center gap-1 p-0.5 rounded-xl bg-slate-950/90 border border-white/10 flex-shrink-0">
             <button
               type="button"
               onClick={() => setPosMode('quick')}
-              className={`min-h-[42px] px-4 rounded-xl text-xs sm:text-sm font-black transition flex items-center gap-2 active:scale-95 ${
+              className={`min-h-[38px] px-3.5 rounded-lg text-xs sm:text-sm font-black transition flex items-center gap-1.5 active:scale-95 ${
                 posMode === 'quick'
                   ? 'bg-gradient-to-r from-amber-500 to-amber-600 text-slate-950 shadow-md shadow-amber-500/25 ring-1 ring-amber-400/50'
                   : 'text-slate-300 hover:text-white hover:bg-white/5'
@@ -1194,7 +1384,7 @@ export default function PosScreen({
             <button
               type="button"
               onClick={() => setPosMode('oil')}
-              className={`min-h-[42px] px-4 rounded-xl text-xs sm:text-sm font-black transition flex items-center gap-2 active:scale-95 ${
+              className={`min-h-[38px] px-3.5 rounded-lg text-xs sm:text-sm font-black transition flex items-center gap-1.5 active:scale-95 ${
                 posMode === 'oil'
                   ? 'bg-gradient-to-r from-teal-500 to-teal-600 text-slate-950 shadow-md shadow-teal-500/25 ring-1 ring-teal-400/50'
                   : 'text-slate-300 hover:text-white hover:bg-white/5'
@@ -1356,18 +1546,36 @@ export default function PosScreen({
             )}
           </div>
 
-          {/* Golden Add New Customer Button (Plate is Optional) */}
-          <button
-            type="button"
-            onClick={() => {
-              setEditingVehicle(null);
-              setShowNewVehicleModal(true);
-            }}
-            className="min-h-[42px] px-3.5 sm:px-4 rounded-2xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-black text-xs sm:text-sm shadow-lg shadow-amber-500/20 flex items-center justify-center gap-2 transition active:scale-95 flex-shrink-0"
-          >
-            <Plus className="w-4 h-4 stroke-[3]" />
-            <span>+ إضافة عميل جديد 👤</span>
-          </button>
+          <div className="flex items-center gap-2 flex-shrink-0">
+            {/* Toggle Financial Pulse Bar (BarChart3 Icon-Only - على يمين كرت إضافة عميل جديد) */}
+            {onToggleFinancialPulse && (
+              <button
+                type="button"
+                onClick={onToggleFinancialPulse}
+                className={`min-h-[42px] min-w-[42px] px-2.5 rounded-2xl border transition flex items-center justify-center tap-bounce shadow-md ${
+                  showFinancialPulse
+                    ? 'bg-amber-500/25 border-amber-400 text-amber-300 ring-2 ring-amber-400/40 shadow-amber-500/20'
+                    : 'bg-slate-900/90 hover:bg-slate-800 text-slate-300 hover:text-white border-white/15 hover:border-amber-400/50'
+                }`}
+                title={showFinancialPulse ? 'إخفاء شريط النبض المالي لتوفير مساحة الشاشة' : 'فتح شريط النبض المالي ومؤشرات المركز (📊)'}
+              >
+                <BarChart3 className={`w-4 h-4 ${showFinancialPulse ? 'text-amber-400' : 'text-slate-300'}`} />
+              </button>
+            )}
+
+            {/* Golden Add New Customer Button (Plate is Optional) */}
+            <button
+              type="button"
+              onClick={() => {
+                setEditingVehicle(null);
+                setShowNewVehicleModal(true);
+              }}
+              className="min-h-[42px] px-3.5 sm:px-4 rounded-2xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-black text-xs sm:text-sm shadow-lg shadow-amber-500/20 flex items-center justify-center gap-2 transition active:scale-95 flex-shrink-0"
+            >
+              <Plus className="w-4 h-4 stroke-[3]" />
+              <span>+ إضافة عميل جديد 👤</span>
+            </button>
+          </div>
         </div>
 
         {/* MODE 1 (QUICK): Customer context strip */}
@@ -1389,7 +1597,10 @@ export default function PosScreen({
                   )}
                   <button
                     type="button"
-                    onClick={() => setQuickCustomerOverride(null)}
+                    onClick={() => {
+                      setQuickCustomerOverride(null);
+                      setSelectedVehicle(null);
+                    }}
                     className="text-slate-400 hover:text-rose-400 font-black text-xs mr-1"
                     title="العودة للحساب العام"
                   >
@@ -1476,7 +1687,7 @@ export default function PosScreen({
                   </div>
 
                   {/* MOD-LANE: In-Bay Active Service Alert Badge */}
-                  {vehicleCurrentlyInBay && (
+                  {posMode === 'oil' && vehicleCurrentlyInBay && (
                     <div className="mt-2.5 p-2 rounded-xl bg-amber-500/25 border border-amber-400/60 flex items-center justify-between gap-3 text-amber-200">
                       <div className="flex items-center gap-2 text-xs font-bold">
                         <AlertTriangle className="w-4 h-4 text-amber-300 shrink-0 animate-pulse" />
@@ -1598,10 +1809,10 @@ export default function PosScreen({
         </div>
       )}
 
-      {/* 2. TWO-COLUMN POS INTERFACE */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-3.5 flex-1 min-h-0 items-start">
+      {/* 2. TWO-COLUMN POS INTERFACE — STRICT VIEWPORT LOCK (Side-by-side from md screen) */}
+      <div className="grid grid-cols-1 md:grid-cols-12 gap-2 flex-1 min-h-0 h-full items-stretch overflow-hidden">
         {/* LEFT COLUMN: PRODUCTS / SERVICES / ODOMETER (7 COLS) */}
-        <div className="lg:col-span-7 flex flex-col gap-3 pr-0.5">
+        <div className="md:col-span-7 flex flex-col gap-2 pr-0.5 overflow-y-auto custom-scrollbar h-full min-h-0">
           {/* ==================== A. QUICK MODE INTERFACE (فاتورة سريعة) ==================== */}
           {posMode === 'quick' && (
             <div className="space-y-3 animate-in fade-in duration-150">
@@ -1983,15 +2194,17 @@ export default function PosScreen({
           )}
         </div>
 
-        {/* RIGHT COLUMN: PINNED CART & CHECKOUT (5 COLS) — FIXED VIEWPORT ERGONOMICS */}
-        <div className="lg:col-span-5 apple-glass rounded-3xl p-4 border border-white/10 flex flex-col h-[calc(100vh-140px)] sticky top-2 shadow-2xl">
+        {/* RIGHT COLUMN: PINNED CART & CHECKOUT (5 COLS) — STRICT VIEWPORT LOCK */}
+        <div className="md:col-span-5 apple-glass rounded-2xl p-2.5 sm:p-3 border border-white/10 flex flex-col h-full min-h-0 shadow-2xl overflow-hidden justify-between">
           {/* 1. Cart Header (Fixed) */}
-          <div className="border-b border-white/10 pb-2.5 flex items-center justify-between flex-shrink-0">
-            <div>
-              <h3 className="font-black text-white text-base">سلة الفاتورة</h3>
-              <p className="text-xs text-slate-400">
-                {cartItems.length > 0 ? `${cartItems.length} بنود في الفاتورة` : 'السلة فارغة'}
-              </p>
+          <div className="border-b border-white/10 pb-1.5 flex items-center justify-between flex-shrink-0">
+            <div className="flex items-center gap-2">
+              <h3 className="font-black text-white text-sm sm:text-base">سلة الفاتورة</h3>
+              <span className={`text-[11px] font-mono font-bold px-2 py-0.5 rounded-full ${
+                cartItems.length > 0 ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30' : 'bg-white/5 text-slate-400'
+              }`}>
+                {cartItems.length > 0 ? `${cartItems.length} بنود` : 'فارغة'}
+              </span>
             </div>
 
             {cartItems.length > 0 && (
@@ -2001,15 +2214,15 @@ export default function PosScreen({
                     <button
                       type="button"
                       onClick={handleClearCartClick}
-                      className="px-2.5 py-1 rounded-xl bg-rose-500 hover:bg-rose-600 text-white text-xs font-black transition active:scale-95 shadow-md shadow-rose-500/30 animate-pulse flex items-center gap-1"
+                      className="px-2 py-0.5 rounded-lg bg-rose-500 hover:bg-rose-600 text-white text-[11px] font-black transition active:scale-95 shadow-md shadow-rose-500/30 animate-pulse flex items-center gap-1"
                     >
-                      <Trash2 className="w-3.5 h-3.5" />
+                      <Trash2 className="w-3 h-3" />
                       <span>تأكيد المسح؟</span>
                     </button>
                     <button
                       type="button"
                       onClick={() => setClearCartConfirmPending(false)}
-                      className="px-2 py-1 rounded-xl bg-slate-800 text-slate-300 text-xs font-bold"
+                      className="px-1.5 py-0.5 rounded-lg bg-slate-800 text-slate-300 text-[11px] font-bold"
                     >
                       تراجع
                     </button>
@@ -2018,9 +2231,9 @@ export default function PosScreen({
                   <button
                     type="button"
                     onClick={handleClearCartClick}
-                    className="text-xs text-rose-400/90 hover:text-rose-300 font-bold px-2 py-1 rounded-lg hover:bg-rose-500/10 transition flex items-center gap-1"
+                    className="text-[11px] text-rose-400/90 hover:text-rose-300 font-bold px-2 py-0.5 rounded-lg hover:bg-rose-500/10 transition flex items-center gap-1"
                   >
-                    <Trash2 className="w-3.5 h-3.5" />
+                    <Trash2 className="w-3 h-3" />
                     <span>تفريغ السلة</span>
                   </button>
                 )}
@@ -2029,12 +2242,12 @@ export default function PosScreen({
           </div>
 
           {/* 2. Scrollable Cart Items List */}
-          <div className="flex-1 min-h-0 overflow-y-auto my-2 space-y-2 pr-1 custom-scrollbar">
+          <div className="flex-1 min-h-0 overflow-y-auto my-1.5 space-y-1.5 pr-1 custom-scrollbar">
             {cartItems.length === 0 ? (
-              <div className="h-full flex flex-col items-center justify-center text-center p-6 text-slate-500">
-                <Package className="w-12 h-12 stroke-[1.2] mb-2 opacity-40" />
-                <p className="text-sm font-semibold">لم يتم إضافة أي أصناف حتى الآن</p>
-                <p className="text-xs text-slate-500 mt-1">
+              <div className="h-full min-h-[70px] max-h-[110px] flex flex-col items-center justify-center text-center p-2 text-slate-500">
+                <Package className="w-7 h-7 stroke-[1.2] mb-1 opacity-40 text-slate-400" />
+                <p className="text-xs font-semibold text-slate-400">السلة فارغة</p>
+                <p className="text-[11px] text-slate-500 mt-0.5">
                   {posMode === 'quick'
                     ? 'اختر صنفاً أو خدمة من الشبكة السريعة للبدء'
                     : 'اختر الزيت أو اضغط [➕ إضافة صنف إضافي] للبدء'}
@@ -2068,8 +2281,10 @@ export default function PosScreen({
                           </span>
                         )}
                       </div>
-                      <div className="text-xs text-slate-400 font-mono flex items-center gap-2 mt-0.5">
+                      <div className="text-xs text-slate-400 font-mono flex items-center gap-1.5 mt-0.5">
                         <span className="text-amber-400 font-bold">{Number(item.unit_price).toLocaleString()} ر.ي</span>
+                        <span className="text-slate-500">&times; {item.qty} =</span>
+                        <span className="text-white font-bold">{Number(item.total_price || (item.unit_price * item.qty)).toLocaleString()} ر.ي</span>
                         {isService && (
                           <span className="text-teal-400 text-[10px] bg-teal-500/10 px-1.5 rounded">خدمة ورشة</span>
                         )}
@@ -2208,8 +2423,8 @@ export default function PosScreen({
 
               {/* Net Total */}
               <div className="pt-1.5 border-t border-white/10 flex justify-between items-center">
-                <span className="font-black text-sm text-white">الصافي المطلوب:</span>
-                <span className="font-mono font-black text-2xl text-amber-400">
+                <span className="font-black text-xs sm:text-sm text-white">الصافي المطلوب:</span>
+                <span className="font-mono font-black text-xl sm:text-2xl text-amber-400">
                   {netTotal.toLocaleString()}{' '}
                   <span className="text-xs font-sans text-slate-300 font-bold">ر.ي</span>
                 </span>
@@ -2247,7 +2462,7 @@ export default function PosScreen({
                           setSplitElectronicAmount(String(netTotal - half));
                         }
                       }}
-                      className={`min-h-[40px] py-1 px-1 rounded-xl text-[11px] font-bold transition flex items-center justify-center border active:scale-95 ${
+                      className={`min-h-[36px] sm:min-h-[38px] py-1 px-1 rounded-xl text-[11px] font-bold transition flex items-center justify-center border active:scale-95 ${
                         isCreditDisabled
                           ? 'opacity-40 cursor-not-allowed bg-slate-900 border-white/5 text-slate-500'
                           : isSelected
@@ -2374,7 +2589,7 @@ export default function PosScreen({
               type="button"
               disabled={isSubmittingInvoice || cartItems.length === 0}
               onClick={handleSubmitInvoice}
-              className={`w-full min-h-[52px] rounded-2xl font-black text-sm sm:text-base shadow-xl flex items-center justify-center gap-2 transition active:scale-[0.98] ${
+              className={`w-full min-h-[46px] sm:min-h-[48px] rounded-2xl font-black text-sm sm:text-base shadow-xl flex items-center justify-center gap-2 transition active:scale-[0.98] ${
                 cartItems.length === 0 || isSubmittingInvoice
                   ? 'bg-slate-800 text-slate-500 cursor-not-allowed border border-white/5'
                   : 'bg-gradient-to-r from-emerald-500 to-green-600 hover:from-emerald-400 hover:to-green-500 text-slate-950 shadow-emerald-500/25 ring-1 ring-emerald-400/40'
@@ -2386,22 +2601,14 @@ export default function PosScreen({
                   <span>جاري ترحيل الفاتورة...</span>
                 </>
               ) : (
-                <span>حفظ الفاتورة وإصدار الإيصال 🖨️</span>
+                <div className="flex items-center gap-2">
+                  <span>حفظ الفاتورة وإصدار الإيصال 🖨️</span>
+                  <span className="text-[10px] bg-slate-950/20 px-1.5 py-0.5 rounded font-mono font-bold hidden sm:inline">
+                    Enter ↵
+                  </span>
+                </div>
               )}
             </button>
-
-            {/* Cashier Mistaken Invoice Void/Cancel Option */}
-            {lastSubmittedInvoice && (
-              <button
-                type="button"
-                disabled={isVoidingInvoice}
-                onClick={handleVoidLastInvoice}
-                className="w-full text-center text-[11px] text-rose-400/90 hover:text-rose-300 font-bold transition py-1 hover:underline"
-                title="إلغاء الفاتورة الأخيرة واسترجاع المخزون تلقائياً"
-              >
-                {isVoidingInvoice ? 'جاري الإلغاء...' : `✕ إلغاء الفاتورة الأخيرة (#${lastSubmittedInvoice.invoice_number}) واسترجاع المخزون`}
-              </button>
-            )}
           </div>
         </div>
       </div>

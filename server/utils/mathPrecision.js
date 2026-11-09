@@ -13,7 +13,19 @@
 function roundMoney(val, decimals = 2) {
   const num = Number(val);
   if (isNaN(num) || !isFinite(num)) return 0;
-  return Number(Math.round(Number(num + 'e' + decimals)) + 'e-' + decimals);
+  
+  // Guard against scientific exponential representation (e.g. 5e-324, 1e-7)
+  const str = num.toString();
+  if (str.includes('e')) {
+    const parts = str.split('e');
+    const exp = Number(parts[1]);
+    if (exp < -decimals) return 0; // The exponent is smaller than precision decimal places
+    if (exp > 20) return num; // Huge number
+  }
+
+  const res = Number(Math.round(Number(num + 'e' + decimals)) + 'e-' + decimals);
+  // Avoid negative zero (-0)
+  return Object.is(res, -0) ? 0 : (isNaN(res) ? 0 : res);
 }
 
 /**
@@ -29,7 +41,7 @@ function safeNum(val, fallback = 0) {
 }
 
 /**
- * Safe division protecting against zero, null, undefined, or NaN denominators.
+ * Safe division protecting against zero, null, undefined, NaN, or ultra-tiny denominators.
  * @param {number} numerator
  * @param {number} denominator
  * @param {number} fallback
@@ -38,7 +50,7 @@ function safeNum(val, fallback = 0) {
 function safeDiv(numerator, denominator, fallback = 0) {
   const n = safeNum(numerator, 0);
   const d = safeNum(denominator, 0);
-  if (d === 0) return fallback;
+  if (Math.abs(d) < 1e-9) return fallback;
   const res = n / d;
   return (!isNaN(res) && isFinite(res)) ? roundMoney(res) : fallback;
 }

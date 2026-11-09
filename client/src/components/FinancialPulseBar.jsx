@@ -21,6 +21,7 @@ import {
   Droplets,
   Database,
   Download,
+  X,
 } from 'lucide-react';
 import { APP_EVENTS, subscribeAppEvent } from '../utils/eventBus';
 
@@ -30,6 +31,7 @@ export default function FinancialPulseBar({
   refreshTrigger,
   isOwnerMode = false,
   onToggleOwnerMode,
+  onClose,
 }) {
   const [pulse, setPulse] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -71,37 +73,72 @@ export default function FinancialPulseBar({
   const { liquid, inventory, debts, today } = pulse;
 
   return (
-    <div className="w-full mb-3 flex-shrink-0 select-none print:hidden">
+    <div className="w-full mb-3 flex-shrink-0 select-none print:hidden animate-in fade-in slide-in-from-top-2 duration-200">
       {/* Top Header Bar with Quick Navigation Actions */}
       <div className="apple-glass rounded-2xl p-2.5 border border-white/10 flex items-center justify-between gap-3 shadow-lg">
-        {/* Left / Title area */}
-        <div className="flex items-center gap-2">
-          <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-amber-400 to-orange-500 text-slate-950 flex items-center justify-center shadow-md shadow-amber-500/20">
-            <Sparkles className="w-4 h-4 stroke-[2.4]" />
-          </div>
-          <span className="text-xs font-black text-white tracking-wide hidden sm:inline">
-            النبض المالي والتشغيلي الحي
-          </span>
-          <span className="badge-kiosk bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
-            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
-            <span>النظام متصل</span>
-          </span>
-          {today && (
-            <span className="hidden lg:flex items-center gap-2 px-2.5 py-1 rounded-xl bg-white/5 border border-white/10 text-xs font-mono font-bold text-slate-300">
-              <span className="text-amber-400">🚗 {today.total_cars_served || today.total_invoices || 0} سيارات</span>
-              <span className="text-white/20">•</span>
-              <span className="text-teal-300">🛢️ {(today.oil_sales !== undefined ? today.oil_sales : (today.goods_sales || today.goods_revenue || 0)).toLocaleString()} ر.ي زيوت</span>
-            </span>
-          )}
+        {/* Quick Operations: Statement of Accounts & Bay Analytics (استبدال الجزء المصور بناءً على طلب المستخدم) */}
+        <div className="flex items-center gap-2 flex-wrap">
+          <button
+            type="button"
+            onClick={onOpenStatement}
+            className="min-h-[40px] px-3.5 py-1.5 rounded-xl bg-blue-500/15 hover:bg-blue-500/25 text-blue-300 border border-blue-500/30 text-xs font-black flex items-center gap-1.5 tap-bounce shadow-sm transition active:scale-95"
+            title="فتح محرك كشوفات الحساب والطباعة للعملاء والموردين"
+          >
+            <FileText className="w-3.5 h-3.5 text-blue-400" />
+            <span>كشف الحسابات 🧾</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={onOpenBayProfitability}
+            className="min-h-[40px] px-3.5 py-1.5 rounded-xl bg-purple-500/15 hover:bg-purple-500/25 text-purple-300 border border-purple-500/30 text-xs font-black flex items-center gap-1.5 tap-bounce shadow-sm transition active:scale-95"
+            title="عرض نشاط وحركة سيارات الحفرة ومبيعات الزيوت والتحليلات"
+          >
+            <Wrench className="w-3.5 h-3.5 text-purple-400" />
+            <span>بيانات وتحليلات الحفرة 🚗</span>
+          </button>
         </div>
 
-        {/* Center / Action Pills */}
+        {/* Action Pills & Far-Left Controls */}
         <div className="flex items-center gap-2">
-          {/* Smart Cashier / Owner Mode Toggle Button (الجزء الأول) */}
+          {/* Quick Backup Export Action */}
+          <a
+            href="/api/backup"
+            download
+            className="min-h-[40px] px-3.5 py-1.5 rounded-xl bg-cyan-500/15 hover:bg-cyan-500/25 text-cyan-300 border border-cyan-500/30 text-xs font-black flex items-center gap-1.5 tap-bounce shadow-sm"
+            title="تصدير وتنزيل نسخة احتياطية فورية (.sqlite) لقاعدة البيانات الحالية على جهازك بنقرة واحدة"
+          >
+            <Download className="w-3.5 h-3.5 text-cyan-400" />
+            <span className="hidden md:inline">تصدير نسخة احتياطية 💾</span>
+            <span className="md:hidden">نسخ احتياطي 💾</span>
+          </a>
+
+          {/* Refresh button */}
+          <button
+            type="button"
+            onClick={fetchPulse}
+            disabled={loading}
+            className="min-h-[40px] min-w-[40px] p-2 rounded-xl bg-white/5 hover:bg-white/10 text-slate-300 hover:text-white tap-bounce flex items-center justify-center border border-white/5"
+            title="تحديث الأرصدة اللحظية"
+          >
+            <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin text-amber-400' : ''}`} />
+          </button>
+
+          {/* Collapse/Expand KPI Cards Toggle */}
+          <button
+            type="button"
+            onClick={() => setIsExpanded(!isExpanded)}
+            className="min-h-[40px] min-w-[40px] p-2 rounded-xl bg-white/5 hover:bg-white/10 text-slate-300 hover:text-white tap-bounce flex items-center justify-center border border-white/5"
+            title={isExpanded ? 'تصغير بطاقات المؤشرات' : 'توسيع بطاقات المؤشرات'}
+          >
+            {isExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+          </button>
+
+          {/* Smart Cashier / Owner Mode Toggle Button (موقع أقصى الشمال بناءً على طلب المستخدم) */}
           <button
             type="button"
             onClick={onToggleOwnerMode}
-            className={`min-h-[42px] px-3.5 py-1.5 rounded-xl text-xs font-black flex items-center gap-1.5 tap-bounce shadow-sm border ${
+            className={`min-h-[40px] px-3.5 py-1.5 rounded-xl text-xs font-black flex items-center gap-1.5 tap-bounce shadow-sm border ${
               isOwnerMode
                 ? 'bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border-emerald-500/40 shadow-emerald-500/10'
                 : 'bg-amber-500/15 hover:bg-amber-500/25 text-amber-300 border-amber-500/30'
@@ -121,63 +158,17 @@ export default function FinancialPulseBar({
             )}
           </button>
 
-          {/* Owner Only Actions: Statement of Account & Bay Profitability */}
-          {isOwnerMode && (
-            <>
-              <button
-                type="button"
-                onClick={onOpenStatement}
-                className="min-h-[42px] px-3.5 py-1.5 rounded-xl bg-blue-500/15 hover:bg-blue-500/25 text-blue-300 border border-blue-500/30 text-xs font-extrabold flex items-center gap-1.5 tap-bounce"
-                title="فتح محرك كشوفات الحساب والطباعة"
-              >
-                <FileText className="w-3.5 h-3.5" />
-                <span>كشف حساب تفصيلي 🧾</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={onOpenBayProfitability}
-                className="min-h-[42px] px-3.5 py-1.5 rounded-xl bg-purple-500/15 hover:bg-purple-500/25 text-purple-300 border border-purple-500/30 text-xs font-extrabold flex items-center gap-1.5 tap-bounce"
-                title="عرض نشاط وحركة سيارات الحفرة ومبيعات الزيوت"
-              >
-                <Wrench className="w-3.5 h-3.5 text-purple-400" />
-                <span>حركة سيارات الحفرة 🚗</span>
-              </button>
-            </>
+          {/* Close Pulse Bar Action (إخفاء الشريط بالكامل لإعادة كامل المساحة) */}
+          {onClose && (
+            <button
+              type="button"
+              onClick={onClose}
+              className="min-h-[40px] min-w-[40px] p-2 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 text-rose-300 hover:text-white tap-bounce flex items-center justify-center border border-rose-500/25 transition ml-1"
+              title="إغلاق وإخفاء شريط النبض لتوفير مساحة الشاشة"
+            >
+              <X className="w-4 h-4" />
+            </button>
           )}
-
-          {/* Quick Backup Export Action */}
-          <a
-            href="/api/backup"
-            download
-            className="min-h-[42px] px-3.5 py-1.5 rounded-xl bg-cyan-500/15 hover:bg-cyan-500/25 text-cyan-300 border border-cyan-500/30 text-xs font-black flex items-center gap-1.5 tap-bounce shadow-sm"
-            title="تصدير وتنزيل نسخة احتياطية فورية (.sqlite) لقاعدة البيانات الحالية على جهازك بنقرة واحدة"
-          >
-            <Download className="w-3.5 h-3.5 text-cyan-400" />
-            <span className="hidden md:inline">تصدير نسخة احتياطية 💾</span>
-            <span className="md:hidden">نسخ احتياطي 💾</span>
-          </a>
-
-          {/* Refresh button */}
-          <button
-            type="button"
-            onClick={fetchPulse}
-            disabled={loading}
-            className="min-h-[42px] min-w-[42px] p-2 rounded-xl bg-white/5 hover:bg-white/10 text-slate-300 hover:text-white tap-bounce flex items-center justify-center border border-white/5"
-            title="تحديث الأرصدة اللحظية"
-          >
-            <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin text-amber-400' : ''}`} />
-          </button>
-
-          {/* Collapse/Expand Toggle */}
-          <button
-            type="button"
-            onClick={() => setIsExpanded(!isExpanded)}
-            className="min-h-[42px] min-w-[42px] p-2 rounded-xl bg-white/5 hover:bg-white/10 text-slate-300 hover:text-white tap-bounce flex items-center justify-center border border-white/5"
-            title={isExpanded ? 'تصغير الشريط' : 'توسيع الشريط'}
-          >
-            {isExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
-          </button>
         </div>
       </div>
 

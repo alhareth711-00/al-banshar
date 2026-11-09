@@ -30,10 +30,24 @@ export default function PackagingConversionModal({ isOpen, onClose, inventory = 
     return parentCandidates.find((i) => String(i.id) === String(fromId));
   }, [parentCandidates, fromId]);
 
-  // Potential target items (individual cans 1L, etc.)
+  // Potential target items (individual cans 1L, etc.) - Filtered by matching ownership parity [MOD-CONSIGNMENT]
   const targetCandidates = useMemo(() => {
-    return inventory.filter((item) => item.item_type === 'product' && item.is_active === 1 && String(item.id) !== String(fromId));
-  }, [inventory, fromId]);
+    return inventory.filter((item) => {
+      if (item.item_type !== 'product' || item.is_active !== 1 || String(item.id) === String(fromId)) {
+        return false;
+      }
+      if (selectedParent) {
+        if (selectedParent.is_consignment) {
+          // If parent is consignment: target must be consignment for same supplier, or have 0 stock (can auto-align)
+          return item.is_consignment ? (item.consignment_supplier_name === selectedParent.consignment_supplier_name) : (Number(item.stock_qty) === 0);
+        } else {
+          // If parent is shop-owned: target must be shop-owned
+          return !item.is_consignment;
+        }
+      }
+      return true;
+    });
+  }, [inventory, fromId, selectedParent]);
 
   // Selected target item
   const selectedTarget = useMemo(() => {
@@ -43,6 +57,7 @@ export default function PackagingConversionModal({ isOpen, onClose, inventory = 
   // When parent selection changes, update default unitsPerPack if carton_pack_qty is set
   const handleParentChange = (id) => {
     setFromId(id);
+    setToId(''); // Reset target to avoid incompatible ownership
     const item = parentCandidates.find((i) => String(i.id) === String(id));
     if (item && item.carton_pack_qty && item.carton_pack_qty > 1) {
       setUnitsPerPack(item.carton_pack_qty);
@@ -166,13 +181,16 @@ export default function PackagingConversionModal({ isOpen, onClose, inventory = 
                 <option value="">-- اختر الصنف الأصل --</option>
                 {parentCandidates.map((p) => (
                   <option key={p.id} value={p.id}>
-                    {p.name} ({p.brand}) - متاح: {p.stock_qty}
+                    {p.name} ({p.brand}) {p.is_consignment ? `[🤝 أمانة: ${p.consignment_supplier_name || 'مورد'}]` : '[مملوك]'} - متاح: {p.stock_qty}
                   </option>
                 ))}
               </select>
               {selectedParent && (
-                <div className="text-[11px] text-slate-400 font-mono">
-                  رصيد المخزن الحالي: <span className="text-emerald-400 font-bold">{selectedParent.stock_qty}</span> عبوة
+                <div className="text-[11px] text-slate-400 font-mono flex items-center justify-between pt-0.5">
+                  <span>رصيد المخزن الحالي: <strong className="text-emerald-400 font-bold">{selectedParent.stock_qty}</strong> عبوة</span>
+                  <span className={`px-2 py-0.5 rounded-md text-[10px] font-bold ${selectedParent.is_consignment ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30' : 'bg-blue-500/20 text-blue-300'}`}>
+                    {selectedParent.is_consignment ? `🤝 أمانة: ${selectedParent.consignment_supplier_name || 'مورد'}` : '🏢 بضاعة مملوكة للمحل'}
+                  </span>
                 </div>
               )}
             </div>
@@ -192,13 +210,16 @@ export default function PackagingConversionModal({ isOpen, onClose, inventory = 
                 <option value="">-- اختر الصنف الناتج --</option>
                 {targetCandidates.map((t) => (
                   <option key={t.id} value={t.id}>
-                    {t.name} ({t.brand} - {t.pack_size || 'قطعة'})
+                    {t.name} ({t.brand} - {t.pack_size || 'قطعة'}) {t.is_consignment ? `[🤝 أمانة]` : '[🏢 مملوك]'}
                   </option>
                 ))}
               </select>
               {selectedTarget && (
-                <div className="text-[11px] text-slate-400 font-mono">
-                  رصيد المخزن الحالي: <span className="text-teal-400 font-bold">{selectedTarget.stock_qty}</span> عبوة
+                <div className="text-[11px] text-slate-400 font-mono flex items-center justify-between pt-0.5">
+                  <span>رصيد المخزن الحالي: <strong className="text-teal-400 font-bold">{selectedTarget.stock_qty}</strong> عبوة</span>
+                  <span className={`px-2 py-0.5 rounded-md text-[10px] font-bold ${selectedTarget.is_consignment ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30' : 'bg-blue-500/20 text-blue-300'}`}>
+                    {selectedTarget.is_consignment ? `🤝 أمانة` : '🏢 بضاعة مملوكة'}
+                  </span>
                 </div>
               )}
             </div>

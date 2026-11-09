@@ -42,7 +42,7 @@ export default function ClosingReport({ onOpenBayProfitability }) {
   const [copied, setCopied] = useState(false);
   const [currentShiftData, setCurrentShiftData] = useState(null);
   const [showShiftModal, setShowShiftModal] = useState(false);
-  const [printLayout, setPrintLayout] = useState('a4'); // 'a4' or 'thermal80'
+  const [printLayout, setPrintLayout] = useState('thermal80'); // 'thermal80' (default 80mm roll) or 'a4'
 
   const settings = getShopSettings();
   const enableShiftsMode = !!settings.enableShiftsMode;
@@ -946,88 +946,137 @@ export default function ClosingReport({ onOpenBayProfitability }) {
           </div>
       </div>
 
+      {/* Scoped CSS for Isolated Thermal (80mm) & A4 Closing Report Printing */}
+      <style>{`
+        @media print {
+          @page {
+            margin: 0 !important;
+            size: ${printLayout === 'thermal80' ? '72mm 297mm' : 'A4 portrait'};
+          }
+          html, body {
+            background: #ffffff !important;
+            color: #000000 !important;
+            margin: 0 !important;
+            padding: 0 !important;
+            height: auto !important;
+            min-height: auto !important;
+            overflow: visible !important;
+          }
+          body * {
+            visibility: hidden !important;
+          }
+          .closing-printable-area, .closing-printable-area * {
+            visibility: visible !important;
+          }
+          .closing-printable-area {
+            position: absolute !important;
+            left: 0 !important;
+            right: 0 !important;
+            top: 0 !important;
+            width: 100% !important;
+            max-width: 100% !important;
+            margin: 0 !important;
+            padding: ${printLayout === 'thermal80' ? '4px 1mm 12px 1mm' : '10mm'} !important;
+            background: #ffffff !important;
+            color: #000000 !important;
+            box-shadow: none !important;
+            border: none !important;
+            border-radius: 0 !important;
+            height: auto !important;
+            max-height: none !important;
+            overflow: visible !important;
+            z-index: 999999 !important;
+          }
+          .fixed, .overflow-hidden, .overflow-y-auto {
+            position: static !important;
+            overflow: visible !important;
+            max-height: none !important;
+            height: auto !important;
+          }
+        }
+      `}</style>
+
       {/* 3. Printable Document Structure (Visible ONLY in @media print) */}
-      <div className="hidden print:block text-black bg-white p-6 font-sans">
+      <div className="hidden print:block text-black bg-white font-sans closing-printable-area">
         {printLayout === 'thermal80' ? (
           /* THERMAL 80MM RECEIPT LAYOUT */
-          <div className="w-[72mm] mx-auto text-xs leading-tight font-mono space-y-2">
-            <div className="text-center border-b pb-2">
-              <div className="font-black text-sm">{settings.shopName}</div>
-              <div className="text-[10px] text-gray-600">{settings.address} &bull; هاتف: {settings.shopPhone}</div>
-              <div className="font-bold mt-1 text-[11px]">إيصال إغلاق الصندوق اليومي</div>
-              <div className="text-[10px] text-gray-500">{reportDate}</div>
+          <div className="w-full mx-auto text-xs leading-normal font-sans space-y-2">
+            <div className="text-center border-b-2 border-black pb-2">
+              <div className="font-black text-lg leading-tight">{settings.shopName}</div>
+              <div className="text-xs font-bold text-gray-800 mt-0.5">{settings.address} &bull; هاتف: {settings.shopPhone}</div>
+              <div className="font-black mt-2 text-sm border-2 border-black py-1 px-2 rounded inline-block bg-white text-black">
+                إيصال إغلاق الصندوق اليومي
+              </div>
+              <div className="text-xs font-black text-gray-900 mt-1">تاريخ اليوم: {reportDate}</div>
             </div>
 
-            <div className="space-y-1 text-[11px]">
-              <div className="flex justify-between">
-                <span>السيارات المخدومة:</span>
-                <span className="font-bold">{summary.total_cars_served}</span>
+            <div className="space-y-1.5 text-xs font-bold py-1 border-b-2 border-black">
+              <div className="flex justify-between items-center">
+                <span className="text-gray-700">السيارات المخدومة:</span>
+                <span className="font-black text-sm">{summary.total_cars_served} سيارة</span>
               </div>
-              <div className="flex justify-between">
-                <span>إجمالي الفواتير:</span>
-                <span className="font-bold">{summary.total_invoices}</span>
+              <div className="flex justify-between items-center">
+                <span className="text-gray-700">إجمالي الفواتير المصدرة:</span>
+                <span className="font-black text-sm">{summary.total_invoices} فاتورة</span>
               </div>
-              <div className="flex justify-between border-t pt-1 font-bold">
-                <span>إجمالي المبيعات:</span>
-                <span>{summary.total_net_sales.toLocaleString()} ر.ي</span>
+              <div className="flex justify-between items-center border-t border-dashed border-gray-400 pt-1 text-sm">
+                <span className="font-black">إجمالي المبيعات الصافية:</span>
+                <span className="font-black font-mono">{summary.total_net_sales.toLocaleString()} ر.ي</span>
               </div>
-              <div className="flex justify-between text-[10px] text-gray-600 pr-2">
-                <span>- مبيعات بضائع:</span>
-                <span>{goodsRev.toLocaleString()} ر.ي</span>
+              <div className="flex justify-between text-xs text-gray-800 pr-2">
+                <span>- مبيعات أصناف وبضائع:</span>
+                <span className="font-mono">{goodsRev.toLocaleString()} ر.ي</span>
               </div>
-              <div className="flex justify-between text-[10px] text-gray-600 pr-2">
-                <span>- إيرادات خدمات:</span>
-                <span>{servRev.toLocaleString()} ر.ي</span>
-              </div>
-              <div className="flex justify-between text-[10px] text-gray-600 pr-2">
-                <span>- ساعة الذروة:</span>
-                <span>{peakHour.label} ({peakHour.cars_count} سيارات)</span>
-              </div>
-              <div className="flex justify-between text-[10px] text-gray-600 pr-2">
-                <span>- معدل الفاتورة:</span>
-                <span>{avgTicket.toLocaleString()} ر.ي / سيارة</span>
+              <div className="flex justify-between text-xs text-gray-800 pr-2">
+                <span>- إيرادات أجور يد وخدمات:</span>
+                <span className="font-mono">{servRev.toLocaleString()} ر.ي</span>
               </div>
             </div>
 
-            <div className="border-t pt-1 space-y-1 text-[11px]">
-              <div className="flex justify-between">
-                <span>مقبوضات كاش:</span>
-                <span className="font-bold">+{cash_register.inflow_cash_invoices.toLocaleString()}</span>
+            <div className="border-b-2 border-black py-1.5 space-y-1 text-xs font-bold">
+              <div className="flex justify-between items-center">
+                <span className="text-gray-800">مقبوضات مبيعات كاش:</span>
+                <span className="font-black font-mono">+{cash_register.inflow_cash_invoices.toLocaleString()} ر.ي</span>
               </div>
-              <div className="flex justify-between">
-                <span>تحصيل ديون كاش:</span>
-                <span className="font-bold">+{cash_register.inflow_cash_debt_collected.toLocaleString()}</span>
+              <div className="flex justify-between items-center">
+                <span className="text-gray-800">تحصيل ديون قديمة كاش:</span>
+                <span className="font-black font-mono">+{cash_register.inflow_cash_debt_collected.toLocaleString()} ر.ي</span>
               </div>
-              <div className="flex justify-between text-gray-700">
-                <span>مصاريف نقدية:</span>
-                <span>-{transactions_summary.expenses_total.toLocaleString()}</span>
+              <div className="flex justify-between items-center text-gray-900">
+                <span>مصاريف نقدية من الصندوق:</span>
+                <span className="font-black font-mono">-{transactions_summary.expenses_total.toLocaleString()} ر.ي</span>
               </div>
               {ownerDrawings > 0 && (
-                <div className="flex justify-between text-gray-700">
-                  <span>مسحوبات مالك (3101):</span>
-                  <span>-{ownerDrawings.toLocaleString()}</span>
+                <div className="flex justify-between items-center text-gray-900">
+                  <span>مسحوبات جاري المالك (3101):</span>
+                  <span className="font-black font-mono">-{ownerDrawings.toLocaleString()} ر.ي</span>
                 </div>
               )}
-              <div className="flex justify-between border-t pt-1 font-black text-xs">
-                <span>رصيد الصندوق (1101):</span>
-                <span>{liveDrawerBal.toLocaleString()} ر.ي</span>
+              <div className="flex justify-between items-center border-2 border-black p-2 mt-2 bg-gray-50 text-sm">
+                <span className="font-black">رصيد الصندوق الفعلي (1101):</span>
+                <span className="font-black font-mono text-base">{liveDrawerBal.toLocaleString()} ر.ي</span>
               </div>
             </div>
 
-            <div className="border-t pt-1 space-y-1 text-[10px]">
-              <div className="flex justify-between">
-                <span>محافظ إلكترونية:</span>
-                <span>{payment_methods_breakdown.e_wallets.total.toLocaleString()} ر.ي</span>
+            <div className="border-b-2 border-black py-1.5 space-y-1 text-xs font-bold">
+              <div className="flex justify-between items-center">
+                <span className="text-gray-700">محافظ وبنوك إلكترونية:</span>
+                <span className="font-mono font-black">{payment_methods_breakdown.e_wallets.total.toLocaleString()} ر.ي</span>
               </div>
-              <div className="flex justify-between">
-                <span>مبيعات آجل (ديون):</span>
-                <span>{summary.total_new_debts.toLocaleString()} ر.ي</span>
+              <div className="flex justify-between items-center">
+                <span className="text-gray-700">مبيعات آجلة جديدة (ديون):</span>
+                <span className="font-mono font-black">{summary.total_new_debts.toLocaleString()} ر.ي</span>
               </div>
             </div>
 
-            <div className="border-t pt-2 text-center text-[10px] space-y-4">
-              <div>توقيع الكاشير: ........................</div>
-              <div className="text-[9px] text-gray-400">طُبع بتاريخ {new Date().toLocaleString('ar-YE')}</div>
+            <div className="pt-3 text-center text-xs font-bold space-y-3">
+              <div className="flex justify-around items-center pt-2">
+                <div>توقيع الكاشير: ........................</div>
+                <div>توقيع المشرف: ........................</div>
+              </div>
+              <div className="text-[10px] text-gray-600 font-mono border-t border-gray-300 pt-1">
+                نظام سريع وبنشر PRO &bull; طُبع في {new Date().toLocaleString('ar-YE')}
+              </div>
             </div>
           </div>
         ) : (

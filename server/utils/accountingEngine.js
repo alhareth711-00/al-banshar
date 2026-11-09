@@ -11,33 +11,6 @@ const { formatDate } = require('./helpers');
  * Initializes and seeds default Chart of Accounts if not present.
  */
 function seedChartOfAccounts(db) {
-  // Ensure 3001 Opening Capital account exists even if accounts were seeded previously
-  try {
-    db.prepare(`
-      INSERT OR IGNORE INTO chart_of_accounts (code, name, type, sub_type, normal_balance, description)
-      VALUES ('3001', 'رأس المال / الأرصدة الافتتاحية (بضاعة أول المدة)', 'equity', 'capital', 'credit', 'رأس المال الافتتاحي وحقوق الملكية المقابلة لبضاعة أول المدة والأرصدة التأسيسية')
-    `).run();
-    db.prepare(`
-      INSERT OR IGNORE INTO chart_of_accounts (code, name, type, sub_type, normal_balance, description)
-      VALUES ('4302', 'إيراد مبيعات الزيوت التالفة والتدوير', 'revenue', 'reclamation_revenue', 'credit', 'عوائد بيع الزيوت المحروقة والتالفة لشركات التدوير (ربح صافٍ 100%)')
-    `).run();
-    db.prepare(`
-      INSERT OR IGNORE INTO chart_of_accounts (code, name, type, sub_type, normal_balance, description)
-      VALUES ('4303', 'فائض وأرباح تسوية عهدة الصندوق', 'revenue', 'cash_surplus', 'credit', 'الفائض النقدي غير المفسر الناتج عن جرد وتسوية عهدة الصندوق عند إغلاق الورديات')
-    `).run();
-    db.prepare(`
-      INSERT OR IGNORE INTO chart_of_accounts (code, name, type, sub_type, normal_balance, description)
-      VALUES ('6110', 'عجز وفروقات عهدة الصندوق النقدي', 'expense', 'cash_shortage', 'debit', 'العجز النقدي المثبت رسمياً الناتج عن جرد وتسوية عهدة الصندوق عند إغلاق الورديات')
-    `).run();
-  } catch (e) {
-    // ignore
-  }
-
-  const count = db.prepare('SELECT COUNT(*) as count FROM chart_of_accounts').get().count;
-  if (count > 1) return;
-
-  console.log('[Accounting] Initializing standard Chart of Accounts...');
-
   const accounts = [
     // 1000 - Assets (الأصول)
     { code: '1101', name: 'الصندوق النقدي الرئيسي (الدرج)', type: 'asset', sub_type: 'cash_drawer', normal_balance: 'debit', description: 'النقدية الحاضرة في درج كاشير المركز' },
@@ -87,7 +60,7 @@ function seedChartOfAccounts(db) {
   ];
 
   const stmt = db.prepare(`
-    INSERT INTO chart_of_accounts (code, name, type, sub_type, normal_balance, description)
+    INSERT OR IGNORE INTO chart_of_accounts (code, name, type, sub_type, normal_balance, description)
     VALUES (@code, @name, @type, @sub_type, @normal_balance, @description)
   `);
 
@@ -294,12 +267,16 @@ function createJournalEntry(db, { entry_date, ref_type, ref_id, ref_number, desc
 function postInvoice(db, { invoice, items }) {
   const lines = [];
 
-  const paidAmount = roundMoney(safeNum(invoice.paid_amount, 0));
+  const rawPaidAmount = roundMoney(safeNum(invoice.paid_amount, 0));
   const remainingDebt = roundMoney(safeNum(invoice.remaining_debt, 0));
   const itemsTotal = roundMoney(safeNum(invoice.items_total, 0));
   const laborTotal = roundMoney(safeNum(invoice.labor_total, 0));
   const scrapDeduction = roundMoney(safeNum(invoice.scrap_battery_deduction, 0));
   const discount = roundMoney(safeNum(invoice.discount, 0));
+  const netTotal = roundMoney(Math.max(0, itemsTotal + laborTotal - scrapDeduction - discount));
+
+  // Clamping payment to net total to prevent double-entry debit imbalance on overpayments (change returned to customer)
+  const paidAmount = roundMoney(Math.min(rawPaidAmount, netTotal));
 
   // 1. Debit Payments
   if (paidAmount > 0) {
@@ -536,10 +513,8 @@ function postPurchase(db, { purchase, items }) {
       const invAcc = getInventoryAccountCode(inv.category);
       categoryDebits[invAcc] = roundMoney((categoryDebits[invAcc] || 0) + lineTotal);
 
-      // Calculate new WAC defensively
-      const prevQty = Math.max(0, safeNum(inv.stock_qty, 0) - inQty); // stock was already incremented in model
-      const prevCost = safeNum(inv.cost_price, inUnitCost);
-      const newWac = calcWAC(prevQty, prevCost, inQty, inUnitCost);
+      // inv.cost_price is already updated to the new authoritative WAC by purchaseModel
+      const newWac = safeNum(inv.cost_price, inUnitCost);
 
       // Record stock movement
       db.prepare(`
@@ -1313,23 +1288,45 @@ function getStatementOfAccount(db, { party_type, party_id, start_date, end_date,
   // Calculate opening balance before start_date
   let openingBalance = 0;
   if (start_date) {
-    const prevRows = db.prepare(`
-      SELECT jl.debit, jl.credit
-      FROM journal_lines jl
-      JOIN journal_entries je ON jl.journal_entry_id = je.id
-      WHERE jl.account_code = ? 
-        AND jl.party_type = ? 
-        AND jl.party_id = ?
-        AND date(je.entry_date) < date(?)
-    `).all(accountCode, party_type, party_id, start_date);
+    if (party_type === 'worker') {
+      const prevWages = db.prepare(`
+        SELECT COALESCE(SUM(daily_wage), 0) AS total
+        FROM worker_attendance
+        WHERE worker_id = ? AND status = 'present' AND date(work_date) < date(?)
+      `).get(party_id, start_date).total;
+      openingBalance = roundMoney(openingBalance + prevWages);
 
-    for (const r of prevRows) {
-      if (party_type === 'customer' || party_type === 'worker') {
-        // Debit increases customer/worker debt, credit decreases it
-        openingBalance = roundMoney(openingBalance + r.debit - r.credit);
-      } else {
-        // Supplier is liability: credit increases payable, debit decreases it
-        openingBalance = roundMoney(openingBalance + r.credit - r.debit);
+      const prevRows = db.prepare(`
+        SELECT jl.debit, jl.credit
+        FROM journal_lines jl
+        JOIN journal_entries je ON jl.journal_entry_id = je.id
+        WHERE jl.party_type = 'worker' 
+          AND jl.party_id = ?
+          AND date(je.entry_date) < date(?)
+      `).all(party_id, start_date);
+
+      for (const r of prevRows) {
+        openingBalance = roundMoney(openingBalance - r.debit + r.credit);
+      }
+    } else {
+      const prevRows = db.prepare(`
+        SELECT jl.debit, jl.credit
+        FROM journal_lines jl
+        JOIN journal_entries je ON jl.journal_entry_id = je.id
+        WHERE jl.account_code = ? 
+          AND jl.party_type = ? 
+          AND jl.party_id = ?
+          AND date(je.entry_date) < date(?)
+      `).all(accountCode, party_type, party_id, start_date);
+
+      for (const r of prevRows) {
+        if (party_type === 'customer') {
+          // Debit increases customer debt, credit decreases it
+          openingBalance = roundMoney(openingBalance + r.debit - r.credit);
+        } else {
+          // Supplier is liability: credit increases payable, debit decreases it
+          openingBalance = roundMoney(openingBalance + r.credit - r.debit);
+        }
       }
     }
   }
@@ -1353,11 +1350,17 @@ function getStatementOfAccount(db, { party_type, party_id, start_date, end_date,
       ) AS paper_bill_number
     FROM journal_lines jl
     JOIN journal_entries je ON jl.journal_entry_id = je.id
-    WHERE jl.account_code = ? 
-      AND jl.party_type = ? 
+    WHERE jl.party_type = ? 
       AND jl.party_id = ?
   `;
-  const params = [accountCode, party_type, party_id];
+  const params = [party_type, party_id];
+
+  if (party_type !== 'worker') {
+    query += ' AND jl.account_code = ?';
+    params.push(accountCode);
+  } else {
+    query += " AND jl.account_code IN ('1202', '6108')";
+  }
 
   if (start_date) {
     query += ' AND date(je.entry_date) >= date(?)';
@@ -1415,6 +1418,43 @@ function getStatementOfAccount(db, { party_type, party_id, start_date, end_date,
     });
   }
 
+  // If party_type === 'worker', include daily earned wages from worker_attendance
+  if (party_type === 'worker') {
+    let attQuery = `SELECT * FROM worker_attendance WHERE worker_id = ? AND status = 'present'`;
+    const attParams = [party_id];
+    if (start_date) {
+      attQuery += ' AND date(work_date) >= date(?)';
+      attParams.push(start_date);
+    }
+    if (end_date) {
+      attQuery += ' AND date(work_date) <= date(?)';
+      attParams.push(end_date);
+    }
+    const attendanceRecords = db.prepare(attQuery).all(...attParams);
+    for (const att of attendanceRecords) {
+      transactions.push({
+        entry_id: `att_${att.id}`,
+        entry_number: `ATT-${att.work_date.replace(/-/g, '')}`,
+        entry_date: att.work_date,
+        ref_type: 'attendance',
+        ref_number: `ATT-${att.work_date}`,
+        description: `استحقاق أجر يوم عمل (${att.work_date}) - حاضر`,
+        debit: 0,
+        credit: Number(att.daily_wage) || 0,
+        created_at: att.created_at,
+        paper_bill_number: null,
+      });
+    }
+
+    // Re-sort transactions by date
+    transactions.sort((a, b) => {
+      const dateA = a.entry_date || '';
+      const dateB = b.entry_date || '';
+      if (dateA !== dateB) return dateA.localeCompare(dateB);
+      return String(a.created_at || a.entry_id).localeCompare(String(b.created_at || b.entry_id));
+    });
+  }
+
   // Optional filter by paper_bill_number (Upgrade 4)
   if (paper_bill_number && paper_bill_number.trim()) {
     const pTerm = paper_bill_number.trim().toLowerCase();
@@ -1432,9 +1472,10 @@ function getStatementOfAccount(db, { party_type, party_id, start_date, end_date,
     totalDebits = roundMoney(totalDebits + t.debit);
     totalCredits = roundMoney(totalCredits + t.credit);
 
-    if (party_type === 'customer' || party_type === 'worker') {
+    if (party_type === 'customer') {
       runningBalance = roundMoney(runningBalance + t.debit - t.credit);
     } else {
+      // Both supplier and worker: Credit increases payable/due (له), Debit decreases it (سددنا له / استلم)
       runningBalance = roundMoney(runningBalance + t.credit - t.debit);
     }
 

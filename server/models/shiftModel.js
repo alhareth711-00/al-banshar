@@ -70,8 +70,8 @@ const shiftModel = {
         COALESCE(SUM(CASE WHEN payment_method != 'cash' AND payment_method != 'credit' THEN paid_amount ELSE 0 END), 0) AS ewallet_sales,
         COALESCE(SUM(remaining_debt), 0) AS new_debts
       FROM invoices
-      WHERE created_at >= ?
-    `).get(shift.opened_at);
+      WHERE is_voided = 0 AND (shift_id = ? OR (shift_id IS NULL AND created_at >= ?))
+    `).get(shift.id, shift.opened_at);
 
     // 2. Shift Cash Receipt Vouchers (RV)
     const rvStats = db.prepare(`

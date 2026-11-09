@@ -20,6 +20,7 @@ import {
 import VoucherPrintTemplate from './VoucherPrintTemplate';
 import { getShopSettings, formatYemeniWhatsAppLink } from '../utils/settings';
 import { tafqeet } from '../utils/tafqeet';
+import { printThermalVoucherSilently } from '../utils/voucherThermalPrinter';
 
 export default function VoucherDetailsModal({
   isOpen,
@@ -70,7 +71,11 @@ export default function VoucherDetailsModal({
   if (!isOpen) return null;
 
   const handlePrint = () => {
-    window.print();
+    if (printMode === 'thermal') {
+      printThermalVoucherSilently(voucher);
+    } else {
+      window.print();
+    }
   };
 
   const getWhatsAppMessage = () => {
@@ -109,6 +114,59 @@ ${voucher.new_balance > 0 ? `⚖️ *الرصيد المتبقي:* ${Number(vouc
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-3 lg:p-6 bg-slate-950/80 backdrop-blur-md select-none print:p-0 print:bg-white print:static">
+      {/* Scoped CSS for Isolated Thermal (80mm) & A4 Voucher Printing */}
+      <style>{`
+        @media print {
+          @page {
+            margin: 0 !important;
+            size: ${printMode === 'thermal' ? '72mm 297mm' : 'auto'};
+          }
+          html, body {
+            background: #ffffff !important;
+            color: #000000 !important;
+            margin: 0 !important;
+            padding: 0 !important;
+            height: auto !important;
+            min-height: auto !important;
+            overflow: visible !important;
+          }
+          body * {
+            visibility: hidden !important;
+          }
+          .voucher-printable-area, .voucher-printable-area * {
+            visibility: visible !important;
+          }
+          .voucher-printable-area {
+            position: absolute !important;
+            left: 0 !important;
+            right: 0 !important;
+            top: 0 !important;
+            width: 100% !important;
+            max-width: 100% !important;
+            margin: 0 !important;
+            padding: ${printMode === 'thermal' ? '4px 1mm 12px 1mm' : '6mm'} !important;
+            background: #ffffff !important;
+            color: #000000 !important;
+            box-shadow: none !important;
+            border: none !important;
+            border-radius: 0 !important;
+            height: auto !important;
+            max-height: none !important;
+            overflow: visible !important;
+            z-index: 999999 !important;
+          }
+          .fixed, .overflow-hidden, .overflow-y-auto {
+            position: static !important;
+            overflow: visible !important;
+            max-height: none !important;
+            height: auto !important;
+          }
+          .no-print {
+            display: none !important;
+          }
+        }
+      `}</style>
+
       <div className="relative w-full max-w-4xl max-h-[92vh] flex flex-col rounded-3xl bg-slate-900 border border-white/10 shadow-2xl overflow-hidden print:border-none print:shadow-none print:max-w-none print:max-h-none print:bg-white print:rounded-none">
         {/* Top Header - Hidden in Print */}
         <div className="flex items-center justify-between p-4 px-6 border-b border-white/10 bg-slate-950/60 print:hidden">
@@ -233,7 +291,7 @@ ${voucher.new_balance > 0 ? `⚖️ *الرصيد المتبقي:* ${Number(vouc
                 </button>
               </div>
 
-              <div className="bg-white rounded-2xl p-4 overflow-x-auto shadow-2xl">
+              <div className="voucher-printable-area bg-white rounded-2xl p-4 overflow-x-auto shadow-2xl print:p-0 print:m-0 print:shadow-none print:border-none">
                 <VoucherPrintTemplate voucher={voucher} mode={printMode} />
               </div>
             </div>
@@ -508,6 +566,13 @@ ${voucher.new_balance > 0 ? `⚖️ *الرصيد المتبقي:* ${Number(vouc
           </div>
         </div>
       </div>
+
+      {/* Fallback printable area if print triggered while viewing details tab */}
+      {activeTab !== 'print' && voucher && (
+        <div className="hidden print:block voucher-printable-area print:p-0 print:m-0">
+          <VoucherPrintTemplate voucher={voucher} mode={printMode} />
+        </div>
+      )}
     </div>
   );
 }

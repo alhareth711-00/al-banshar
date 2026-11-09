@@ -172,7 +172,7 @@ const inventoryModel = {
         name: data.name.trim(),
         category,
         item_type: isService ? 'service' : 'product',
-        brand: data.brand ? data.brand.trim() : (isService ? 'خدمات المركز' : 'عام'),
+        brand: data.brand && data.brand.trim() ? data.brand.trim() : (isService ? 'خدمات المركز' : ''),
         viscosity,
         oil_type,
         api_grade,
@@ -275,6 +275,15 @@ const inventoryModel = {
       ? Math.max(1, safeNum(data.carton_pack_qty, 1))
       : (existing.carton_pack_qty || 1);
 
+    // [MOD-CONSIGNMENT Guard]: Prevent switching ownership on items with existing physical stock
+    if (data.is_consignment !== undefined) {
+      const newIsConsignment = data.is_consignment ? 1 : 0;
+      const currentIsConsignment = existing.is_consignment ? 1 : 0;
+      if (newIsConsignment !== currentIsConsignment && Number(existing.stock_qty) > 0) {
+        throw new Error(`حظر محاسبي [MOD-CONSIGNMENT]: لا يمكن تغيير صفة ملكية الصنف "${existing.name}" (من/إلى بضاعة أمانة) طالما يوجد له رصيد حالي بالمستودع (${existing.stock_qty} وحدة). يرجى تسوية رصيد المخزن إلى الصفر أولاً لحماية ميزان المراجعة والأستاذ العام.`);
+      }
+    }
+
     const stmt = db.prepare(`
       UPDATE inventory SET
         sku = @sku,
@@ -314,7 +323,7 @@ const inventoryModel = {
       name: data.name ? data.name.trim() : existing.name,
       category,
       item_type: isService ? 'service' : (data.item_type || existing.item_type || 'product'),
-      brand: data.brand ? data.brand.trim() : existing.brand,
+      brand: data.brand !== undefined ? (data.brand && data.brand.trim() ? data.brand.trim() : '') : existing.brand,
       viscosity,
       oil_type,
       api_grade,
@@ -420,15 +429,17 @@ const inventoryModel = {
       const costValue = roundMoney(Math.abs(delta) * item.cost_price);
 
       // 2. Record stock movement
+      const refType = item.is_consignment && delta < 0 ? 'consignment_damage' : 'adjustment';
       db.prepare(`
         INSERT INTO stock_movements (
           inventory_id, movement_type, ref_type, ref_id,
           qty_in, qty_out, unit_cost, total_cost, unit_price,
           balance_qty_after, wac_cost_after, notes, created_at
-        ) VALUES (?, ?, 'adjustment', ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now', 'localtime'))
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now', 'localtime'))
       `).run(
         id,
         movementType,
+        refType,
         id,
         delta > 0 ? delta : 0,
         delta < 0 ? Math.abs(delta) : 0,
@@ -442,31 +453,136 @@ const inventoryModel = {
 
       // 3. Post balanced double-entry adjustment in General Ledger
       if (costValue > 0) {
-        const invAccount = getInventoryAccountCode(item.category);
-        const lines = [];
+        const isConsignment = Boolean(item.is_consignment);
 
-        if (delta > 0) {
-          // Surplus: Debit Inventory, Credit Retained Earnings / Equity
-          lines.push(
-            { account_code: invAccount, debit: costValue, credit: 0, description: `تسوية جردية فائض: ${item.name}` },
-            { account_code: '3201', debit: 0, credit: costValue, description: `أرباح تسوية جردية فائض: ${item.name}` }
-          );
+        if (isConsignment) {
+          // [MOD-CONSIGNMENT]: Consignment goods do NOT belong to shop inventory assets (1301-1305).
+          // If Deficit (delta < 0): workshop bears the loss for third-party custody!
+          // Debit Operating Loss (6109), Credit Consignment Supplier Payables (2101).
+          if (delta < 0) {
+            const supplierName = (item.consignment_supplier_name || 'مورد بضاعة أمانة').trim();
+            let supplier = db.prepare('SELECT id, name, balance_due FROM suppliers WHERE name = ? OR company_name = ? LIMIT 1').get(supplierName, supplierName);
+            if (!supplier) {
+              const newSup = db.prepare('INSERT INTO suppliers (name, company_name, balance_due, notes) VALUES (?, ?, ?, ?)').run(
+                supplierName,
+                supplierName,
+                costValue,
+                'مورد بضاعة أمانة تم إنشاؤه آلياً عند تسوية عجز أمانة'
+              );
+              supplier = { id: newSup.lastInsertRowid, name: supplierName, balance_due: costValue };
+            } else {
+              db.prepare('UPDATE suppliers SET balance_due = balance_due + ? WHERE id = ?').run(costValue, supplier.id);
+            }
+
+            const lines = [
+              { account_code: '6109', debit: costValue, credit: 0, description: `خسائر تلف وعجز بضاعة أمانة: ${item.name}` },
+              { account_code: '2101', debit: 0, credit: costValue, party_type: 'supplier', party_id: supplier.id, description: `التزام مورد أمانة (${supplier.name}) عن تلف/عجز (${item.name})` }
+            ];
+
+            createJournalEntry(db, {
+              entry_date: formatDate(),
+              ref_type: 'inventory_adjustment',
+              ref_id: id,
+              description: `تسوية عجز/تلف بضاعة أمانة (${item.name}): ${delta} عبوة`,
+              lines,
+            });
+          }
+          // If Surplus (delta > 0): Consignment goods do NOT inflate shop equity!
+          // We only adjusted physical custody stock and recorded stock movement. No equity distortion.
         } else {
-          // Shrinkage/Loss: Debit Operating Loss/Expense, Credit Inventory
-          lines.push(
-            { account_code: '6109', debit: costValue, credit: 0, description: `خسائر عجز جردي: ${item.name}` },
-            { account_code: invAccount, debit: 0, credit: costValue, description: `تخفيض مخزون بعجز جردي: ${item.name}` }
-          );
-        }
+          // Standard Owned Inventory
+          const invAccount = getInventoryAccountCode(item.category);
+          const lines = [];
 
-        createJournalEntry(db, {
-          entry_date: formatDate(),
-          ref_type: 'inventory_adjustment',
-          ref_id: id,
-          description: `قيد تسوية جردية (${item.name}): ${delta > 0 ? '+' : ''}${delta} ${item.pack_size}`,
-          lines,
-        });
+          if (delta > 0) {
+            // Surplus: Debit Inventory, Credit Retained Earnings / Equity
+            lines.push(
+              { account_code: invAccount, debit: costValue, credit: 0, description: `تسوية جردية فائض: ${item.name}` },
+              { account_code: '3201', debit: 0, credit: costValue, description: `أرباح تسوية جردية فائض: ${item.name}` }
+            );
+          } else {
+            // Shrinkage/Loss: Debit Operating Loss/Expense, Credit Inventory
+            lines.push(
+              { account_code: '6109', debit: costValue, credit: 0, description: `خسائر عجز جردي: ${item.name}` },
+              { account_code: invAccount, debit: 0, credit: costValue, description: `تخفيض مخزون بعجز جردي: ${item.name}` }
+            );
+          }
+
+          createJournalEntry(db, {
+            entry_date: formatDate(),
+            ref_type: 'inventory_adjustment',
+            ref_id: id,
+            description: `قيد تسوية جردية (${item.name}): ${delta > 0 ? '+' : ''}${delta} ${item.pack_size}`,
+            lines,
+          });
+        }
       }
+
+      return this.getById(id);
+    });
+
+    return execute();
+  },
+
+  /**
+   * Receives a new batch of consignment stock without generating immediate financial debt
+   * (Debt is recognized only upon actual sale)
+   */
+  receiveConsignmentStock(id, { qty, supplier_name, notes = '', received_by = 'أمين المستودع' }) {
+    const execute = db.transaction(() => {
+      const item = this.getById(id);
+      if (!item) throw new Error('الصنف غير موجود');
+      if (!item.is_consignment) {
+        throw new Error('هذا الصنف ليس مسجلاً كبضاعة أمانة. لتوريد بضاعة مملوكة يرجى استخدام فاتورة مشتريات رسمية.');
+      }
+
+      const inQty = safeNum(qty, 0);
+      if (inQty <= 0) {
+        throw new Error('الكمية المستلمة يجب أن تكون أكبر من الصفر');
+      }
+
+      const effectiveSupplier = (supplier_name || item.consignment_supplier_name || 'مورد عام').trim();
+      const newStock = roundMoney(item.stock_qty + inQty);
+
+      // 1. Update stock
+      db.prepare('UPDATE inventory SET stock_qty = ? WHERE id = ?').run(newStock, id);
+
+      // If supplier name was changed/updated during receipt, update item
+      if (effectiveSupplier && effectiveSupplier !== item.consignment_supplier_name) {
+        db.prepare('UPDATE inventory SET consignment_supplier_name = ? WHERE id = ?').run(effectiveSupplier, id);
+      }
+
+      // 2. Ensure supplier exists in suppliers table
+      let supplier = db.prepare('SELECT id, name FROM suppliers WHERE name = ? OR company_name = ? LIMIT 1').get(effectiveSupplier, effectiveSupplier);
+      if (!supplier) {
+        const newSup = db.prepare('INSERT INTO suppliers (name, company_name, balance_due, notes) VALUES (?, ?, 0, ?)').run(
+          effectiveSupplier,
+          effectiveSupplier,
+          'مورد بضاعة أمانة تم تسجيله عند استلام دفعة أمانة'
+        );
+        supplier = { id: newSup.lastInsertRowid, name: effectiveSupplier };
+      }
+
+      const totalCostValue = roundMoney(inQty * item.cost_price);
+
+      // 3. Record stock movement (custody receipt, zero immediate debt)
+      db.prepare(`
+        INSERT INTO stock_movements (
+          inventory_id, movement_type, ref_type, ref_id,
+          qty_in, qty_out, unit_cost, total_cost, unit_price,
+          balance_qty_after, wac_cost_after, notes, created_at
+        ) VALUES (?, 'adjustment_in', 'consignment_receipt', ?, ?, 0, ?, ?, ?, ?, ?, ?, datetime('now', 'localtime'))
+      `).run(
+        id,
+        supplier.id,
+        inQty,
+        item.cost_price,
+        totalCostValue,
+        item.sell_price,
+        newStock,
+        item.cost_price,
+        `استلام دفعة بضاعة أمانة برسم البيع (المورد: ${effectiveSupplier})${notes ? ` - ${notes}` : ''} [بواسطة: ${received_by}]`
+      );
 
       return this.getById(id);
     });
@@ -485,6 +601,23 @@ const inventoryModel = {
       const toItem = this.getById(to_id);
 
       if (!fromItem || !toItem) throw new Error('أحد الأصناف المحددة للتحويل غير موجود');
+
+      // [MOD-CONSIGNMENT]: Enforce Consignment Ownership Parity
+      if (fromItem.is_consignment) {
+        if (!toItem.is_consignment) {
+          // If child item has zero stock, auto-align it as consignment with the same supplier
+          if (Number(toItem.stock_qty) === 0) {
+            db.prepare('UPDATE inventory SET is_consignment = 1, consignment_supplier_name = ? WHERE id = ?')
+              .run(fromItem.consignment_supplier_name, to_id);
+          } else {
+            throw new Error(`لا يمكن تفكيك صنف أمانة تابع للمورد (${fromItem.consignment_supplier_name}) إلى صنف مملوك للمحل (${toItem.name}). يرجى اختيار صنف ناتج مخصص للأمانة لنفس المورد منعاً لاختلاط الذمة المالية.`);
+          }
+        } else if (fromItem.consignment_supplier_name !== toItem.consignment_supplier_name) {
+          throw new Error(`تعارض في اسم مورد الأمانة: الصنف الأصل يتبع (${fromItem.consignment_supplier_name}) بينما الصنف الناتج يتبع (${toItem.consignment_supplier_name}).`);
+        }
+      } else if (toItem.is_consignment) {
+        throw new Error(`لا يمكن تفكيك صنف مملوك للمحل (${fromItem.name}) إلى صنف أمانة تابع للمورد (${toItem.consignment_supplier_name}).`);
+      }
 
       const packages = Math.max(1, safeNum(packages_to_convert, 1));
       const unitsPerPkg = Math.max(1, safeNum(units_per_package, fromItem.carton_pack_qty || 24));
@@ -645,6 +778,89 @@ const inventoryModel = {
       total_negative_stock_alerts: negativeStockTotal,
       categories,
     };
+  },
+
+  /**
+   * Retrieves comprehensive consignment settlement data grouped by supplier
+   * for consignment audit, liquidation, and settlements with reps
+   */
+  getConsignmentSettlementSummary(supplierFilter = null) {
+    let query = `
+      SELECT id, name, sku, brand, category, viscosity, pack_size, cost_price, sell_price, stock_qty, consignment_supplier_name
+      FROM inventory
+      WHERE is_consignment = 1 AND is_active = 1
+    `;
+    const params = [];
+    if (supplierFilter && supplierFilter !== 'all') {
+      query += ' AND consignment_supplier_name = ?';
+      params.push(supplierFilter.trim());
+    }
+    query += ' ORDER BY consignment_supplier_name ASC, name ASC';
+    const items = db.prepare(query).all(...params);
+
+    // Group items by supplier
+    const suppliersMap = {};
+
+    for (const item of items) {
+      const supName = (item.consignment_supplier_name || 'مورد عام').trim();
+      if (!suppliersMap[supName]) {
+        // Find supplier record
+        const supRecord = db.prepare('SELECT id, name, company_name, phone, balance_due FROM suppliers WHERE name = ? OR company_name = ? LIMIT 1').get(supName, supName);
+        
+        let totalPaidVouchers = 0;
+        if (supRecord) {
+          const pvSum = db.prepare(`
+            SELECT COALESCE(SUM(amount), 0) AS total_paid
+            FROM official_vouchers
+            WHERE voucher_type = 'payment' AND party_type = 'supplier' AND party_id = ? AND status != 'voided'
+          `).get(supRecord.id);
+          totalPaidVouchers = Number(pvSum?.total_paid) || 0;
+        }
+
+        suppliersMap[supName] = {
+          supplier_name: supName,
+          supplier_id: supRecord?.id || null,
+          supplier_phone: supRecord?.phone || null,
+          current_balance_due: Number(supRecord?.balance_due) || 0,
+          total_paid_vouchers: totalPaidVouchers,
+          total_stock_qty: 0,
+          total_sold_qty: 0,
+          total_lost_qty: 0,
+          total_cost_due: 0,
+          total_stock_cost_value: 0,
+          items: [],
+        };
+      }
+
+      // Compute units sold and lost from stock movements
+      const soldStats = db.prepare(`
+        SELECT 
+          COALESCE(SUM(CASE WHEN movement_type = 'sale' THEN qty_out ELSE 0 END), 0) AS sold_qty,
+          COALESCE(SUM(CASE WHEN ref_type = 'consignment_damage' OR (movement_type = 'adjustment_out' AND notes LIKE '%أمانة%') THEN qty_out ELSE 0 END), 0) AS lost_qty
+        FROM stock_movements
+        WHERE inventory_id = ?
+      `).get(item.id);
+
+      const soldQty = Number(soldStats?.sold_qty) || 0;
+      const lostQty = Number(soldStats?.lost_qty) || 0;
+      const shelfStock = Math.max(0, Number(item.stock_qty) || 0);
+      const costDue = roundMoney((soldQty + lostQty) * item.cost_price);
+      const stockCostVal = roundMoney(shelfStock * item.cost_price);
+
+      item.sold_qty = soldQty;
+      item.lost_qty = lostQty;
+      item.total_cost_due = costDue;
+      item.stock_cost_value = stockCostVal;
+
+      suppliersMap[supName].items.push(item);
+      suppliersMap[supName].total_stock_qty += shelfStock;
+      suppliersMap[supName].total_sold_qty += soldQty;
+      suppliersMap[supName].total_lost_qty += lostQty;
+      suppliersMap[supName].total_cost_due = roundMoney(suppliersMap[supName].total_cost_due + costDue);
+      suppliersMap[supName].total_stock_cost_value = roundMoney(suppliersMap[supName].total_stock_cost_value + stockCostVal);
+    }
+
+    return Object.values(suppliersMap);
   },
 
   /**

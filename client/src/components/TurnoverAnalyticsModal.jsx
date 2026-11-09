@@ -213,7 +213,6 @@ export default function TurnoverAnalyticsModal({ isOpen, onClose, onEditItem }) 
                   <tr key={item.id} className="hover:bg-white/5 transition">
                     <td className="p-3 font-bold text-white">
                       <div>{item.name}</div>
-                      <div className="text-[10px] font-mono text-slate-400">{item.sku}</div>
                     </td>
                     <td className="p-3 text-slate-300">
                       <div>{item.brand}</div>

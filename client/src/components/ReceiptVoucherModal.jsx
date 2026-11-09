@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import { tafqeet } from '../utils/tafqeet';
 import { getShopSettings, formatYemeniWhatsAppLink } from '../utils/settings';
+import { printThermalVoucherSilently } from '../utils/voucherThermalPrinter';
 
 export default function ReceiptVoucherModal({
   isOpen,
@@ -151,7 +152,11 @@ export default function ReceiptVoucherModal({
   };
 
   const handlePrint = () => {
-    window.print();
+    if (printedVoucher) {
+      printThermalVoucherSilently(printedVoucher);
+    } else {
+      window.print();
+    }
   };
 
   return (

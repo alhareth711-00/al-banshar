@@ -1,4 +1,6 @@
 const inventoryModel = require('../models/inventoryModel');
+const excelImportEngine = require('../utils/excelImportEngine');
+const db = require('../db/database');
 const { asyncHandler, AppError } = require('../utils/errorHandler');
 
 const inventoryController = {
@@ -240,6 +242,115 @@ const inventoryController = {
         success: true,
         message: `تم فك وتحويل ${result.packages_converted} عبوة إلى ${result.units_produced} وحدة بنجاح${result.waste_units > 0 ? ` (احتساب فاقد تفريغ وترسيب: ${result.waste_units} وحدة)` : ''}`,
         data: result,
+      });
+    } catch (err) {
+      throw new AppError(err.message, 400);
+    }
+  }),
+
+  /**
+   * Generates and downloads blank Excel Template
+   * GET /api/inventory/import-template
+   */
+  getImportTemplate: asyncHandler(async (req, res) => {
+    const buffer = excelImportEngine.generateTemplateBuffer();
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', 'attachment; filename="quick_lube_catalog_template.xlsx"');
+    res.send(buffer);
+  }),
+
+  /**
+   * Previews & validates uploaded Excel/CSV file without saving
+   * POST /api/inventory/import-preview
+   * Body: { fileBase64, fileName }
+   */
+  previewImport: asyncHandler(async (req, res) => {
+    const { fileBase64, csvText } = req.body;
+    let buffer = null;
+
+    if (fileBase64) {
+      buffer = Buffer.from(fileBase64, 'base64');
+    } else if (csvText) {
+      buffer = Buffer.from(csvText, 'utf8');
+    } else {
+      throw new AppError('يرجى اختيار ملف إكسل أو CSV لمعاينته', 400);
+    }
+
+    try {
+      const preview = excelImportEngine.parseAndValidate(buffer, db);
+      res.json({
+        success: true,
+        data: preview,
+      });
+    } catch (err) {
+      throw new AppError(`فشل قراءة وفحص ملف الإكسل: ${err.message}`, 400);
+    }
+  }),
+
+  /**
+   * Commits the valid new items and posts opening balance ledger entries
+   * POST /api/inventory/import-commit
+   * Body: { items: [...] }
+   */
+  commitImport: asyncHandler(async (req, res) => {
+    const { items } = req.body;
+    if (!items || !Array.isArray(items) || items.length === 0) {
+      throw new AppError('لا توجد عناصر صالحة للاستيراد في الطلب', 400);
+    }
+
+    try {
+      const result = excelImportEngine.commitImport(items, db);
+      res.json({
+        success: true,
+        message: `تم استيراد (${result.importedCount}) صنف جديد بنجاح، وتوليد (${result.openingEntriesCount}) قيد محاسبي لرصيد أول المدة بقيمة (${result.totalCommittedCost.toLocaleString()} ر.ي) 🚀`,
+        data: result,
+      });
+    } catch (err) {
+      throw new AppError(`فشل استيراد الأصناف: ${err.message}`, 400);
+    }
+  }),
+
+  /**
+   * Receives a new batch of consignment stock
+   * POST /api/inventory/:id/consignment-inbound
+   */
+  receiveConsignmentStock: asyncHandler(async (req, res) => {
+    const id = parseInt(req.params.id, 10);
+    const { qty, supplier_name, notes, received_by } = req.body;
+
+    if (!qty || Number(qty) <= 0) {
+      throw new AppError('يرجى تحديد كمية موجبة مستلمة من بضاعة الأمانة', 400);
+    }
+
+    try {
+      const updated = inventoryModel.receiveConsignmentStock(id, {
+        qty: Number(qty),
+        supplier_name,
+        notes,
+        received_by: received_by || 'أمين المستودع',
+      });
+
+      res.json({
+        success: true,
+        message: `تم توريد واستلام (${qty}) عبوة أمانة برسم البيع بنجاح وتحديث رصيد الصنف 🤝`,
+        data: updated,
+      });
+    } catch (err) {
+      throw new AppError(err.message, 400);
+    }
+  }),
+
+  /**
+   * Retrieves consignment settlement summary grouped by supplier
+   * GET /api/inventory/consignment-settlements
+   */
+  getConsignmentSettlementSummary: asyncHandler(async (req, res) => {
+    const { supplier } = req.query;
+    try {
+      const settlements = inventoryModel.getConsignmentSettlementSummary(supplier || null);
+      res.json({
+        success: true,
+        data: settlements,
       });
     } catch (err) {
       throw new AppError(err.message, 400);

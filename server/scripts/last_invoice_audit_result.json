@@ -1,0 +1,72 @@
+{
+  "timestamp": "2026-11-07T00:13:11.506Z",
+  "db_path": "C:\\Users\\Elite\\AppData\\Roaming\\AlBanshar\\db\\quick_lube.db",
+  "scenarios": [
+    {
+      "name": "فاتورة غيار زيت متكاملة",
+      "status": "PASS",
+      "invoice_id": 8,
+      "invoice_number": "INV-20261107-008"
+    },
+    {
+      "name": "فاتورة بنشر وأجور يد",
+      "status": "PASS",
+      "invoice_id": 9,
+      "invoice_number": "INV-20261107-009"
+    },
+    {
+      "name": "فاتورة بطارية مع مقايضة سكراب",
+      "status": "PASS",
+      "invoice_id": 10,
+      "invoice_number": "INV-20261107-010"
+    },
+    {
+      "name": "فاتورة بيع آجل لعميل دائم",
+      "status": "PASS",
+      "invoice_id": 11,
+      "invoice_number": "INV-20261107-011"
+    },
+    {
+      "name": "إلغاء فاتورة وردّ المخزون",
+      "status": "PASS",
+      "invoice_id": 8,
+      "invoice_number": "INV-20261107-008"
+    }
+  ],
+  "guards": [
+    {
+      "name": "منع التكرار بالنقر المزدوج (client_token)",
+      "status": "PASS"
+    },
+    {
+      "name": "منع البيع بالسالب (Negative Stock Guard)",
+      "status": "PASS"
+    },
+    {
+      "name": "حظر الخصم الزائد عن قيمة الفاتورة",
+      "status": "PASS"
+    }
+  ],
+  "accounting_checks": [],
+  "ui_compat_checks": [
+    {
+      "name": "توافق واجهة الكاشير وسند الطباعة",
+      "status": "PASS"
+    }
+  ],
+  "critical_issues": [],
+  "warnings": [],
+  "cleanups_ready": false,
+  "meta": {
+    "success": true,
+    "createdInvoices": [
+      8,
+      9,
+      10,
+      11,
+      12
+    ],
+    "labVehicleId": 4,
+    "createdAuditShift": null
+  }
+}

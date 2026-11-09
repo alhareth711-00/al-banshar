@@ -10,10 +10,10 @@ function seedDatabase(force = false) {
 
   // Helper to ensure expense categories exist
   seedExpenseCategories();
-  seedSuppliersAndPurchases();
 
   if (!force && (vehicleCount > 0 || inventoryCount > 0)) {
     console.log(`[Seed] Database already contains ${vehicleCount} vehicles and ${inventoryCount} inventory items. Skipping vehicle/inventory seed.`);
+    seedSuppliersAndPurchases();
     return;
   }
 
@@ -182,6 +182,7 @@ function seedDatabase(force = false) {
   });
 
   runSeed();
+  seedSuppliersAndPurchases();
 }
 
 function seedExpenseCategories() {
@@ -241,22 +242,29 @@ function seedSuppliersAndPurchases() {
     ) VALUES (?, ?, ?, ?, ?, ?)
   `);
 
+  const checkInv = db.prepare('SELECT id FROM inventory WHERE id = ?');
+  const safeInsertPurItem = (purId, invId, qty, cost, sell, subtotal) => {
+    if (checkInv.get(invId)) {
+      insertPurItem.run(purId, invId, qty, cost, sell, subtotal);
+    }
+  };
+
   // Past Purchase 1: Toyota oils and filters from Bazara (Total 320,000, Paid 200,000 cash from drawer, 120,000 remaining on account)
   insertPur.run(
     1, 'PUR-20261015-001', 1, 'شركة بازرعة للسيارات والمحركات', 'BAZ-88412',
     320000, 200000, 120000, 'cash', 1, 'توريد دفعة زيوت تويوتا 20W-50 وفلاتر أصلية', `${today} 08:00:00`
   );
-  insertPurItem.run(1, 1, 10, 22000, 26000, 220000); // 10 cans 4L Toyota
-  insertPurItem.run(1, 14, 20, 3200, 4500, 64000);   // 20 oil filters Toyota
-  insertPurItem.run(1, 2, 5, 5800, 7000, 29000);     // 5 cans 1L Toyota
+  safeInsertPurItem(1, 1, 10, 22000, 26000, 220000); // 10 cans 4L Toyota
+  safeInsertPurItem(1, 14, 20, 3200, 4500, 64000);   // 20 oil filters Toyota
+  safeInsertPurItem(1, 2, 5, 5800, 7000, 29000);     // 5 cans 1L Toyota
 
   // Past Purchase 2: Baqer batteries (Total 285,000, Paid 200,000 via Kuraimi, 85,000 remaining)
   insertPur.run(
     2, 'PUR-20261018-002', 3, 'وكالة باقر الوطنية للبطاريات', 'BQR-5519',
     285000, 200000, 85000, 'kuraimi', 0, 'توريد بطاريات باقر 70Ah وأمل 55Ah مع شهادات الضمان', `${today} 12:30:00`
   );
-  insertPurItem.run(2, 20, 3, 68000, 79000, 204000); // 3 Baqer 70Ah
-  insertPurItem.run(2, 21, 1, 49000, 58000, 49000);  // 1 Amal 55Ah
+  safeInsertPurItem(2, 20, 3, 68000, 79000, 204000); // 3 Baqer 70Ah
+  safeInsertPurItem(2, 21, 1, 49000, 58000, 49000);  // 1 Amal 55Ah
 }
 
 module.exports = { seedDatabase };

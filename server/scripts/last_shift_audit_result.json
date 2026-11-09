@@ -1,0 +1,46 @@
+{
+  "timestamp": "2026-11-07T01:01:44.228Z",
+  "db_path": "C:\\Users\\Elite\\AppData\\Roaming\\AlBanshar\\db\\quick_lube.db",
+  "scenarios": [
+    {
+      "name": "وردية مطابقة تامة بدون فروقات",
+      "status": "PASS",
+      "shift_code": "SH-20261107-003"
+    },
+    {
+      "name": "إغلاق وردية بها عجز وتسوية القيود",
+      "status": "PASS",
+      "shift_code": "SH-20261107-004"
+    },
+    {
+      "name": "إغلاق وردية بها فائض وتسوية الإيرادات",
+      "status": "PASS",
+      "shift_code": "SH-20261107-005"
+    },
+    {
+      "name": "درع تجميد فواتير الورديات المغلقة",
+      "status": "PASS"
+    }
+  ],
+  "guards": [
+    {
+      "name": "منع فتح ورديتين متزامنتين",
+      "status": "PASS"
+    },
+    {
+      "name": "منع تكرار إغلاق الوردية المغلقة",
+      "status": "PASS"
+    }
+  ],
+  "critical_issues": [],
+  "warnings": [],
+  "meta": {
+    "success": true,
+    "createdShiftIds": [
+      5,
+      6,
+      7,
+      8
+    ]
+  }
+}

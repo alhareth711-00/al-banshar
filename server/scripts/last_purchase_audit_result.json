@@ -1,0 +1,50 @@
+{
+  "timestamp": "2026-11-07T00:28:07.638Z",
+  "db_path": "C:\\Users\\Elite\\AppData\\Roaming\\AlBanshar\\db\\quick_lube.db",
+  "scenarios": [
+    {
+      "name": "شراء كراتين زيت كاش مع شحن وWAC",
+      "status": "PASS",
+      "purchase_id": 8
+    },
+    {
+      "name": "شراء آجل وإثبات مديونية المورد وتاريخ الاستحقاق",
+      "status": "PASS",
+      "purchase_id": 9
+    },
+    {
+      "name": "سداد دفعة للمورد بسند صرف رسمي وتخفيض الدين",
+      "status": "PASS"
+    },
+    {
+      "name": "مردودات مشتريات وتخفيض المخزون والدين",
+      "status": "PASS",
+      "return_id": 3
+    }
+  ],
+  "guards": [
+    {
+      "name": "درع حظر شراء بضاعة الأمانة تجارياً",
+      "status": "PASS"
+    },
+    {
+      "name": "منع حذف الموردين المرتبطين بحسابات وديون",
+      "status": "PASS"
+    }
+  ],
+  "critical_issues": [],
+  "warnings": [],
+  "meta": {
+    "success": true,
+    "createdPurchases": [
+      8,
+      9
+    ],
+    "createdVouchers": [
+      null
+    ],
+    "createdReturns": [
+      3
+    ]
+  }
+}

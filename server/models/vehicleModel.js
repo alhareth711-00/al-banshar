@@ -343,10 +343,10 @@ const vehicleModel = {
     const vehicles = db.prepare(`
       SELECT 
         cv.*,
-        (SELECT MAX(created_at) FROM invoices WHERE vehicle_id = cv.id) AS last_service_date,
-        (SELECT current_odometer FROM invoices WHERE vehicle_id = cv.id ORDER BY id DESC LIMIT 1) AS last_recorded_odometer,
-        (SELECT net_total FROM invoices WHERE vehicle_id = cv.id ORDER BY id DESC LIMIT 1) AS last_invoice_total,
-        (SELECT COUNT(*) FROM invoices WHERE vehicle_id = cv.id) AS visit_count,
+        (SELECT MAX(created_at) FROM invoices WHERE vehicle_id = cv.id AND is_voided = 0) AS last_service_date,
+        (SELECT current_odometer FROM invoices WHERE vehicle_id = cv.id AND is_voided = 0 ORDER BY id DESC LIMIT 1) AS last_recorded_odometer,
+        (SELECT net_total FROM invoices WHERE vehicle_id = cv.id AND is_voided = 0 ORDER BY id DESC LIMIT 1) AS last_invoice_total,
+        (SELECT COUNT(*) FROM invoices WHERE vehicle_id = cv.id AND is_voided = 0) AS visit_count,
         (SELECT sent_at FROM service_reminders_log WHERE vehicle_id = cv.id ORDER BY id DESC LIMIT 1) AS last_reminded_at,
         (SELECT COUNT(*) FROM service_reminders_log WHERE vehicle_id = cv.id) AS reminder_sent_count
       FROM customers_vehicles cv
@@ -373,7 +373,7 @@ const vehicleModel = {
         const pastInvoices = db.prepare(`
           SELECT current_odometer, created_at 
           FROM invoices 
-          WHERE vehicle_id = ? 
+          WHERE vehicle_id = ? AND is_voided = 0 
           ORDER BY id DESC LIMIT 2
         `).all(v.id);
 

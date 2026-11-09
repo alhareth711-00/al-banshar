@@ -11,7 +11,9 @@
     "audit:inventory": "node scripts/inventoryAudit.js",
     "audit:radar": "node scripts/retentionRadarAudit.js",
     "audit:chaos": "node scripts/chaosAudit.js",
-    "audit:all": "node scripts/runMasterAudit.js"
+    "audit:all": "node scripts/runMasterAudit.js",
+    "audit:interactive": "node scripts/masterInteractiveAudit.js",
+    "license:generate": "node scripts/generateLicense.js"
   },
   "keywords": [
     "pos",
@@ -25,7 +27,8 @@
   "dependencies": {
     "better-sqlite3": "^13.0.3",
     "cors": "^2.8.6",
-    "express": "^5.3.0"
+    "express": "^5.3.0",
+    "xlsx": "^0.18.5"
   },
   "devDependencies": {
     "fast-check": "^4.10.2"

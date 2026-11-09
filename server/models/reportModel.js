@@ -318,7 +318,7 @@ const reportModel = {
       FROM invoice_items ii
       JOIN invoices i ON ii.invoice_id = i.id
       JOIN inventory inv ON ii.inventory_id = inv.id
-      WHERE date(i.created_at) = date(?) AND inv.category = 'oil'
+      WHERE i.is_voided = 0 AND date(i.created_at) = date(?) AND inv.category = 'oil'
       GROUP BY inv.pack_size
     `).all(date);
 
@@ -349,7 +349,7 @@ const reportModel = {
       FROM invoice_items ii
       JOIN invoices i ON ii.invoice_id = i.id
       JOIN inventory inv ON ii.inventory_id = inv.id
-      WHERE date(i.created_at) = date(?) AND inv.category = 'oil'
+      WHERE i.is_voided = 0 AND date(i.created_at) = date(?) AND inv.category = 'oil'
       GROUP BY inv.id
       ORDER BY qty_sold DESC
     `).all(date);
@@ -364,7 +364,7 @@ const reportModel = {
       FROM invoice_items ii
       JOIN invoices i ON ii.invoice_id = i.id
       JOIN inventory inv ON ii.inventory_id = inv.id
-      WHERE date(i.created_at) = date(?) AND inv.category = 'filter'
+      WHERE i.is_voided = 0 AND date(i.created_at) = date(?) AND inv.category = 'filter'
       GROUP BY inv.id
       ORDER BY qty_sold DESC
     `).all(date);
@@ -489,14 +489,14 @@ const reportModel = {
       WHERE jl.account_code = '5101' AND date(je.entry_date) = date(?)
     `).get(date);
 
-    // Secondary / Fallback: Item cost from inventory for physical products only (excluding pure labor)
+    // Secondary / Fallback: Item cost from frozen invoice_items (or inventory) for physical products only (excluding pure labor)
     const cogsRow = db.prepare(`
       SELECT 
-        COALESCE(SUM(ii.qty * COALESCE(inv.cost_price, 0)), 0) AS total_cogs
+        COALESCE(SUM(ii.qty * COALESCE(NULLIF(ii.cost_price, 0), inv.cost_price, 0)), 0) AS total_cogs
       FROM invoice_items ii
       JOIN invoices i ON ii.invoice_id = i.id
       LEFT JOIN inventory inv ON ii.inventory_id = inv.id
-      WHERE date(i.created_at) = date(?) AND (ii.item_type != 'service' AND COALESCE(inv.category, '') != 'service')
+      WHERE i.is_voided = 0 AND date(i.created_at) = date(?) AND (ii.item_type != 'service' AND COALESCE(inv.category, '') != 'service')
     `).get(date);
 
     const totalCogs = cogsLedger && Number(cogsLedger.total_cogs) > 0
@@ -530,7 +530,7 @@ const reportModel = {
       FROM invoice_items ii
       JOIN invoices i ON ii.invoice_id = i.id
       LEFT JOIN inventory inv ON ii.inventory_id = inv.id
-      WHERE date(i.created_at) = date(?) AND ii.item_type != 'service'
+      WHERE i.is_voided = 0 AND date(i.created_at) = date(?) AND ii.item_type != 'service'
       GROUP BY category
     `).all(date);
 

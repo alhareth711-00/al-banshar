@@ -13,6 +13,7 @@ import {
   Wrench,
 } from 'lucide-react';
 import { tafqeet } from '../utils/tafqeet';
+import { printThermalVoucherSilently } from '../utils/voucherThermalPrinter';
 
 export default function GeneralPaymentVoucherModal({
   isOpen,
@@ -128,7 +129,11 @@ export default function GeneralPaymentVoucherModal({
   };
 
   const handlePrint = () => {
-    window.print();
+    if (printedVoucher) {
+      printThermalVoucherSilently(printedVoucher);
+    } else {
+      window.print();
+    }
   };
 
   return (

@@ -1,0 +1,399 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <title>دليل التشغيل الميداني السريع — سريع وبنشر PRO</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800;900&display=swap');
+
+    @page {
+      size: A4 portrait;
+      margin: 10mm 12mm;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: 'Tajawal', sans-serif;
+      background: #f8fafc;
+      color: #0f172a;
+      line-height: 1.45;
+      padding: 20px;
+    }
+
+    .no-print-bar {
+      max-width: 900px;
+      margin: 0 auto 20px auto;
+      background: #0f172a;
+      color: #fff;
+      padding: 14px 24px;
+      border-radius: 16px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      box-shadow: 0 10px 25px -5px rgba(0,0,0,0.2);
+    }
+
+    .print-btn {
+      background: #f59e0b;
+      color: #000;
+      font-weight: 800;
+      border: none;
+      padding: 10px 22px;
+      border-radius: 10px;
+      cursor: pointer;
+      font-family: inherit;
+      font-size: 14px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      transition: all 0.2s;
+    }
+    .print-btn:hover {
+      background: #fbbf24;
+      transform: scale(1.02);
+    }
+
+    .a4-page {
+      max-width: 900px;
+      margin: 0 auto;
+      background: #fff;
+      padding: 30px 35px;
+      border-radius: 16px;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.06);
+      border: 1px solid #e2e8f0;
+    }
+
+    /* Header */
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 3px solid #f59e0b;
+      padding-bottom: 16px;
+      margin-bottom: 20px;
+    }
+    .header-right h1 {
+      font-size: 24px;
+      font-weight: 900;
+      color: #0f172a;
+      letter-spacing: -0.5px;
+    }
+    .header-right p {
+      font-size: 12px;
+      color: #64748b;
+      font-weight: 700;
+      margin-top: 2px;
+    }
+    .badge-yemen {
+      background: #fef3c7;
+      color: #b45309;
+      font-size: 11px;
+      font-weight: 800;
+      padding: 4px 10px;
+      border-radius: 8px;
+      border: 1px solid #fde68a;
+      display: inline-block;
+      margin-top: 4px;
+    }
+    .support-badge {
+      text-align: left;
+      font-size: 11px;
+      color: #475569;
+    }
+    .support-phone {
+      font-size: 15px;
+      font-weight: 900;
+      color: #059669;
+      direction: ltr;
+      display: block;
+      margin-top: 2px;
+    }
+
+    /* Grid Layout */
+    .grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin-bottom: 18px;
+    }
+    .full-width {
+      grid-column: span 2;
+    }
+
+    /* Cards */
+    .card {
+      border: 1.5px solid #e2e8f0;
+      border-radius: 12px;
+      padding: 14px 16px;
+      background: #fff;
+      position: relative;
+    }
+    .card-highlight {
+      border-color: #f59e0b;
+      background: #fffbeb;
+    }
+    .card-success {
+      border-color: #10b981;
+      background: #ecfdf5;
+    }
+    .card-cyan {
+      border-color: #06b6d4;
+      background: #ecfeff;
+    }
+
+    .card-title {
+      font-size: 13.5px;
+      font-weight: 900;
+      color: #0f172a;
+      margin-bottom: 8px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .card-title span.num {
+      width: 22px;
+      height: 22px;
+      border-radius: 6px;
+      background: #0f172a;
+      color: #fff;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 11px;
+    }
+
+    ol, ul {
+      padding-right: 18px;
+      font-size: 11.5px;
+      color: #334155;
+    }
+    li {
+      margin-bottom: 5px;
+      line-height: 1.4;
+    }
+    strong {
+      color: #0f172a;
+    }
+
+    /* Shortcuts Table */
+    .shortcuts-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 11px;
+      margin-top: 6px;
+    }
+    .shortcuts-table td {
+      padding: 5px 8px;
+      border-bottom: 1px solid #cbd5e1;
+    }
+    .kbd {
+      background: #e2e8f0;
+      border: 1px solid #94a3b8;
+      border-radius: 4px;
+      padding: 1px 6px;
+      font-family: monospace;
+      font-weight: 800;
+      font-size: 11px;
+      color: #0f172a;
+    }
+
+    /* Footer Banner */
+    .footer-banner {
+      border-top: 2px dashed #cbd5e1;
+      padding-top: 14px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 11px;
+      color: #64748b;
+    }
+    .footer-ethics {
+      font-weight: 800;
+      color: #059669;
+    }
+
+    @media print {
+      body {
+        background: #fff;
+        padding: 0;
+      }
+      .no-print-bar {
+        display: none !important;
+      }
+      .a4-page {
+        box-shadow: none;
+        border: none;
+        padding: 0;
+        max-width: 100%;
+      }
+      .card {
+        break-inside: avoid;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Top Action Bar (Hidden when printing) -->
+  <div class="no-print-bar">
+    <div>
+      <strong style="font-size: 15px; color: #f59e0b;">دليل التشغيل الميداني A4 (جاهز للطباعة والتسليم)</strong>
+      <p style="font-size: 11px; color: #94a3b8; margin-top: 2px;">
+        اطبع هذا الدليل وضع نسخة منه بجوار شاشة الكاشير داخل الورشة ليسهل على العمال وفنيي الحفرة الرجوع إليه.
+      </p>
+    </div>
+    <button class="print-btn" onclick="window.print()">
+      🖨️ طباعة الدليل الآن (Print / PDF)
+    </button>
+  </div>
+
+  <div class="a4-page">
+    <!-- Header -->
+    <div class="header">
+      <div class="header-right">
+        <h1>نظام سريع وبنشر PRO 🚗⚡</h1>
+        <p>الدليل الميداني السريع لكاشير وفنيي ورش تغيير الزيوت والبناشر (السوق اليمني)</p>
+        <span class="badge-yemen">معتمد للأفران والورش وسوق صنعاء والمحافظات</span>
+      </div>
+      <div class="support-badge">
+        <span>الدعم الفني وتجديد الاشتراك:</span>
+        <span class="support-phone">770834754 📲</span>
+        <span style="font-size: 10px; color: #94a3b8;">واتساب / اتصال مباشر</span>
+      </div>
+    </div>
+
+    <!-- Grid Content -->
+    <div class="grid">
+      <!-- Card 1: Fast Service Flow -->
+      <div class="card card-highlight">
+        <div class="card-title">
+          <span class="num">1</span>
+          <span>دورة خدمة السيارة السريعة (أقل من 30 ثانية)</span>
+        </div>
+        <ol>
+          <li><strong>رقم اللوحة أو الهاتف:</strong> اكتب رقم لوحة السيارة (مثال: <code>صنعاء 12345</code>) أو هاتف الزبون للتعرف الفوري عليه.</li>
+          <li><strong>سعة المحرك التلقائية:</strong> يحدد النظام تلقائياً كمية الزيت المطلوبة للسيارة (مثلاً <code>4.2 لتر</code>).</li>
+          <li><strong>فحص السلامة (8 نقاط مجاناً):</strong> ماء رديتر، زيت فرامل، مساحات، هواء كفرات.</li>
+          <li><strong>الدفع المحلي:</strong> اختر الدفع نقداً (ريال يمني)، أو عبر <strong>بنك الكريمي</strong>، أو محفظة <strong>جيب / جوالي</strong>، أو آجل مسجل.</li>
+        </ol>
+      </div>
+
+      <!-- Card 2: 1-Click Repeat -->
+      <div class="card card-success">
+        <div class="card-title">
+          <span class="num">2</span>
+          <span>زر الإعادة السحرية بنقرة واحدة (1-Click Repeat)</span>
+        </div>
+        <ul>
+          <li>عند عودة أي سيارة زارت الورشة سابقاً، يظهر زر ذهبي: <br><strong>[ ⚡ تكرار آخر خدمة للسيارة بنقرة واحدة ]</strong>.</li>
+          <li><strong>الفائدة:</strong> يضع النظام فوراً نفس نوع الزيت، والفلتر، والكمية، والسعر الذي أخذته السيارة في آخر زيارة دون الحاجة لإعادة البحث.</li>
+          <li>وفر وقتك وأنجز طابور السيارات والزبائن بدون أي تأخير.</li>
+        </ul>
+      </div>
+
+      <!-- Card 3: Printing & WhatsApp Receipt -->
+      <div class="card">
+        <div class="card-title">
+          <span class="num">3</span>
+          <span>الفاتورة وكرت الزيت الذكي بالواتساب</span>
+        </div>
+        <ul>
+          <li><strong>إرسال فوري بالواتساب:</strong> اضغط زر <code>إرسال للواتساب 📲</code> ليتم إرسال كرت الخدمة الرقمي وفاتورة الزيوت مباشرة لهاتف العميل.</li>
+          <li><strong>تنبيه الغيار القادم:</strong> يتضمن الكرت موعد غيار الزيت القادم والمسافة المقترحة (مثلاً بعد <code>3,000 كم</code>).</li>
+          <li><strong>الطباعة الحرارية:</strong> طباعة فورية على ورق الفواتير الحراري القياسي <code>80mm</code> بدون هوامش زائدة.</li>
+        </ul>
+      </div>
+
+      <!-- Card 4: Daily Shift & Cash Closing -->
+      <div class="card">
+        <div class="card-title">
+          <span class="num">4</span>
+          <span>إغلاق الوردية وجرد الصندوق اليومي</span>
+        </div>
+        <ul>
+          <li>توجه إلى تبويب <strong>[ الإغلاق اليومي وتقرير المالك 📊 ]</strong>.</li>
+          <li><strong>عد النقدية الفعلي:</strong> أدخل المبلغ النقدي الموجود في الدرج، وسيقوم النظام بكشف أي زيادة أو عجز مالي بدقة تامة.</li>
+          <li><strong>إشعار المالك:</strong> زر <code>إرسال تقرير الإغلاق لواتساب المالك</code> يرسل ملخص الأرباح والمبيعات وصافي الكاش بلمسة واحدة.</li>
+        </ul>
+      </div>
+
+      <!-- Card 5: Inventory & Packaging -->
+      <div class="card card-cyan">
+        <div class="card-title">
+          <span class="num">5</span>
+          <span>المخزون وحاسبة فك الكراتين</span>
+        </div>
+        <ul>
+          <li><strong>فك الكراتين للعلب:</strong> اضغط على <code>فك وتجزئة عبوة</code> لتحويل كرتون الزيت (24 علبة) إلى علب مفرقة مع احتساب التكلفة آلياً.</li>
+          <li><strong>استيراد إكسل:</strong> من تبويب المخزون، اضغط <code>استيراد من Excel</code> لرفع مئات الأصناف والأسعار في 5 ثوانٍ مع اتزان الدفاتر المحاسبية.</li>
+        </ul>
+      </div>
+
+      <!-- Card 6: Shortcuts & Hotkeys -->
+      <div class="card">
+        <div class="card-title">
+          <span class="num">6</span>
+          <span>مفاتيح الاختصار السريعة (Hotkeys)</span>
+        </div>
+        <table class="shortcuts-table">
+          <tr>
+            <td><span class="kbd">F11</span></td>
+            <td><strong>ملء الشاشة / وضع الكشك:</strong> إخفاء أو إظهار حواف الشاشة.</td>
+          </tr>
+          <tr>
+            <td><span class="kbd">F1</span></td>
+            <td><strong>دليل الاستخدام:</strong> فتح الدليل الإرشادي التفاعلي في النظام.</td>
+          </tr>
+          <tr>
+            <td><span class="kbd">Ctrl + K</span></td>
+            <td><strong>البحث الشامل السريع:</strong> للبحث عن صنف أو سيارة أو خدمة.</td>
+          </tr>
+          <tr>
+            <td><span class="kbd">Owner PIN</span></td>
+            <td><strong>رمز حماية المالك (1234):</strong> لإخفاء الأرباح عن عمال الحفرة.</td>
+          </tr>
+        </table>
+      </div>
+
+      <!-- Full Width: Safety & Data Protection -->
+      <div class="card full-width" style="background: #f8fafc; border: 1.5px dashed #94a3b8;">
+        <div class="card-title" style="color: #0369a1;">
+          <span>🛡️ درع الأمان وحفظ البيانات وتجديد الاشتراك</span>
+        </div>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; font-size: 11px;">
+          <div>
+            <strong>💾 النسخ الاحتياطي التلقائي:</strong>
+            <p style="color: #64748b; margin-top: 2px;">
+              يقوم النظام بأخذ نسخة احتياطية يومية مشفرة في مسار ويندوز الآمن. ننصح بتنزيل نسخة على فلاش ميموري أسبوعياً من شاشة الإعدادات.
+            </p>
+          </div>
+          <div>
+            <strong>🔑 كود جهازك وتجديد الاشتراك:</strong>
+            <p style="color: #64748b; margin-top: 2px;">
+              تجد كود جهازك في شاشة <code>الإعدادات ⚙️ > إدارة الاشتراك</code>. أرسل الكود عبر الواتساب إلى <strong>770834754</strong> لاستلام مفتاح التجديد السنوي فوراً.
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Footer Banner -->
+    <div class="footer-banner">
+      <div>
+        <span>نظام سريع وبنشر PRO — إصدار السوق اليمني 2026</span>
+        <span style="margin: 0 8px;">•</span>
+        <span>Offline-First (يعمل 100% بدون إنترنت)</span>
+      </div>
+      <div class="footer-ethics">
+        <span>أمانة مهنية: بياناتك ملكك ومحمية دائماً 🛡️</span>
+      </div>
+    </div>
+  </div>
+
+</body>
+</html>

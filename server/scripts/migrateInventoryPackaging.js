@@ -16,6 +16,7 @@ if (!invCols.includes('bulk_unit')) {
 
 // 1. Sanitize all non-oil records
 db.exec("UPDATE inventory SET viscosity = NULL, oil_type = NULL, api_grade = NULL WHERE category != 'oil'");
+db.exec("UPDATE inventory SET brand = '' WHERE brand = 'عام' AND category != 'oil'");
 
 // 2. Clean records 1 to 6
 db.exec(`

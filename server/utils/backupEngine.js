@@ -3,7 +3,7 @@ const path = require('path');
 const db = require('../db/database');
 const { formatDate } = require('./helpers');
 
-const BACKUPS_DIR = path.join(__dirname, '..', 'backups');
+const BACKUPS_DIR = process.env.BACKUPS_DIR || path.join(__dirname, '..', 'backups');
 
 function ensureBackupsDir() {
   if (!fs.existsSync(BACKUPS_DIR)) {
@@ -189,6 +189,26 @@ const backupEngine = {
     if (!fs.existsSync(filePath)) {
       return { valid: false, error: 'الملف غير موجود على القرص' };
     }
+
+    try {
+      const stats = fs.statSync(filePath);
+      if (stats.size < 4096) {
+        return { valid: false, error: 'حجم ملف النسخة الاحتياطية غير صالح (أقل من الحد الأدنى المقبول 4KB)' };
+      }
+
+      // Verify SQLite 3 Magic Header ("SQLite format 3\0")
+      const headerBuf = Buffer.alloc(16);
+      const fd = fs.openSync(filePath, 'r');
+      fs.readSync(fd, headerBuf, 0, 16, 0);
+      fs.closeSync(fd);
+
+      if (headerBuf.toString('utf8', 0, 15) !== 'SQLite format 3' || headerBuf[15] !== 0) {
+        return { valid: false, error: 'الملف ليس قاعدة بيانات SQLite صالحة (الترويسة التوقيعية للملف تالفة أو غير متوافقة)' };
+      }
+    } catch (e) {
+      return { valid: false, error: `فشل فحص ترويسة الملف: ${e.message}` };
+    }
+
     const Database = require('better-sqlite3');
     let testDb = null;
     try {
@@ -259,7 +279,7 @@ const backupEngine = {
     }
 
     // 3. Prepare target DB path
-    const activeDbPath = path.join(__dirname, '..', 'db', 'quick_lube.db');
+    const activeDbPath = (typeof db.getDbPath === 'function' ? db.getDbPath() : null) || process.env.DB_PATH || path.join(__dirname, '..', 'db', 'quick_lube.db');
     const walPath = `${activeDbPath}-wal`;
     const shmPath = `${activeDbPath}-shm`;
 

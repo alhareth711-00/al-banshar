@@ -127,7 +127,7 @@ export default function PendingServicesModal({
     }));
   };
 
-  const handleCompleteService = async (quickAllPass = false) => {
+  const handleCompleteService = async (quickAllPass = false, shouldSendWhatsApp = false) => {
     if (!selectedInvoice) return;
 
     try {
@@ -185,12 +185,13 @@ ${safetyReportText}
 شاكرين ثقتكم الغالية ويسعدنا دائماً خدمتكم بكل اهتمام!`;
 
       const phoneToUse = updatedInv.customer_phone || selectedInvoice.customer_phone;
-      if (phoneToUse && phoneToUse !== '---') {
+      if (shouldSendWhatsApp && phoneToUse && phoneToUse !== '---') {
         const whatsappUrl = formatYemeniWhatsAppLink(phoneToUse, msg);
         window.open(whatsappUrl, '_blank');
+        setSuccessToast(`تم إتمام الفاتورة #${updatedInv.invoice_number} بنجاح وإرسال التقرير للعميل 📲`);
+      } else {
+        setSuccessToast(`تم إتمام الفاتورة #${updatedInv.invoice_number} وتفريغ الحفرة بنجاح ✅`);
       }
-
-      setSuccessToast(`تم إتمام الفاتورة ${updatedInv.invoice_number} بنجاح وإرسال التقرير للعميل 📲`);
       setTimeout(() => setSuccessToast(''), 4000);
 
       if (onServiceCompleted) onServiceCompleted();
@@ -202,52 +203,6 @@ ${safetyReportText}
     } finally {
       setSubmitting(false);
     }
-  };
-
-  const handlePrintSticker = () => {
-    if (!selectedInvoice) return;
-    const stickerWindow = window.open('', '_blank', 'width=380,height=450');
-    if (!stickerWindow) return;
-
-    stickerWindow.document.write(`
-      <html dir="rtl" lang="ar">
-        <head>
-          <title>ملصق غيار الزيت - ${selectedInvoice.plate_number}</title>
-          <style>
-            @page { size: 60mm 40mm; margin: 2mm; }
-            body { font-family: 'Cairo', 'Segoe UI', Tahoma, sans-serif; text-align: center; margin: 0; padding: 4px; font-size: 11px; }
-            .border-box { border: 2px dashed #000; border-radius: 8px; padding: 6px; }
-            .title { font-weight: 900; font-size: 13px; margin-bottom: 4px; }
-            .grid { display: flex; justify-content: space-between; margin: 3px 0; font-weight: bold; }
-            .highlight { font-size: 14px; font-weight: 900; background: #eee; padding: 2px 4px; border-radius: 4px; }
-            .footer { font-size: 9px; margin-top: 4px; color: #555; }
-          </style>
-        </head>
-        <body onload="window.print(); window.close();">
-          <div class="border-box">
-            <div class="title">🚗 ${settings.shopName} - موعد غيار الزيت</div>
-            <div class="grid">
-              <span>رقم اللوحة:</span>
-              <span>${selectedInvoice.plate_number || 'بدون لوحة'}</span>
-            </div>
-            <div class="grid">
-              <span>العداد الحالي:</span>
-              <span>${Number(selectedInvoice.current_odometer).toLocaleString()} كم</span>
-            </div>
-            <div class="grid" style="margin: 6px 0;">
-              <span>العداد القادم:</span>
-              <span class="highlight">${Number(selectedInvoice.next_odometer).toLocaleString()} كم</span>
-            </div>
-            <div class="grid">
-              <span>تاريخ الغيار القادم:</span>
-              <span>${selectedInvoice.next_service_date}</span>
-            </div>
-            <div class="footer">شكراً لزيارتكم • هاتف: ${settings.phone || '---'}</div>
-          </div>
-        </body>
-      </html>
-    `);
-    stickerWindow.document.close();
   };
 
   if (!isOpen) return null;
@@ -473,41 +428,30 @@ ${safetyReportText}
                 </div>
 
                 {/* Action Buttons */}
-                <div className="pt-2 space-y-2">
+                <div className="pt-2">
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                    {/* Primary Completion Button */}
+                    {/* Primary Instant 1-Click Release Button */}
                     <button
                       type="button"
                       disabled={submitting}
-                      onClick={() => handleCompleteService(false)}
+                      onClick={() => handleCompleteService(true, false)}
                       className="min-h-[50px] px-4 rounded-2xl bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-slate-950 font-black text-sm shadow-xl shadow-emerald-500/25 flex items-center justify-center gap-2 transition active:scale-95"
+                      title="اعتماد سلامة الفحص وتفريغ الحفرة فوراً وخروج السيارة"
                     >
-                      <Send className="w-4 h-4 stroke-[2.5]" />
-                      <span>{submitting ? 'جاري الاعتماد...' : 'اعتماد الفحص وإرسال واتساب للعميل 📲'}</span>
+                      <Check className="w-5 h-5 stroke-[3]" />
+                      <span>{submitting ? 'جاري الاعتماد...' : 'إتمام الخدمة وتفريغ الحفرة فوراً ⚡'}</span>
                     </button>
 
-                    {/* Quick 100% Clean Pass Button */}
+                    {/* Secondary WhatsApp Report Button */}
                     <button
                       type="button"
                       disabled={submitting}
-                      onClick={() => handleCompleteService(true)}
+                      onClick={() => handleCompleteService(false, true)}
                       className="min-h-[50px] px-4 rounded-2xl bg-slate-900 hover:bg-slate-800 border border-teal-500/40 text-teal-300 font-black text-xs flex items-center justify-center gap-2 transition active:scale-95"
-                      title="اعتماد مباشر أن الفحص 100% سليم وإرسال الواتساب فوراً"
+                      title="اعتماد الخدمة وإرسال تقرير فحص الـ 8 نقاط عبر الواتساب للعميل"
                     >
-                      <Sparkles className="w-4 h-4 text-teal-400" />
-                      <span>⚡ إنجاز سليم 100% وإرسال واتساب</span>
-                    </button>
-                  </div>
-
-                  {/* Secondary Print Sticker Button */}
-                  <div className="flex justify-end pt-1">
-                    <button
-                      type="button"
-                      onClick={handlePrintSticker}
-                      className="px-3 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 border border-white/10 text-slate-300 font-bold text-xs flex items-center gap-1.5 transition active:scale-95"
-                    >
-                      <Printer className="w-3.5 h-3.5 text-amber-400" />
-                      <span>🏷️ طباعة استكر الزجاج الحراري للسيارة</span>
+                      <Send className="w-4 h-4" />
+                      <span>إتمام الخدمة + إرسال واتساب 📲</span>
                     </button>
                   </div>
                 </div>

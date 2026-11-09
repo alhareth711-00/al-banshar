@@ -5,6 +5,14 @@ server/node_modules/
 
 # Production build outputs
 client/dist/
+dist_desktop/
+dist_patch/
+tools/patch-builder/stage/
+حقيبة_تثبيت_العميل_USB/
+bin/
+updates/*.zip
+server/database.sqlite
+server/data/temp*
 
 # Auto backups & sqlite temp files (preserve core db)
 server/backups/

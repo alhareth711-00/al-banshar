@@ -9,12 +9,14 @@ const {
   postDebtCollection,
   postWorkerAdvance,
   reconcileAllOpeningBalances,
+  reconcileAllOpeningInventory,
 } = require('../utils/accountingEngine');
 
 function reconcileHistoricalLedger() {
   // Always verify and reconcile any debtor vehicles or suppliers lacking opening balances
   try {
     reconcileAllOpeningBalances(db);
+    reconcileAllOpeningInventory(db);
   } catch (err) {
     console.warn('[Accounting] Opening balance reconciliation warning:', err.message);
   }
@@ -93,6 +95,7 @@ function initDb() {
 
       // Sanitize and isolate non-oil items from oil specifications
       db.exec("UPDATE inventory SET viscosity = NULL, oil_type = NULL, api_grade = NULL WHERE category != 'oil'");
+      db.exec("UPDATE inventory SET brand = '' WHERE brand = 'عام' AND category != 'oil'");
 
       // Clean existing inventory items 1 through 6
       db.exec(`
@@ -198,7 +201,11 @@ function initDb() {
       if (!invCols.includes('voided_at')) {
         db.exec("ALTER TABLE invoices ADD COLUMN voided_at TEXT");
       }
-      console.log('[DB] Pre-schema migration applied: upgraded invoices schema with shift_id, is_voided, and audit columns.');
+      if (!invCols.includes('client_token')) {
+        db.exec("ALTER TABLE invoices ADD COLUMN client_token TEXT");
+        db.exec("CREATE UNIQUE INDEX IF NOT EXISTS idx_invoices_client_token ON invoices(client_token) WHERE client_token IS NOT NULL");
+      }
+      console.log('[DB] Pre-schema migration applied: upgraded invoices schema with shift_id, is_voided, client_token, and audit columns.');
     }
 
     // Pre-schema migration: invoice_items cost_price [MOD-CATALOG-RETRO]
@@ -596,25 +603,27 @@ function initDb() {
     console.warn('[DB] Stage 5/6 Migration warning:', err.message);
   }
 
-  // Seed default shop services catalog if none exist
+  // Seed default shop services catalog if explicitly requested
   try {
-    const srvCount = db.prepare("SELECT COUNT(*) as count FROM inventory WHERE category = 'service' OR item_type = 'service'").get().count;
-    if (srvCount === 0) {
-      const insertSrv = db.prepare(`
-        INSERT INTO inventory (
-          sku, barcode, name, category, item_type, brand, viscosity, pack_size,
-          carton_pack_qty, tire_battery_spec, country_of_origin, dot_code,
-          battery_capacity_ah, warranty_months, cost_price, sell_price,
-          stock_qty, min_stock_alert, location_shelf, is_active, notes
-        ) VALUES (?, ?, ?, 'service', 'service', 'خدمات المركز', null, 'unit', 1, null, 'محلي', null, null, 0, ?, ?, 9999, 0, 'حفرة الغيار', 1, ?)
-      `);
+    if (process.env.SEED_DEFAULT_SERVICES === 'true') {
+      const srvCount = db.prepare("SELECT COUNT(*) as count FROM inventory WHERE category = 'service' OR item_type = 'service'").get().count;
+      if (srvCount === 0) {
+        const insertSrv = db.prepare(`
+          INSERT INTO inventory (
+            sku, barcode, name, category, item_type, brand, viscosity, pack_size,
+            carton_pack_qty, tire_battery_spec, country_of_origin, dot_code,
+            battery_capacity_ah, warranty_months, cost_price, sell_price,
+            stock_qty, min_stock_alert, location_shelf, is_active, notes
+          ) VALUES (?, ?, ?, 'service', 'service', 'خدمات المركز', null, 'unit', 1, null, 'محلي', null, null, 0, ?, ?, 9999, 0, 'حفرة الغيار', 1, ?)
+        `);
 
-      insertSrv.run('SRV-OIL-CHG', 'SRV001', 'أجرة مصنعية غيار زيت وفلتر', 0, 1500, 'أجرة يد غيار زيت مع فحص سائل الفرامل والرديتر مجاناً');
-      insertSrv.run('SRV-TIRE-PATCH', 'SRV002', 'رقعة تيوبلس ألماني حراري مع فحص تسريب', 300, 2500, 'رقعة تيوبلس سريعة مع فحص البلف');
-      insertSrv.run('SRV-WHEEL-BAL', 'SRV003', 'ترصيص أرضي ليزر ديجيتال (للكفر الواحد)', 200, 2000, 'ترصيص كمبيوتر مع أوزان الرصاص');
-      insertSrv.run('SRV-CHASSIS-LUBE', 'SRV004', 'تشحيم شاسيه ومفاصل وعمود كردان كامل', 500, 3500, 'تشحيم شحم عالي الحرارة للمفاصل');
-      insertSrv.run('SRV-DIAG-COMP', 'SRV005', 'فحص كمبيوتر سيارات شامل OBD2 وكشف أعطال', 0, 5000, 'قراءة ومسح أكواد الأعطال وفحص الحساسات');
-      console.log('[DB] Seeded 5 standard automotive pit & tire workshop services.');
+        insertSrv.run('SRV-OIL-CHG', 'SRV001', 'أجرة مصنعية غيار زيت وفلتر', 0, 1500, 'أجرة يد غيار زيت مع فحص سائل الفرامل والرديتر مجاناً');
+        insertSrv.run('SRV-TIRE-PATCH', 'SRV002', 'رقعة تيوبلس ألماني حراري مع فحص تسريب', 300, 2500, 'رقعة تيوبلس سريعة مع فحص البلف');
+        insertSrv.run('SRV-WHEEL-BAL', 'SRV003', 'ترصيص أرضي ليزر ديجيتال (للكفر الواحد)', 200, 2000, 'ترصيص كمبيوتر مع أوزان الرصاص');
+        insertSrv.run('SRV-CHASSIS-LUBE', 'SRV004', 'تشحيم شاسيه ومفاصل وعمود كردان كامل', 500, 3500, 'تشحيم شحم عالي الحرارة للمفاصل');
+        insertSrv.run('SRV-DIAG-COMP', 'SRV005', 'فحص كمبيوتر سيارات شامل OBD2 وكشف أعطال', 0, 5000, 'قراءة ومسح أكواد الأعطال وفحص الحساسات');
+        console.log('[DB] Seeded 5 standard automotive pit & tire workshop services.');
+      }
     }
   } catch (err) {
     console.warn('[DB] Seeding services warning:', err.message);
@@ -666,8 +675,39 @@ function initDb() {
       CREATE INDEX IF NOT EXISTS idx_invoices_worker_date ON invoices(worker_id, created_at);
       CREATE INDEX IF NOT EXISTS idx_daily_tx_worker_date ON daily_transactions(worker_id, tx_type, created_at);
       UPDATE workers SET commission_rate = 0 WHERE commission_rate != 0;
+
+      -- Worker Daily Attendance & Cumulative Wage Accrual
+      CREATE TABLE IF NOT EXISTS worker_attendance (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        worker_id INTEGER NOT NULL REFERENCES workers(id) ON DELETE CASCADE,
+        work_date TEXT NOT NULL,
+        status TEXT NOT NULL DEFAULT 'present' CHECK(status IN ('present', 'absent')),
+        daily_wage REAL NOT NULL DEFAULT 0,
+        notes TEXT,
+        created_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime')),
+        UNIQUE(worker_id, work_date)
+      );
+      CREATE INDEX IF NOT EXISTS idx_worker_attendance_date ON worker_attendance(work_date);
+      CREATE INDEX IF NOT EXISTS idx_worker_attendance_worker ON worker_attendance(worker_id, work_date);
     `);
-    console.log('[DB] Migration applied: expense_categories is_active and technician performance indexes verified.');
+
+    // Update technician #1 name if it was generic 'عامل'
+    const existingWorker = db.prepare('SELECT id, name FROM workers WHERE id = 1').get();
+    if (existingWorker) {
+      if (existingWorker.name === 'عامل' || !existingWorker.name) {
+        db.prepare(`
+          UPDATE workers SET 
+            name = 'محمد', 
+            role = 'فني غيار زيوت وبنشر', 
+            daily_base_wage = 3000, 
+            commission_rate = 0, 
+            active = 1 
+          WHERE id = 1
+        `).run();
+        console.log('[DB] Updated technician #1 to: محمد (3,000 YER/day).');
+      }
+    }
+    console.log('[DB] Migration applied: expense_categories, worker_attendance, and technician verified.');
   } catch (err) {
     console.warn('[DB] Migration warning on expense_categories and indexes:', err.message);
   }

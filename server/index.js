@@ -194,6 +194,30 @@ app.post('/api/backup/restore-local', (req, res) => {
   }
 });
 
+// License Guard Middleware: Blocks destructive / write actions when subscription is locked
+const licenseEngine = require('./utils/licenseEngine');
+app.use('/api', (req, res, next) => {
+  if (
+    req.method === 'GET' ||
+    req.path.startsWith('/system/license') ||
+    req.path.startsWith('/backup') ||
+    req.path === '/system/factory-reset'
+  ) {
+    return next();
+  }
+  const db = require('./db/database');
+  const status = licenseEngine.getLicenseStatus(db);
+  if (!status.valid) {
+    return res.status(403).json({
+      success: false,
+      code: 'LICENSE_LOCKED',
+      message: status.message || 'انتهت فترة اشتراك النظام ومهلة السماح. يرجى إدخال كود التجديد لاستئناف العمل.',
+      data: status,
+    });
+  }
+  next();
+});
+
 // API Routes
 app.use('/api/vehicles', vehicleRoutes);
 app.use('/api/inventory', inventoryRoutes);
@@ -212,13 +236,21 @@ app.use('/api/shifts', shiftRoutes);
 app.use('/api/system', systemRoutes);
 
 // Serve production static frontend if available
-const clientDistPath = path.join(__dirname, '..', 'client', 'dist');
+const clientDistCandidates = [
+  path.join(__dirname, '..', 'client', 'dist'),
+  path.join(__dirname, '..', '..', 'client', 'dist'),
+  path.join(__dirname, '..', 'resources', 'client', 'dist'),
+];
+const clientDistPath = clientDistCandidates.find((p) => fs.existsSync(p)) || clientDistCandidates[0];
 if (fs.existsSync(clientDistPath)) {
+  console.log('[Server] Serving production static frontend from:', clientDistPath);
   app.use(express.static(clientDistPath));
   app.use((req, res, next) => {
     if (req.path.startsWith('/api')) return next();
     res.sendFile(path.join(clientDistPath, 'index.html'));
   });
+} else {
+  console.warn('[Server] Warning: client/dist not found in candidates:', clientDistCandidates);
 }
 
 // Global Error Handler
@@ -227,14 +259,26 @@ app.use(errorHandler);
 // Initialize DB and Seed data before listening
 try {
   initDb();
-  seedDatabase();
+  if (process.env.SEED_DEMO_DATA === 'true') {
+    seedDatabase();
+  }
   backupEngine.performDailyAutoBackup();
-  app.listen(PORT, () => {
+  try {
+    const { initPrinterSelfHealing } = require('./utils/printerSelfHealer');
+    initPrinterSelfHealing();
+  } catch (e) {}
+  const serverInstance = app.listen(PORT, () => {
     console.log(`🚀 Quick Lube POS Backend running on http://localhost:${PORT}`);
     console.log(`📡 Ready for Phase 1 endpoints testing`);
   });
+  serverInstance.on('error', (err) => {
+    console.error('⚠️ Server listener error:', err.message);
+  });
 } catch (err) {
   console.error('Failed to start server:', err);
+  try {
+    fs.appendFileSync(path.join(__dirname, '..', 'desktop_boot.log'), `[SERVER CRASH] ${err.stack || err}\n`);
+  } catch (e) {}
   process.exit(1);
 }
 

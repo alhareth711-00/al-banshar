@@ -166,6 +166,130 @@ export default function ShiftHandoverModal({ isOpen, onClose, currentShift, onSh
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/85 backdrop-blur-md select-none">
+      {/* Scoped CSS for Isolated Thermal (80mm) Shift Handover Slip */}
+      <style>{`
+        @media print {
+          @page {
+            margin: 0 !important;
+            size: 72mm 297mm;
+          }
+          html, body {
+            background: #ffffff !important;
+            color: #000000 !important;
+            margin: 0 !important;
+            padding: 0 !important;
+            height: auto !important;
+            min-height: auto !important;
+            overflow: visible !important;
+          }
+          body * {
+            visibility: hidden !important;
+          }
+          .shift-printable-area, .shift-printable-area * {
+            visibility: visible !important;
+          }
+          .shift-printable-area {
+            position: absolute !important;
+            left: 0 !important;
+            right: 0 !important;
+            top: 0 !important;
+            width: 100% !important;
+            max-width: 100% !important;
+            margin: 0 !important;
+            padding: 4px 1mm 12px 1mm !important;
+            background: #ffffff !important;
+            color: #000000 !important;
+            box-shadow: none !important;
+            border: none !important;
+            border-radius: 0 !important;
+            height: auto !important;
+            max-height: none !important;
+            overflow: visible !important;
+            z-index: 999999 !important;
+          }
+          .fixed, .overflow-hidden, .overflow-y-auto {
+            position: static !important;
+            overflow: visible !important;
+            max-height: none !important;
+            height: auto !important;
+          }
+        }
+      `}</style>
+
+      {/* Hidden Thermal 80mm Print-Only Container */}
+      {closedSlip && (
+        <div className="hidden print:block shift-printable-area text-black bg-white font-sans text-xs leading-normal">
+          <div className="text-center border-b-2 border-black pb-2">
+            <div className="font-black text-lg leading-tight">{settings.shopName}</div>
+            <div className="text-xs font-bold text-gray-800 mt-0.5">{settings.address} &bull; هاتف: {settings.shopPhone}</div>
+            <div className="font-black mt-2 text-sm border-2 border-black py-1 px-2 rounded inline-block bg-white text-black">
+              محضر تسليم واستلام وردية
+            </div>
+            <div className="text-xs font-mono font-black mt-1">كود الوردية: {closedSlip.shift_code}</div>
+          </div>
+
+          <div className="py-2 text-xs space-y-1 border-b-2 border-black font-bold">
+            <div className="flex justify-between items-center">
+              <span className="text-gray-700">المسلِّم (الكاشير):</span>
+              <span className="font-black text-sm">{closedSlip.cashier_name}</span>
+            </div>
+            <div className="flex justify-between items-center">
+              <span className="text-gray-700">المستلِم (المناوب):</span>
+              <span className="font-black text-sm">{closedSlip.handed_over_to}</span>
+            </div>
+            <div className="flex justify-between items-center text-[11px] text-gray-800">
+              <span>وقت البدء: {closedSlip.opened_at}</span>
+            </div>
+            <div className="flex justify-between items-center text-[11px] text-gray-800">
+              <span>وقت الإغلاق: {closedSlip.closed_at}</span>
+            </div>
+          </div>
+
+          <div className="py-2 space-y-1 text-xs font-bold border-b-2 border-black">
+            <div className="flex justify-between items-center">
+              <span>رصيد الافتتاح:</span>
+              <span className="font-mono">{Number(closedSlip.opening_cash).toLocaleString()} ر.ي</span>
+            </div>
+            <div className="flex justify-between items-center">
+              <span>إجمالي المقبوضات:</span>
+              <span className="font-mono">+{Number(closedSlip.total_inflow).toLocaleString()} ر.ي</span>
+            </div>
+            <div className="flex justify-between items-center">
+              <span>إجمالي المدفوعات:</span>
+              <span className="font-mono">-{Number(closedSlip.total_outflow).toLocaleString()} ر.ي</span>
+            </div>
+            <div className="flex justify-between items-center border-t border-dashed border-gray-400 pt-1">
+              <span>الرصيد الدفتري المتوقع:</span>
+              <span className="font-mono font-black">{Number(closedSlip.expected_cash).toLocaleString()} ر.ي</span>
+            </div>
+            <div className="flex justify-between items-center border-2 border-black p-2 mt-1 bg-gray-50 text-sm">
+              <span className="font-black">النقد الفعلي المسلَّم:</span>
+              <span className="font-black font-mono text-base">{Number(closedSlip.actual_cash).toLocaleString()} ر.ي</span>
+            </div>
+            <div className="flex justify-between items-center pt-1">
+              <span>الفارق:</span>
+              <span className="font-mono font-black">
+                {closedSlip.difference === 0
+                  ? 'مطابق تماماً (0 ر.ي)'
+                  : `${closedSlip.difference > 0 ? '+' : ''}${Number(closedSlip.difference).toLocaleString()} ر.ي (${
+                      closedSlip.difference < 0 ? 'عجز' : 'فائض'
+                    })`}
+              </span>
+            </div>
+          </div>
+
+          <div className="pt-3 text-center text-xs font-bold space-y-4">
+            <div className="flex justify-around items-center pt-2">
+              <div>توقيع المسلِّم: ....................</div>
+              <div>توقيع المستلِم: ....................</div>
+            </div>
+            <div className="text-[10px] text-gray-600 font-mono border-t border-gray-300 pt-1">
+              نظام سريع وبنشر PRO &bull; طُبع في {new Date().toLocaleString('ar-YE')}
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="apple-glass bg-slate-950 border border-white/20 rounded-3xl w-full max-w-lg overflow-hidden shadow-2xl animate-in fade-in zoom-in-95 duration-200 max-h-[92vh] flex flex-col">
         {/* Header Bar */}
         <div className="px-5 py-4 border-b border-white/10 flex items-center justify-between gap-3 bg-white/5 flex-shrink-0">

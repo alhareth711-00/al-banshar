@@ -62,6 +62,26 @@ const workerController = {
       data: stats,
     });
   }),
+
+  toggleAttendance: asyncHandler(async (req, res) => {
+    const id = parseInt(req.params.id, 10);
+    const date = req.body.date || null;
+    const updatedAtt = workerModel.toggleAttendance(id, date);
+    res.json({
+      success: true,
+      message: `تم تحديث حالة الحضور للفني إلى: ${updatedAtt.status === 'present' ? 'حاضر 🟢' : 'غائب 🔴'}`,
+      data: updatedAtt,
+    });
+  }),
+
+  getBalance: asyncHandler(async (req, res) => {
+    const id = parseInt(req.params.id, 10);
+    const balance = workerModel.getWorkerBalance(id);
+    res.json({
+      success: true,
+      data: balance,
+    });
+  }),
 };
 
 module.exports = workerController;

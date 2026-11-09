@@ -8,7 +8,6 @@ import {
   Wrench,
   Barcode,
   ShieldCheck,
-  MapPin,
   Calculator,
   Calendar,
   AlertTriangle,
@@ -77,6 +76,59 @@ export const getPackQtyLabel = (bulkUnit, retailUnit) => {
   return `الكمية داخل العبوة:`;
 };
 
+// List of popular detectable brands for Smart Brand Auto-Detect
+export const KNOWN_DETECTABLE_BRANDS = [
+  // زيوت
+  { keyword: 'تويوتا', brand: 'تويوتا' },
+  { keyword: 'كاسترول', brand: 'كاسترول' },
+  { keyword: 'شل', brand: 'شل' },
+  { keyword: 'توتال', brand: 'توتال' },
+  { keyword: 'بترومين', brand: 'بترومين' },
+  { keyword: 'فوكس', brand: 'فوكس' },
+  { keyword: 'موبيل', brand: 'موبيل 1' },
+  { keyword: 'عترون', brand: 'عترون' },
+  { keyword: 'صقر', brand: 'صقر' },
+  { keyword: 'موتول', brand: 'موتول' },
+  { keyword: 'فالفولين', brand: 'فالفولين' },
+  { keyword: 'امسويل', brand: 'امسويل' },
+  { keyword: 'لوفرين', brand: 'لوفرين' },
+  { keyword: 'لكزس', brand: 'لكزس' },
+  { keyword: 'هيونداي', brand: 'هيونداي' },
+  { keyword: 'نيسان', brand: 'نيسان' },
+  { keyword: 'هوندا', brand: 'هوندا' },
+  { keyword: 'ميتسوبيشي', brand: 'ميتسوبيشي' },
+  // بطاريات
+  { keyword: 'هانكوك', brand: 'هانكوك' },
+  { keyword: 'انديكو', brand: 'إنديكو' },
+  { keyword: 'إنديكو', brand: 'إنديكو' },
+  { keyword: 'فارتا', brand: 'فارتا' },
+  { keyword: 'باقر', brand: 'باقر' },
+  { keyword: 'اوبتيما', brand: 'أوبتيما' },
+  { keyword: 'روكيت', brand: 'روكيت' },
+  { keyword: 'كلورايد', brand: 'كلورايد' },
+  { keyword: 'اسيدلكو', brand: 'إيه سي ديلكو' },
+  { keyword: 'ديلكو', brand: 'إيه سي ديلكو' },
+  // كفرات
+  { keyword: 'سيلون', brand: 'سيلون' },
+  { keyword: 'يوكوهاما', brand: 'يوكوهاما' },
+  { keyword: 'دانلوب', brand: 'دانلوب' },
+  { keyword: 'بريدجستون', brand: 'بريدجستون' },
+  { keyword: 'ميشلان', brand: 'ميشلان' },
+  { keyword: 'ماكسس', brand: 'ماكسس' },
+  { keyword: 'كومهو', brand: 'كومهو' },
+  { keyword: 'كونتيننتال', brand: 'كونتيننتال' },
+  { keyword: 'بيريلي', brand: 'بيريلي' },
+  { keyword: 'جودير', brand: 'جودير' },
+  { keyword: 'لينغ لونغ', brand: 'لينغ لونغ' },
+  { keyword: 'نكسن', brand: 'نكسن' },
+  // فلاتر وقطع
+  { keyword: 'دينسو', brand: 'دينسو' },
+  { keyword: 'ساكورا', brand: 'ساكورا' },
+  { keyword: 'مان', brand: 'مان' },
+  { keyword: 'بوش', brand: 'بوش' },
+  { keyword: 'فيك', brand: 'VIC' },
+];
+
 // Single-letter prefix SKU generator (Z=زيت, F=فلتر, T=إطار, B=بطارية, S=خدمة, P=منتج عام)
 export const generateSingleLetterSku = (category) => {
   const prefixMap = {
@@ -131,15 +183,27 @@ export default function AddInventoryModal({ isOpen, onClose, onCreated, itemToEd
   const [viscositiesList, setViscositiesList] = useState(getCustomViscosities());
   const [knownBrands, setKnownBrands] = useState(getCustomOilBrands());
   const [isCustomVisc, setIsCustomVisc] = useState(false);
+  const [isCustomBrand, setIsCustomBrand] = useState(false);
+  const [suppliersList, setSuppliersList] = useState([]);
   const nameInputRef = useRef(null);
 
   // Close on Escape & Autofocus on open
   useEffect(() => {
     if (!isOpen) return;
 
+    fetch('/api/suppliers')
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.success && Array.isArray(data.data)) {
+          setSuppliersList(data.data);
+        }
+      })
+      .catch(() => {});
+
     setViscositiesList(getCustomViscosities());
     setKnownBrands(getCustomOilBrands());
     setIsCustomVisc(false);
+    setIsCustomBrand(false);
 
     const timer = setTimeout(() => {
       if (nameInputRef.current) {
@@ -174,7 +238,7 @@ export default function AddInventoryModal({ isOpen, onClose, onCreated, itemToEd
         name: itemToEdit.name || '',
         category: itemToEdit.category || 'oil',
         item_type: itemToEdit.item_type || (itemToEdit.category === 'service' ? 'service' : 'product'),
-        brand: itemToEdit.brand || 'عام',
+        brand: itemToEdit.brand && itemToEdit.brand !== 'عام' ? itemToEdit.brand : (itemToEdit.category === 'oil' ? 'تويوتا' : ''),
         viscosity: itemToEdit.viscosity || '20W-50',
         oil_type: (itemToEdit.oil_type === 'معدني تقليدي' ? 'معدني' : itemToEdit.oil_type) || 'معدني',
         api_grade: itemToEdit.api_grade || 'SP / CF',
@@ -197,7 +261,7 @@ export default function AddInventoryModal({ isOpen, onClose, onCreated, itemToEd
         notes: itemToEdit.notes || '',
       });
       setCustomMarkup(String(m));
-      setShowAdvancedSection(Boolean(itemToEdit.barcode || itemToEdit.location_shelf || itemToEdit.notes));
+      setShowAdvancedSection(Boolean(itemToEdit.barcode || itemToEdit.notes));
     } else {
       setFormData({
         sku: '',
@@ -263,6 +327,23 @@ export default function AddInventoryModal({ isOpen, onClose, onCreated, itemToEd
     }
   };
 
+  const handleNameChange = (val) => {
+    setFormData((prev) => {
+      let updatedBrand = prev.brand;
+      const shouldAutoDetect = !prev.brand || prev.brand === 'تويوتا' || prev.brand === 'عام' || KNOWN_DETECTABLE_BRANDS.some((b) => b.brand === prev.brand);
+      if (shouldAutoDetect && val && val.trim()) {
+        const valLower = val.toLowerCase();
+        for (const item of KNOWN_DETECTABLE_BRANDS) {
+          if (valLower.includes(item.keyword.toLowerCase())) {
+            updatedBrand = item.brand;
+            break;
+          }
+        }
+      }
+      return { ...prev, name: val, brand: updatedBrand };
+    });
+  };
+
   const dotAnalysis = useMemo(() => {
     if (formData.category !== 'tire') return null;
     return calculateDotAge(formData.dot_code);
@@ -298,7 +379,7 @@ export default function AddInventoryModal({ isOpen, onClose, onCreated, itemToEd
           updated.retail_unit = 'دبة'; updated.bulk_unit = 'كرتون'; updated.carton_pack_qty = 4;
         }
       } else if (cat === 'filter') {
-        updated.brand = prev.brand === 'تويوتا' || prev.brand === 'خدمات المركز' ? '' : prev.brand;
+        updated.brand = prev.brand === 'تويوتا' || prev.brand === 'خدمات المركز' || prev.brand === 'عام' ? '' : prev.brand;
         updated.viscosity = '';
         updated.oil_type = '';
         updated.api_grade = '';
@@ -307,7 +388,7 @@ export default function AddInventoryModal({ isOpen, onClose, onCreated, itemToEd
         updated.bulk_unit = 'شدة';
         updated.carton_pack_qty = 10;
       } else if (cat === 'battery') {
-        updated.brand = prev.brand === 'تويوتا' || prev.brand === 'خدمات المركز' ? '' : prev.brand;
+        updated.brand = prev.brand === 'تويوتا' || prev.brand === 'خدمات المركز' || prev.brand === 'عام' ? '' : prev.brand;
         updated.viscosity = '';
         updated.oil_type = '';
         updated.api_grade = '';
@@ -316,7 +397,7 @@ export default function AddInventoryModal({ isOpen, onClose, onCreated, itemToEd
         updated.bulk_unit = 'حبة';
         updated.carton_pack_qty = 1;
       } else if (cat === 'tire') {
-        updated.brand = prev.brand === 'تويوتا' || prev.brand === 'خدمات المركز' ? '' : prev.brand;
+        updated.brand = prev.brand === 'تويوتا' || prev.brand === 'خدمات المركز' || prev.brand === 'عام' ? '' : prev.brand;
         updated.viscosity = '';
         updated.oil_type = '';
         updated.api_grade = '';
@@ -325,7 +406,7 @@ export default function AddInventoryModal({ isOpen, onClose, onCreated, itemToEd
         updated.bulk_unit = 'إطار';
         updated.carton_pack_qty = 1;
       } else if (cat === 'accessory') {
-        updated.brand = prev.brand === 'تويوتا' || prev.brand === 'خدمات المركز' ? 'عام' : prev.brand;
+        updated.brand = prev.brand === 'تويوتا' || prev.brand === 'خدمات المركز' || prev.brand === 'عام' ? '' : prev.brand;
         updated.viscosity = '';
         updated.oil_type = '';
         updated.api_grade = '';
@@ -414,6 +495,8 @@ export default function AddInventoryModal({ isOpen, onClose, onCreated, itemToEd
         ...formData,
         sku,
         barcode: formData.barcode.trim() || null,
+        brand: formData.brand && formData.brand.trim() ? formData.brand.trim() : (isService ? 'خدمات المركز' : ''),
+        location_shelf: null,
         viscosity: isOil ? (formData.viscosity || null) : null,
         oil_type: isOil ? (formData.oil_type || null) : null,
         api_grade: isOil ? (formData.api_grade || null) : null,
@@ -551,7 +634,7 @@ export default function AddInventoryModal({ isOpen, onClose, onCreated, itemToEd
               type="text"
               placeholder={isService ? 'مثال: غيار زيت محرك وتشييك' : 'مثال: زيت تويوتا ذهبي 20W-50 علبة 1 لتر'}
               value={formData.name}
-              onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+              onChange={(e) => handleNameChange(e.target.value)}
               className="w-full min-h-[46px] px-3.5 rounded-xl bg-slate-900 border border-white/15 text-white text-sm font-bold focus:outline-none focus:border-amber-400"
               required
             />
@@ -875,13 +958,21 @@ export default function AddInventoryModal({ isOpen, onClose, onCreated, itemToEd
                       اسم المورد / الشركة صاحبة الأمانة:
                     </label>
                     <input
+                      list="consignment-suppliers-list"
                       type="text"
-                      placeholder="مثال: شركة النفط، بازرعة، شركة النور..."
+                      placeholder="اختر أو اكتب اسم المورد / الشركة صاحبة الأمانة..."
                       value={formData.consignment_supplier_name}
                       onChange={(e) => setFormData({ ...formData, consignment_supplier_name: e.target.value })}
                       className="w-full min-h-[40px] px-3 rounded-xl bg-slate-950 border border-amber-400/40 text-amber-200 text-xs font-bold focus:outline-none focus:border-amber-400"
                       required={formData.is_consignment}
                     />
+                    <datalist id="consignment-suppliers-list">
+                      {suppliersList.map((sup) => (
+                        <option key={sup.id} value={sup.name}>
+                          {sup.company_name ? `${sup.name} (${sup.company_name})` : sup.name}
+                        </option>
+                      ))}
+                    </datalist>
                   </div>
                   <div className="flex items-center text-[11px] text-amber-200/90 bg-amber-500/10 p-2.5 rounded-xl border border-amber-500/20">
                     💡 يظهر هذا الصنف تلقائياً في كشف جرد بضاعة الأمانات لسهولة محاسبة مندوب الشركة عند زيارته.
@@ -945,38 +1036,74 @@ export default function AddInventoryModal({ isOpen, onClose, onCreated, itemToEd
                   </div>
                 </div>
 
-                {/* Brand & Shelf Location */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-slate-300 font-bold mb-1">الماركة / الشركة المصنعة:</label>
-                    <input
-                      type="text"
-                      list="known-oil-brands"
-                      placeholder="تويوتا، شل، كاسترول، بترومين..."
-                      value={formData.brand}
-                      onChange={(e) => setFormData({ ...formData, brand: e.target.value })}
-                      className="w-full min-h-[42px] px-3.5 rounded-xl bg-slate-900 border border-white/15 text-white text-xs"
-                    />
-                    <datalist id="known-oil-brands">
-                      {knownBrands.map((b) => (
-                        <option key={b.id} value={b.name || b.id} />
-                      ))}
-                    </datalist>
+                {/* Brand Selector (موقع الرف تم حذفه بالكامل) */}
+                <div>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="block text-slate-300 font-bold text-xs">
+                      {formData.category === 'oil' ? 'الماركة المعتمدة للزيت:' : 'الماركة / الشركة المصنعة (اختياري):'}
+                    </label>
+                    {formData.category === 'oil' && (
+                      <button
+                        type="button"
+                        onClick={() => setIsCustomBrand(!isCustomBrand)}
+                        className="text-[11px] text-amber-400 hover:text-amber-300 font-bold"
+                      >
+                        {isCustomBrand ? 'قائمة الماركات المعتمدة' : '➕ إضافة ماركة أخرى'}
+                      </button>
+                    )}
                   </div>
 
-                  <div>
-                    <label className="block text-slate-300 font-bold mb-1 flex items-center gap-1">
-                      <MapPin className="w-3.5 h-3.5 text-amber-400" />
-                      <span>موقع الرف في المحل:</span>
-                    </label>
+                  {formData.category === 'oil' ? (
+                    isCustomBrand ? (
+                      <div className="flex gap-2 animate-in fade-in">
+                        <input
+                          type="text"
+                          placeholder="اكتب اسم الماركة الجديدة..."
+                          value={formData.brand}
+                          onChange={(e) => setFormData({ ...formData, brand: e.target.value })}
+                          className="flex-1 min-h-[42px] px-3.5 rounded-xl bg-slate-900 border border-amber-500/50 text-amber-300 text-xs font-bold focus:outline-none focus:border-amber-400"
+                          autoFocus
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setIsCustomBrand(false)}
+                          className="px-3 rounded-xl bg-slate-800 text-slate-300 hover:text-white text-xs font-bold"
+                          title="العودة للقائمة المعتمدة"
+                        >
+                          ✕
+                        </button>
+                      </div>
+                    ) : (
+                      <select
+                        value={formData.brand}
+                        onChange={(e) => {
+                          if (e.target.value === '__new__') {
+                            setIsCustomBrand(true);
+                            setFormData({ ...formData, brand: '' });
+                          } else {
+                            setFormData({ ...formData, brand: e.target.value });
+                          }
+                        }}
+                        className="w-full min-h-[42px] px-3.5 rounded-xl bg-slate-900 border border-white/15 text-white text-xs font-bold focus:outline-none focus:border-amber-400"
+                      >
+                        <option value="">-- اختر ماركة الزيت المعتمدة --</option>
+                        {knownBrands.map((b) => (
+                          <option key={b.id} value={b.id}>
+                            {b.name || b.id}
+                          </option>
+                        ))}
+                        <option value="__new__">➕ إضافة ماركة جديدة أخرى...</option>
+                      </select>
+                    )
+                  ) : (
                     <input
                       type="text"
-                      placeholder="مثال: رف 2، الحفرة، قسم الزيوت..."
-                      value={formData.location_shelf}
-                      onChange={(e) => setFormData({ ...formData, location_shelf: e.target.value })}
-                      className="w-full min-h-[42px] px-3.5 rounded-xl bg-slate-900 border border-white/15 text-white text-xs"
+                      placeholder="اختياري: مثال هانكوك، سيلون، دينسو... (اتركه فارغاً إن لم يتوفر)"
+                      value={formData.brand}
+                      onChange={(e) => setFormData({ ...formData, brand: e.target.value })}
+                      className="w-full min-h-[42px] px-3.5 rounded-xl bg-slate-900 border border-white/15 text-white text-xs focus:outline-none focus:border-amber-400"
                     />
-                  </div>
+                  )}
                 </div>
 
                 {/* Smart Packaging & Units Suite (تخصيص وحدات البيع والتوريد وسعة العبوة) */}

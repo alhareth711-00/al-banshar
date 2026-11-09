@@ -117,6 +117,7 @@ CREATE TABLE IF NOT EXISTS invoices (
     is_voided INTEGER NOT NULL DEFAULT 0 CHECK(is_voided IN (0, 1)),
     void_reason TEXT,
     voided_at TEXT,
+    client_token TEXT UNIQUE,
     created_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime'))
 );
 
@@ -535,6 +536,51 @@ WHEN NEW.service_status = 'pending_service'
 BEGIN
   SELECT RAISE(ABORT, 'قيد الحفرة الحتمي [TRG-LANE-LOCK]: لا يمكن تحويل الفاتورة إلى قيد الخدمة لوجود خدمة نشطة أخرى لنفس المركبة داخل الحفرة.');
 END;
+
+-- =========================================================================
+-- Stage 5: License & Subscription Sentinel (نظام التراخيص والاشتراك ومنع التلاعب)
+-- =========================================================================
+CREATE TABLE IF NOT EXISTS system_license (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    machine_id TEXT NOT NULL,
+    shop_name TEXT NOT NULL DEFAULT 'المركز الذهبي',
+    license_key TEXT NOT NULL,
+    license_type TEXT NOT NULL DEFAULT 'trial',
+    issued_at TEXT NOT NULL,
+    expires_at TEXT NOT NULL,
+    last_seen_at TEXT NOT NULL,
+    signature TEXT NOT NULL,
+    status TEXT NOT NULL,
+    created_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime')),
+    updated_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime'))
+);
+
+CREATE INDEX IF NOT EXISTS idx_license_machine ON system_license(machine_id);
+
+-- =========================================================================
+-- Stage 6: Fiscal Year-End Closing & Retained Earnings (الإغلاق السنوي وترحيل الأرباح)
+-- =========================================================================
+CREATE TABLE IF NOT EXISTS fiscal_years (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    year INTEGER UNIQUE NOT NULL,
+    start_date TEXT NOT NULL,
+    end_date TEXT NOT NULL,
+    is_closed INTEGER NOT NULL DEFAULT 0 CHECK(is_closed IN (0, 1)),
+    closed_at TEXT,
+    closed_by TEXT,
+    closing_jv_id INTEGER REFERENCES journal_entries(id),
+    total_revenue REAL NOT NULL DEFAULT 0,
+    total_cogs REAL NOT NULL DEFAULT 0,
+    total_expenses REAL NOT NULL DEFAULT 0,
+    net_profit REAL NOT NULL DEFAULT 0,
+    retained_earnings_transferred REAL NOT NULL DEFAULT 0,
+    notes TEXT,
+    created_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime'))
+);
+
+CREATE INDEX IF NOT EXISTS idx_fiscal_years_year ON fiscal_years(year);
+CREATE INDEX IF NOT EXISTS idx_fiscal_years_closed ON fiscal_years(is_closed);
+
 
 
 

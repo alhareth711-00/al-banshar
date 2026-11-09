@@ -18,6 +18,8 @@ import {
   Clock,
   Send,
   Building,
+  Edit3,
+  X,
 } from 'lucide-react';
 import ExpenseCategoriesModal from './ExpenseCategoriesModal';
 import { getShopSettings, formatYemeniWhatsAppLink } from '../utils/settings';
@@ -35,16 +37,34 @@ export default function WorkersView({ workers = [], onRefreshData, onOpenCustome
   const [showCategoryModal, setShowCategoryModal] = useState(false);
   const [showAddWorkerModal, setShowAddWorkerModal] = useState(false);
   const [newWorkerName, setNewWorkerName] = useState('');
-  const [newWorkerRole, setNewWorkerRole] = useState('فني غيار زيوت وفلاتر');
+  const [newWorkerRole, setNewWorkerRole] = useState('فني غيار زيوت وبنشر');
   const [newWorkerPhone, setNewWorkerPhone] = useState('');
   const [newWorkerWage, setNewWorkerWage] = useState('');
-  const [newWorkerCommission, setNewWorkerCommission] = useState('');
   const [addWorkerError, setAddWorkerError] = useState('');
+
+  // Edit Worker Modal state
+  const [showEditWorkerModal, setShowEditWorkerModal] = useState(false);
+  const [editingWorkerId, setEditingWorkerId] = useState(null);
+  const [editWorkerName, setEditWorkerName] = useState('');
+  const [editWorkerRole, setEditWorkerRole] = useState('');
+  const [editWorkerPhone, setEditWorkerPhone] = useState('');
+  const [editWorkerWage, setEditWorkerWage] = useState('');
+  const [editWorkerError, setEditWorkerError] = useState('');
+  const [isSubmittingEdit, setIsSubmittingEdit] = useState(false);
 
   const [showAdvanceModal, setShowAdvanceModal] = useState(false);
   const [selectedWorkerForAdvance, setSelectedWorkerForAdvance] = useState(null);
   const [advanceAmount, setAdvanceAmount] = useState('');
   const [advanceNotes, setAdvanceNotes] = useState('');
+
+  // Wage Payout / Settlement Modal state
+  const [showPayoutModal, setShowPayoutModal] = useState(false);
+  const [selectedWorkerForPayout, setSelectedWorkerForPayout] = useState(null);
+  const [payoutAmount, setPayoutAmount] = useState('');
+  const [payoutMethod, setPayoutMethod] = useState('cash');
+  const [payoutPaperBill, setPayoutPaperBill] = useState('');
+  const [payoutNotes, setPayoutNotes] = useState('');
+  const [attendanceTogglingId, setAttendanceTogglingId] = useState(null);
 
   const [showDebtPayModal, setShowDebtPayModal] = useState(false);
   const [selectedVehicleForDebt, setSelectedVehicleForDebt] = useState(null);
@@ -82,10 +102,10 @@ export default function WorkersView({ workers = [], onRefreshData, onOpenCustome
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           name: newWorkerName.trim(),
-          role: newWorkerRole || 'فني غيار زيوت وفلاتر',
+          role: newWorkerRole || 'فني غيار زيوت وبنشر',
           phone: newWorkerPhone.trim(),
           daily_base_wage: Number(newWorkerWage) || 0,
-          commission_rate: Number(newWorkerCommission) || 0,
+          commission_rate: 0,
         }),
       });
       const data = await res.json();
@@ -94,13 +114,63 @@ export default function WorkersView({ workers = [], onRefreshData, onOpenCustome
       setNewWorkerName('');
       setNewWorkerPhone('');
       setNewWorkerWage('');
-      setNewWorkerCommission('');
       fetchWorkerStats();
       if (onRefreshData) onRefreshData();
     } catch (err) {
       setAddWorkerError(err.message);
     } finally {
       setIsSubmitting(false);
+    }
+  };
+
+  const handleOpenEditWorker = (w) => {
+    setEditingWorkerId(w.id);
+    setEditWorkerName(w.name || '');
+    setEditWorkerRole(w.role || '');
+    setEditWorkerPhone(w.phone || '');
+    setEditWorkerWage(w.daily_base_wage !== undefined ? String(w.daily_base_wage) : '0');
+    setEditWorkerError('');
+    setShowEditWorkerModal(true);
+  };
+
+  const handleUpdateWorker = async (e) => {
+    e.preventDefault();
+    if (!editWorkerName.trim()) {
+      setEditWorkerError('يرجى كتابة اسم الفني');
+      return;
+    }
+    if (!editWorkerRole.trim()) {
+      setEditWorkerError('يرجى تحديد أو كتابة المسمى الوظيفي');
+      return;
+    }
+
+    try {
+      setIsSubmittingEdit(true);
+      setEditWorkerError('');
+      const res = await fetch(`/api/workers/${editingWorkerId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: editWorkerName.trim(),
+          role: editWorkerRole.trim(),
+          phone: editWorkerPhone.trim() || null,
+          daily_base_wage: parseFloat(editWorkerWage) || 0,
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        throw new Error(data.message || 'فشل تحديث بيانات الفني');
+      }
+
+      setShowEditWorkerModal(false);
+      await fetchWorkerStats();
+      if (onRefreshData) onRefreshData();
+    } catch (err) {
+      console.error('Error updating worker:', err);
+      setEditWorkerError(err.message || 'حدث خطأ أثناء تعديل بيانات الفني');
+    } finally {
+      setIsSubmittingEdit(false);
     }
   };
 
@@ -111,9 +181,6 @@ export default function WorkersView({ workers = [], onRefreshData, onOpenCustome
       const data = await res.json();
       if (data.success) {
         setExpensesCategories(data.data || []);
-        if (data.data && data.data.length > 0 && !expenseCategory) {
-          setExpenseCategory(data.data[0].name);
-        }
       }
     } catch (e) {
       console.error('Error fetching categories:', e);
@@ -166,7 +233,10 @@ export default function WorkersView({ workers = [], onRefreshData, onOpenCustome
   useEffect(() => {
     const handleKeyDown = (e) => {
       if (e.key === 'Escape') {
+        setShowAddWorkerModal(false);
+        setShowEditWorkerModal(false);
         setShowAdvanceModal(false);
+        setShowPayoutModal(false);
         setShowDebtPayModal(false);
         setCompletedDebtReceipt(null);
         setShowCategoryModal(false);
@@ -185,11 +255,11 @@ export default function WorkersView({ workers = [], onRefreshData, onOpenCustome
   }, [workerStats]);
 
   const totalDailyWages = useMemo(() => {
-    return workerStats.reduce((acc, w) => acc + (Number(w.daily_base_wage) || 0), 0);
+    return workerStats.reduce((acc, w) => acc + (Number(w.today_wage ?? w.daily_base_wage) || 0), 0);
   }, [workerStats]);
 
-  const totalNetDueWorkers = useMemo(() => {
-    return workerStats.reduce((acc, w) => acc + (Number(w.net_due_today) || 0), 0);
+  const totalCumulativeDueWorkers = useMemo(() => {
+    return workerStats.reduce((acc, w) => acc + (Number(w.cumulative_balance) || 0), 0);
   }, [workerStats]);
 
   const totalOutstandingCustomerDebts = useMemo(() => {
@@ -204,7 +274,28 @@ export default function WorkersView({ workers = [], onRefreshData, onOpenCustome
     return todayExpensesList.reduce((acc, t) => acc + (Number(t.amount) || 0), 0);
   }, [todayExpensesList]);
 
-  // Handle Record Worker Advance (مع التحقق الرقابي من رصيد العامل وتمرير id الصحيح)
+  // Handle Toggle Attendance (حاضر / غائب)
+  const handleToggleAttendance = async (workerId) => {
+    try {
+      setAttendanceTogglingId(workerId);
+      const todayStr = getLocalTodayDate();
+      const res = await fetch(`/api/workers/${workerId}/toggle-attendance`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ date: todayStr }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) throw new Error(data.message || 'فشل تحديث حالة الحضور');
+      await loadAllData();
+      if (onRefreshData) onRefreshData();
+    } catch (err) {
+      alert(err.message);
+    } finally {
+      setAttendanceTogglingId(null);
+    }
+  };
+
+  // Handle Record Worker Advance (توليد سند صرف رسمي PV وربطه بالخزينة والوردية)
   const handleRecordAdvance = async (e) => {
     e.preventDefault();
     if (!selectedWorkerForAdvance || !advanceAmount || Number(advanceAmount) <= 0) {
@@ -214,37 +305,86 @@ export default function WorkersView({ workers = [], onRefreshData, onOpenCustome
 
     const advVal = Number(advanceAmount);
     const workerId = selectedWorkerForAdvance.id;
-    const currentNet = Number(selectedWorkerForAdvance.net_due_today || 0);
+    const currentBalance = Number(selectedWorkerForAdvance.cumulative_balance || 0);
 
-    // تنبيه رقابي إذا كانت السلفة أكبر من صافي مستحقات اليوم
-    if (advVal > currentNet) {
+    // تنبيه رقابي إذا كانت السلفة أكبر من إجمالي مستحقات الفني التراكمية
+    if (advVal > currentBalance) {
       const confirmExceed = window.confirm(
-        `⚠️ تنبيه رقابي مالي:\nمبلغ السلفة المطلوب (${advVal.toLocaleString()} ر.ي) أكبر من صافي أجر الفني المتبقي اليوم (${currentNet.toLocaleString()} ر.ي).\n\nهل ترغب في صرف السلفة واعتماد الفارق كذمة مدينة على الفني؟`
+        `⚠️ تنبيه رقابي مالي:\nمبلغ السلفة المطلوب (${advVal.toLocaleString()} ر.ي) أكبر من إجمالي مستحقات الفني التراكمية المتبقية له (${currentBalance.toLocaleString()} ر.ي).\n\nهل ترغب في صرف السلفة واعتماد الفارق كذمة مدينة على الفني؟`
       );
       if (!confirmExceed) return;
     }
 
     try {
       setIsSubmitting(true);
-      const res = await fetch('/api/transactions', {
+      const res = await fetch('/api/vouchers/payment', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          tx_type: 'worker_advance',
+          voucher_type: 'payment',
+          party_type: 'worker',
+          party_id: workerId,
+          party_name: selectedWorkerForAdvance.name,
           amount: advVal,
-          description: advanceNotes.trim() || `سلفة يومية للفني: ${selectedWorkerForAdvance.name}`,
-          worker_id: workerId,
           payment_method: 'cash',
+          offset_account_code: '1202', // سلف فنيين
+          description: advanceNotes.trim() || `سلفة نقدية للفني: ${selectedWorkerForAdvance.name}`,
         }),
       });
 
       const data = await res.json();
-      if (!res.ok) throw new Error(data.message || 'حدث خطأ أثناء حفظ السلفة');
+      if (!res.ok || !data.success) throw new Error(data.message || 'حدث خطأ أثناء حفظ السلفة');
 
       setShowAdvanceModal(false);
       setAdvanceAmount('');
       setAdvanceNotes('');
       setSelectedWorkerForAdvance(null);
+      await loadAllData();
+      if (onRefreshData) onRefreshData();
+    } catch (err) {
+      alert(err.message);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  // Handle Record Worker Wage Payout / Settlement (صرف وتصفية مستحقات أجور)
+  const handleRecordWagePayout = async (e) => {
+    e.preventDefault();
+    if (!selectedWorkerForPayout || !payoutAmount || Number(payoutAmount) <= 0) {
+      alert('يرجى تحديد مبلغ الصرف بشكل صحيح');
+      return;
+    }
+
+    const payVal = Number(payoutAmount);
+    const workerId = selectedWorkerForPayout.id;
+
+    try {
+      setIsSubmitting(true);
+      const res = await fetch('/api/vouchers/payment', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          voucher_type: 'payment',
+          party_type: 'worker',
+          party_id: workerId,
+          party_name: selectedWorkerForPayout.name,
+          amount: payVal,
+          payment_method: payoutMethod,
+          offset_account_code: '6108', // أجور ورواتب الفنيين الأساسية
+          paper_bill_number: payoutPaperBill.trim() || null,
+          description: payoutNotes.trim() || `صرف وتصفية مستحقات أجور للفني: ${selectedWorkerForPayout.name}`,
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok || !data.success) throw new Error(data.message || 'حدث خطأ أثناء صرف مستحقات الفني');
+
+      setShowPayoutModal(false);
+      setPayoutAmount('');
+      setPayoutNotes('');
+      setPayoutPaperBill('');
+      setSelectedWorkerForPayout(null);
       await loadAllData();
       if (onRefreshData) onRefreshData();
     } catch (err) {
@@ -343,14 +483,14 @@ export default function WorkersView({ workers = [], onRefreshData, onOpenCustome
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3.5 flex-shrink-0">
         <div className="apple-glass-card rounded-3xl p-4 border border-purple-500/25">
           <div className="flex items-center justify-between text-slate-400 text-xs font-bold">
-            <span>الصافي المستحق للعمال اليوم:</span>
+            <span>الصافي التراكمي المستحق للعمال:</span>
             <Users className="w-4 h-4 text-purple-400" />
           </div>
           <div className="text-xl font-black font-mono text-purple-400 mt-1">
-            {totalNetDueWorkers.toLocaleString()} <span className="text-xs font-sans text-slate-300">ر.ي</span>
+            {totalCumulativeDueWorkers.toLocaleString()} <span className="text-xs font-sans text-slate-300">ر.ي</span>
           </div>
           <div className="text-[11px] text-slate-400 mt-0.5">
-            الرواتب الأساسية: {totalDailyWages.toLocaleString()} ر.ي
+            يوميات اليوم المكتسبة: {totalDailyWages.toLocaleString()} ر.ي
           </div>
         </div>
 
@@ -536,31 +676,49 @@ export default function WorkersView({ workers = [], onRefreshData, onOpenCustome
 
                 {/* Stats Badges */}
                 <div className="flex flex-wrap items-center gap-2 flex-1 lg:justify-center text-xs">
-                  <div className="px-3 py-1 rounded-xl bg-slate-950/70 border border-white/5 flex items-center gap-1.5">
-                    <Car className="w-3.5 h-3.5 text-emerald-400" />
-                    <span className="text-slate-400">إنجاز اليوم:</span>
-                    <span className="font-mono font-black text-emerald-400">{w.cars_served_today || 0} سيارة</span>
-                  </div>
+                  {/* Attendance Status Toggle */}
+                  <button
+                    type="button"
+                    disabled={attendanceTogglingId === w.id}
+                    onClick={() => handleToggleAttendance(w.id)}
+                    className={`px-3 py-1.5 rounded-xl border flex items-center gap-1.5 font-bold transition active:scale-95 ${
+                      w.today_status === 'present'
+                        ? 'bg-emerald-500/15 border-emerald-500/40 text-emerald-300 hover:bg-emerald-500/25'
+                        : 'bg-rose-500/15 border-rose-500/40 text-rose-300 hover:bg-rose-500/25'
+                    }`}
+                    title="اضغط للتبديل بين حاضر وغائب لليوم"
+                  >
+                    <span className={`w-2 h-2 rounded-full ${w.today_status === 'present' ? 'bg-emerald-400 animate-pulse' : 'bg-rose-400'}`} />
+                    <span>{w.today_status === 'present' ? 'حاضر اليوم 🟢' : 'غائب اليوم 🔴'}</span>
+                  </button>
 
-                  <div className="px-3 py-1 rounded-xl bg-slate-950/70 border border-white/5 flex items-center gap-1.5">
-                    <span className="text-slate-400">الراتب الأساسي:</span>
+                  <div className="px-3 py-1.5 rounded-xl bg-slate-950/70 border border-white/5 flex items-center gap-1.5">
+                    <span className="text-slate-400">اليومية:</span>
                     <span className="font-mono font-bold text-slate-200">
                       {Number(w.daily_base_wage).toLocaleString()} ر.ي
                     </span>
                   </div>
 
-                  <div className="px-3 py-1 rounded-xl bg-slate-950/70 border border-white/5 flex items-center gap-1.5">
-                    <span className="text-slate-400">السلف:</span>
+                  <div className="px-3 py-1.5 rounded-xl bg-slate-950/70 border border-white/5 flex items-center gap-1.5">
+                    <span className="text-slate-400">سلف اليوم:</span>
                     <span className="font-mono font-bold text-amber-400">
-                      -{Number(w.advances_today ?? w.advances_taken_today ?? 0).toLocaleString()} ر.ي
+                      -{Number(w.advances_today ?? 0).toLocaleString()} ر.ي
                     </span>
                   </div>
 
-                  <div className="px-3 py-1 rounded-xl bg-purple-950/50 border border-purple-500/30 flex items-center gap-1.5 shadow-sm">
-                    <span className="text-purple-300 font-bold">الصافي المستحق:</span>
-                    <span className="font-mono font-black text-white text-sm">
-                      {Number(w.net_due_today).toLocaleString()} ر.ي
-                    </span>
+                  <div className={`px-3.5 py-1.5 rounded-xl border flex items-center gap-2 shadow-sm ${
+                    (w.cumulative_balance || 0) >= 0
+                      ? 'bg-purple-950/60 border-purple-500/40 text-white'
+                      : 'bg-rose-950/60 border-rose-500/40 text-white'
+                  }`}>
+                    <div className="flex flex-col items-start leading-tight">
+                      <span className="text-[10px] text-purple-300 font-bold">
+                        {(w.cumulative_balance || 0) >= 0 ? 'الرصيد التراكمي (له):' : 'سلف متجاوزة (عليه):'}
+                      </span>
+                      <span className="font-mono font-black text-sm">
+                        {Math.abs(w.cumulative_balance || 0).toLocaleString()} ر.ي
+                      </span>
+                    </div>
                   </div>
                 </div>
 
@@ -570,7 +728,7 @@ export default function WorkersView({ workers = [], onRefreshData, onOpenCustome
                     <button
                       type="button"
                       onClick={() => onOpenWorkerStatement(w.id)}
-                      className="px-3.5 min-h-[42px] rounded-xl bg-white/5 hover:bg-white/10 text-slate-300 hover:text-white border border-white/10 font-bold text-xs flex items-center justify-center gap-1 transition active:scale-95"
+                      className="px-3 min-h-[42px] rounded-xl bg-white/5 hover:bg-white/10 text-slate-300 hover:text-white border border-white/10 font-bold text-xs flex items-center justify-center gap-1 transition active:scale-95"
                       title="كشف حساب وسلف الفني"
                     >
                       <FileText className="w-3.5 h-3.5" />
@@ -580,14 +738,37 @@ export default function WorkersView({ workers = [], onRefreshData, onOpenCustome
 
                   <button
                     type="button"
+                    onClick={() => handleOpenEditWorker(w)}
+                    className="px-2.5 min-h-[42px] rounded-xl bg-white/5 hover:bg-white/10 text-slate-300 hover:text-white border border-white/10 font-bold text-xs flex items-center justify-center gap-1 transition active:scale-95"
+                    title="تعديل بيانات ومسمى وراتب الفني"
+                  >
+                    <Edit3 className="w-3.5 h-3.5 text-purple-400" />
+                    <span>تعديل</span>
+                  </button>
+
+                  <button
+                    type="button"
                     onClick={() => {
                       setSelectedWorkerForAdvance(w);
                       setShowAdvanceModal(true);
                     }}
-                    className="px-4 min-h-[42px] rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 font-black text-xs flex items-center justify-center gap-1.5 transition active:scale-95 shadow-md shadow-amber-950/20"
+                    className="px-3.5 min-h-[42px] rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 font-black text-xs flex items-center justify-center gap-1.5 transition active:scale-95 shadow-md shadow-amber-950/20"
                   >
                     <Wallet className="w-4 h-4 stroke-[2.5]" />
                     <span>تسجيل سلفة 💸</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSelectedWorkerForPayout(w);
+                      setPayoutAmount(Math.max(0, w.cumulative_balance || 0).toString());
+                      setShowPayoutModal(true);
+                    }}
+                    className="px-3.5 min-h-[42px] rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-xs flex items-center justify-center gap-1.5 transition active:scale-95 shadow-md shadow-emerald-950/20"
+                  >
+                    <CheckCircle className="w-4 h-4 stroke-[2.5]" />
+                    <span>صرف مستحق 💵</span>
                   </button>
                 </div>
               </div>
@@ -843,7 +1024,7 @@ export default function WorkersView({ workers = [], onRefreshData, onOpenCustome
                 <div className="text-white font-extrabold text-sm">{selectedWorkerForAdvance.name}</div>
                 <div className="text-xs text-purple-400 mt-0.5">{selectedWorkerForAdvance.role}</div>
                 <div className="text-xs text-slate-400 mt-1">
-                  الصافي المتبقي له اليوم قبل السلفة: <span className="text-emerald-400 font-mono font-bold">{selectedWorkerForAdvance.net_due_today.toLocaleString()} ر.ي</span>
+                  الرصيد التراكمي المتبقي له قبل السلفة: <span className="text-emerald-400 font-mono font-bold">{(selectedWorkerForAdvance.cumulative_balance || 0).toLocaleString()} ر.ي</span>
                 </div>
               </div>
 
@@ -858,7 +1039,7 @@ export default function WorkersView({ workers = [], onRefreshData, onOpenCustome
                       onClick={() => setAdvanceAmount(amt.toString())}
                       className={`py-2 rounded-xl font-mono font-bold transition text-xs border ${
                         advanceAmount === amt.toString()
-                          ? 'bg-purple-500 text-white border-purple-400'
+                          ? 'bg-amber-400 text-slate-950 border-amber-300'
                           : 'bg-white/5 text-slate-300 border-white/10 hover:bg-white/10'
                       }`}
                     >
@@ -876,7 +1057,7 @@ export default function WorkersView({ workers = [], onRefreshData, onOpenCustome
                   placeholder="مثال: 2000"
                   value={advanceAmount}
                   onChange={(e) => setAdvanceAmount(e.target.value)}
-                  className="w-full min-h-[44px] px-3.5 rounded-xl bg-slate-900 border border-white/15 text-white font-mono text-base font-extrabold"
+                  className="w-full min-h-[44px] px-3.5 rounded-xl bg-slate-900 border border-white/15 text-white font-mono text-base font-extrabold focus:outline-none focus:border-amber-400"
                   required
                 />
               </div>
@@ -889,12 +1070,12 @@ export default function WorkersView({ workers = [], onRefreshData, onOpenCustome
                   placeholder="مثال: حق غداء، مصروف عائلي، سلفة بنزين..."
                   value={advanceNotes}
                   onChange={(e) => setAdvanceNotes(e.target.value)}
-                  className="w-full min-h-[44px] px-3.5 rounded-xl bg-slate-900 border border-white/15 text-white text-xs"
+                  className="w-full min-h-[44px] px-3.5 rounded-xl bg-slate-900 border border-white/15 text-white text-xs focus:outline-none focus:border-amber-400"
                 />
               </div>
 
               <div className="p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/20 text-[11px] text-amber-300">
-                يتم خصم المبلغ تلقائياً من صندوق الكاشير ومن مستحقات العامل في إغلاق اليوم.
+                💡 سيتم إنشاء سند صرف رسمي (PV) وخصم المبلغ من نقدية وردية الدرج تلقائياً لمنع أي عجز وهمي في الصندوق.
               </div>
 
               <div className="pt-2 flex gap-2">
@@ -908,9 +1089,163 @@ export default function WorkersView({ workers = [], onRefreshData, onOpenCustome
                 <button
                   type="submit"
                   disabled={isSubmitting}
-                  className="flex-1 min-h-[44px] rounded-xl bg-purple-500 hover:bg-purple-400 text-white font-extrabold shadow-lg shadow-purple-500/20"
+                  className="flex-1 min-h-[44px] rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 font-extrabold shadow-lg shadow-amber-950/20"
                 >
                   {isSubmitting ? 'جاري التسجيل...' : 'تأكيد وصرف السلفة'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal 1.5: Worker Wage Payout / Settlement (صرف وتصفية مستحقات أجور) */}
+      {showPayoutModal && selectedWorkerForPayout && (
+        <div
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setShowPayoutModal(false);
+          }}
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md cursor-pointer"
+        >
+          <div className="apple-glass border border-white/20 rounded-3xl w-full max-w-md overflow-hidden shadow-2xl animate-in fade-in zoom-in-95 cursor-default">
+            <div className="px-6 py-4 border-b border-white/10 flex items-center justify-between bg-white/5">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center">
+                  <CheckCircle className="w-4 h-4 stroke-[2.5]" />
+                </div>
+                <h3 className="font-extrabold text-white text-base">صرف وتصفية مستحقات أجور</h3>
+              </div>
+              <button onClick={() => setShowPayoutModal(false)} className="text-slate-400 hover:text-white">
+                &times;
+              </button>
+            </div>
+
+            <form onSubmit={handleRecordWagePayout} className="p-6 space-y-4 text-xs">
+              <div className="p-3.5 rounded-2xl bg-slate-900 border border-white/10">
+                <div className="flex justify-between items-start">
+                  <div>
+                    <div className="text-white font-extrabold text-sm">{selectedWorkerForPayout.name}</div>
+                    <div className="text-xs text-purple-400 mt-0.5">{selectedWorkerForPayout.role}</div>
+                  </div>
+                  <div className="text-right">
+                    <div className="text-[11px] text-slate-400">الرصيد التراكمي المتبقي له:</div>
+                    <div className="text-base font-black font-mono text-emerald-400">
+                      {(selectedWorkerForPayout.cumulative_balance || 0).toLocaleString()} ر.ي
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Quick Preset Buttons */}
+              <div>
+                <label className="block text-slate-400 mb-1.5 font-bold">اختيار سريع لمبلغ الصرف:</label>
+                <div className="grid grid-cols-3 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setPayoutAmount(Math.max(0, selectedWorkerForPayout.cumulative_balance || 0).toString())}
+                    className="py-2 px-2 rounded-xl bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 font-bold hover:bg-emerald-500/30 transition text-xs"
+                  >
+                    كامل المستحق
+                  </button>
+                  {[3000, 6000, 10000].slice(0, 2).map((amt) => (
+                    <button
+                      key={amt}
+                      type="button"
+                      onClick={() => setPayoutAmount(amt.toString())}
+                      className={`py-2 rounded-xl font-mono font-bold transition text-xs border ${
+                        payoutAmount === amt.toString()
+                          ? 'bg-emerald-500 text-slate-950 border-emerald-400'
+                          : 'bg-white/5 text-slate-300 border-white/10 hover:bg-white/10'
+                      }`}
+                    >
+                      {amt.toLocaleString()}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-slate-300 font-bold mb-1.5">المبلغ المراد صرفه (ر.ي): <span className="text-rose-400">*</span></label>
+                <input
+                  type="number"
+                  min="1"
+                  placeholder="مثال: 3000"
+                  value={payoutAmount}
+                  onChange={(e) => setPayoutAmount(e.target.value)}
+                  className="w-full min-h-[44px] px-3.5 rounded-xl bg-slate-900 border border-white/15 text-white font-mono text-base font-extrabold focus:outline-none focus:border-emerald-400"
+                  required
+                />
+              </div>
+
+              {/* Payment Method Selector */}
+              <div>
+                <label className="block text-slate-300 font-bold mb-1.5">وسيلة وطريقة الصرف:</label>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setPayoutMethod('cash')}
+                    className={`p-2.5 rounded-xl border text-center font-bold transition flex items-center justify-center gap-2 ${
+                      payoutMethod === 'cash'
+                        ? 'bg-emerald-500 text-slate-950 border-emerald-400'
+                        : 'bg-slate-900 text-slate-300 border-white/10 hover:bg-white/5'
+                    }`}
+                  >
+                    <span>💵 كاش (الدرج 1101)</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setPayoutMethod('kuraimi')}
+                    className={`p-2.5 rounded-xl border text-center font-bold transition flex items-center justify-center gap-2 ${
+                      payoutMethod === 'kuraimi'
+                        ? 'bg-blue-600 text-white border-blue-400'
+                        : 'bg-slate-900 text-slate-300 border-white/10 hover:bg-white/5'
+                    }`}
+                  >
+                    <span>🏦 بنك / الكريمي (1102)</span>
+                  </button>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-slate-300 font-bold mb-1.5">رقم السند الورقي / الدفتر (اختياري):</label>
+                <input
+                  type="text"
+                  placeholder="مثال: 1245"
+                  value={payoutPaperBill}
+                  onChange={(e) => setPayoutPaperBill(e.target.value)}
+                  className="w-full min-h-[44px] px-3.5 rounded-xl bg-slate-900 border border-white/15 text-white font-mono text-xs focus:outline-none focus:border-emerald-400"
+                />
+              </div>
+
+              <div>
+                <label className="block text-slate-300 font-bold mb-1.5">البيان / ملاحظات الصرف:</label>
+                <input
+                  type="text"
+                  placeholder="مثال: تصفية أجور للفني"
+                  value={payoutNotes}
+                  onChange={(e) => setPayoutNotes(e.target.value)}
+                  className="w-full min-h-[44px] px-3.5 rounded-xl bg-slate-900 border border-white/15 text-white text-xs focus:outline-none focus:border-emerald-400"
+                />
+              </div>
+
+              <div className="p-2.5 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-[11px] text-emerald-300">
+                💡 سيتم إصدار سند صرف رسمي (PV) فورياً، وخصم المبلغ من رصيد الصندوق، وإدراجه كمصروف رواتب رسمي (6108) في القوائم المالية.
+              </div>
+
+              <div className="pt-2 flex gap-3">
+                <button
+                  type="button"
+                  onClick={() => setShowPayoutModal(false)}
+                  className="flex-1 min-h-[44px] rounded-xl bg-white/5 text-slate-300 font-bold"
+                >
+                  إلغاء
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSubmitting}
+                  className="flex-1 min-h-[44px] rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black shadow-lg shadow-emerald-500/20 transition active:scale-95"
+                >
+                  {isSubmitting ? 'جاري الصرف...' : 'تأكيد صرف المستحق'}
                 </button>
               </div>
             </form>
@@ -1106,7 +1441,7 @@ export default function WorkersView({ workers = [], onRefreshData, onOpenCustome
                 </div>
                 <div>
                   <h3 className="font-extrabold text-white text-base">إضافة فني / عامل جديد</h3>
-                  <p className="text-xs text-slate-400">تسجيل بيانات الفني وأجره اليومي ونسبة عمولته</p>
+                  <p className="text-xs text-slate-400">تسجيل بيانات الفني وأجره اليومي الثابت (بدون عمولات)</p>
                 </div>
               </div>
               <button
@@ -1139,19 +1474,42 @@ export default function WorkersView({ workers = [], onRefreshData, onOpenCustome
               </div>
 
               <div>
-                <label className="block text-slate-300 font-bold mb-1.5">المسمى والوظيفة:</label>
-                <select
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className="text-slate-300 font-bold">المسمى والوظيفة: <span className="text-rose-400">*</span></label>
+                  <span className="text-[10px] text-purple-300">اكتب بحرية أو اختر من المقترحات</span>
+                </div>
+                <input
+                  type="text"
+                  required
+                  placeholder="مثال: فني غيار زيوت وبنشر، معلم ميكانيك..."
                   value={newWorkerRole}
                   onChange={(e) => setNewWorkerRole(e.target.value)}
                   className="w-full min-h-[44px] px-3.5 rounded-xl bg-slate-950 border border-white/15 text-white font-bold focus:outline-none focus:border-purple-400"
-                >
-                  <option value="فني غيار زيوت وفلاتر">فني غيار زيوت وفلاتر</option>
-                  <option value="فني بنشر وترصيص كفرات">فني بنشر وترصيص كفرات</option>
-                  <option value="كهربائي بطاريات وفحص كمبيوتر">كهربائي بطاريات وفحص كمبيوتر</option>
-                  <option value="كاشير ومسؤول صندوق">كاشير ومسؤول صندوق</option>
-                  <option value="عامل غسيل وتشحيم">عامل غسيل وتشحيم</option>
-                  <option value="مشرف عام وخدمات">مشرف عام وخدمات</option>
-                </select>
+                />
+                <div className="flex flex-wrap gap-1.5 mt-2">
+                  {[
+                    'فني غيار زيوت وبنشر',
+                    'فني بنشر وترصيص كفرات',
+                    'معلم ميكانيك',
+                    'كهربائي بطاريات وفحص كمبيوتر',
+                    'عامل غسيل وتشحيم',
+                    'كاشير ومسؤول صندوق',
+                    'مشرف عام وخدمات',
+                  ].map((preset) => (
+                    <button
+                      key={preset}
+                      type="button"
+                      onClick={() => setNewWorkerRole(preset)}
+                      className={`text-[10px] px-2.5 py-1 rounded-lg border font-bold transition active:scale-95 ${
+                        newWorkerRole === preset
+                          ? 'bg-purple-600 text-white border-purple-400 shadow-sm shadow-purple-600/40'
+                          : 'bg-white/5 text-slate-300 border-white/10 hover:bg-white/10'
+                      }`}
+                    >
+                      {preset}
+                    </button>
+                  ))}
+                </div>
               </div>
 
               <div>
@@ -1165,32 +1523,16 @@ export default function WorkersView({ workers = [], onRefreshData, onOpenCustome
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-slate-300 font-bold mb-1.5">الأجر اليومي الأساسي (ر.ي):</label>
-                  <input
-                    type="number"
-                    min="0"
-                    placeholder="0"
-                    value={newWorkerWage}
-                    onChange={(e) => setNewWorkerWage(e.target.value)}
-                    className="w-full min-h-[44px] px-3.5 rounded-xl bg-slate-950 border border-white/15 text-white font-mono font-bold focus:outline-none focus:border-purple-400"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-slate-300 font-bold mb-1.5">نسبة العمولة (%):</label>
-                  <input
-                    type="number"
-                    min="0"
-                    max="100"
-                    step="0.5"
-                    placeholder="0"
-                    value={newWorkerCommission}
-                    onChange={(e) => setNewWorkerCommission(e.target.value)}
-                    className="w-full min-h-[44px] px-3.5 rounded-xl bg-slate-950 border border-white/15 text-white font-mono font-bold focus:outline-none focus:border-purple-400"
-                  />
-                </div>
+              <div>
+                <label className="block text-slate-300 font-bold mb-1.5">الأجر اليومي الأساسي (ريال يمني):</label>
+                <input
+                  type="number"
+                  min="0"
+                  placeholder="مثال: 3000"
+                  value={newWorkerWage}
+                  onChange={(e) => setNewWorkerWage(e.target.value)}
+                  className="w-full min-h-[44px] px-3.5 rounded-xl bg-slate-950 border border-white/15 text-white font-mono font-bold focus:outline-none focus:border-purple-400"
+                />
               </div>
 
               <div className="pt-3 border-t border-white/10 flex items-center justify-end gap-2.5">
@@ -1207,6 +1549,132 @@ export default function WorkersView({ workers = [], onRefreshData, onOpenCustome
                   className="px-6 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-black text-xs shadow-lg shadow-purple-950/30 disabled:opacity-50"
                 >
                   {isSubmitting ? 'جاري الحفظ...' : 'حفظ الفني'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal: Edit Worker */}
+      {showEditWorkerModal && (
+        <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4">
+          <div className="bg-slate-900 border-2 border-purple-500/40 rounded-3xl w-full max-w-md overflow-hidden shadow-2xl animate-in fade-in zoom-in-95 duration-200">
+            <div className="p-5 border-b border-white/10 flex items-center justify-between bg-slate-950">
+              <div className="flex items-center gap-2.5">
+                <div className="w-10 h-10 rounded-2xl bg-purple-500/20 text-purple-400 flex items-center justify-center">
+                  <Edit3 className="w-5 h-5 stroke-[2.5]" />
+                </div>
+                <div>
+                  <h3 className="font-extrabold text-white text-base">تعديل بيانات ومسمى الفني</h3>
+                  <p className="text-xs text-slate-400">تحديث المسمى الوظيفي والأجر اليومي الأساسي</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowEditWorkerModal(false)}
+                className="w-8 h-8 rounded-xl bg-white/5 hover:bg-white/10 text-slate-400 hover:text-white flex items-center justify-center"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <form onSubmit={handleUpdateWorker} className="p-5 space-y-4 text-xs">
+              {editWorkerError && (
+                <div className="p-3 rounded-xl bg-rose-500/20 border border-rose-500/40 text-rose-300 font-bold flex items-center gap-2">
+                  <AlertCircle className="w-4 h-4 flex-shrink-0" />
+                  <span>{editWorkerError}</span>
+                </div>
+              )}
+
+              <div>
+                <label className="block text-slate-300 font-bold mb-1.5">اسم الفني / العامل: <span className="text-rose-400">*</span></label>
+                <input
+                  type="text"
+                  required
+                  placeholder="مثال: يحيى الريمي"
+                  value={editWorkerName}
+                  onChange={(e) => setEditWorkerName(e.target.value)}
+                  className="w-full min-h-[44px] px-3.5 rounded-xl bg-slate-950 border border-white/15 text-white font-bold focus:outline-none focus:border-purple-400"
+                />
+              </div>
+
+              <div>
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className="text-slate-300 font-bold">المسمى والوظيفة: <span className="text-rose-400">*</span></label>
+                  <span className="text-[10px] text-purple-300">اكتب بحرية أو اختر من المقترحات</span>
+                </div>
+                <input
+                  type="text"
+                  required
+                  placeholder="مثال: فني غيار زيوت وبنشر، معلم ميكانيك..."
+                  value={editWorkerRole}
+                  onChange={(e) => setEditWorkerRole(e.target.value)}
+                  className="w-full min-h-[44px] px-3.5 rounded-xl bg-slate-950 border border-white/15 text-white font-bold focus:outline-none focus:border-purple-400"
+                />
+                <div className="flex flex-wrap gap-1.5 mt-2">
+                  {[
+                    'فني غيار زيوت وبنشر',
+                    'فني بنشر وترصيص كفرات',
+                    'معلم ميكانيك',
+                    'كهربائي بطاريات وفحص كمبيوتر',
+                    'عامل غسيل وتشحيم',
+                    'كاشير ومسؤول صندوق',
+                    'مشرف عام وخدمات',
+                  ].map((preset) => (
+                    <button
+                      key={preset}
+                      type="button"
+                      onClick={() => setEditWorkerRole(preset)}
+                      className={`text-[10px] px-2.5 py-1 rounded-lg border font-bold transition active:scale-95 ${
+                        editWorkerRole === preset
+                          ? 'bg-purple-600 text-white border-purple-400 shadow-sm shadow-purple-600/40'
+                          : 'bg-white/5 text-slate-300 border-white/10 hover:bg-white/10'
+                      }`}
+                    >
+                      {preset}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-slate-300 font-bold mb-1.5">رقم الهاتف (اختياري):</label>
+                <input
+                  type="tel"
+                  placeholder="مثال: 771234567"
+                  value={editWorkerPhone}
+                  onChange={(e) => setEditWorkerPhone(e.target.value)}
+                  className="w-full min-h-[44px] px-3.5 rounded-xl bg-slate-950 border border-white/15 text-white font-mono font-bold focus:outline-none focus:border-purple-400"
+                />
+              </div>
+
+              <div>
+                <label className="block text-slate-300 font-bold mb-1.5">الأجر اليومي الأساسي (ريال يمني):</label>
+                <input
+                  type="number"
+                  min="0"
+                  placeholder="مثال: 3000"
+                  value={editWorkerWage}
+                  onChange={(e) => setEditWorkerWage(e.target.value)}
+                  className="w-full min-h-[44px] px-3.5 rounded-xl bg-slate-950 border border-white/15 text-white font-mono font-bold focus:outline-none focus:border-purple-400"
+                />
+              </div>
+
+              <div className="pt-3 border-t border-white/10 flex items-center justify-end gap-2.5">
+                <button
+                  type="button"
+                  onClick={() => setShowEditWorkerModal(false)}
+                  className="px-4 py-2.5 rounded-xl bg-white/10 hover:bg-white/15 text-slate-300 font-bold text-xs"
+                >
+                  إلغاء
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSubmittingEdit}
+                  className="px-6 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-black text-xs shadow-lg shadow-purple-950/30 disabled:opacity-50"
+                >
+                  {isSubmittingEdit ? 'جاري الحفظ...' : 'حفظ التعديلات 💾'}
                 </button>
               </div>
             </form>

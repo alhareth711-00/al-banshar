@@ -1,0 +1,25 @@
+{
+  "timestamp": "2026-11-07T01:08:16.616Z",
+  "db_path": "C:\\Users\\Elite\\AppData\\Roaming\\AlBanshar\\db\\quick_lube.db",
+  "scenarios": [
+    {
+      "name": "درع حماية تراجع الوقت وساعة ويندوز",
+      "status": "PASS"
+    },
+    {
+      "name": "درع سلامة البيانات والنسخ الاحتياطي السريع",
+      "status": "PASS"
+    },
+    {
+      "name": "درع بصمة الجهاز والتوقيع المشفر للتراخيص",
+      "status": "PASS"
+    },
+    {
+      "name": "فحص إعدادات Kiosk وضع الكشك لسطح المكتب",
+      "status": "PASS"
+    }
+  ],
+  "guards": [],
+  "critical_issues": [],
+  "warnings": []
+}

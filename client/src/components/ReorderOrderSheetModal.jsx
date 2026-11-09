@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { X, Printer, ShoppingBag, Send, AlertTriangle, FileText, CheckCircle, Copy, Share2 } from 'lucide-react';
+import { getShopSettings } from '../utils/settings';
+import { printReorderSheetSilently } from '../utils/inventoryPrintTemplates';
 
 export default function ReorderOrderSheetModal({
   isOpen,
@@ -9,6 +11,7 @@ export default function ReorderOrderSheetModal({
   const [data, setData] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
   const [copied, setCopied] = useState(false);
+  const settings = getShopSettings();
 
   useEffect(() => {
     if (isOpen) {
@@ -38,13 +41,14 @@ export default function ReorderOrderSheetModal({
 
   if (!isOpen) return null;
 
-  const handlePrint = () => {
-    window.print();
+  const handlePrint = (layout = 'thermal') => {
+    if (!data) return;
+    printReorderSheetSilently(data, null, layout);
   };
 
   const handleCopyWhatsAppText = () => {
     if (!data || !data.items) return;
-    let text = `*طلب توريد أصناف / نواقص مركز البنشر للسيارات*\n`;
+    let text = `*طلب توريد أصناف / نواقص ${settings.shopName}*\n`;
     text += `رقم الطلب: ${data.requisition_number}\n`;
     text += `التاريخ: ${data.date}\n`;
     text += `------------------------------------\n`;
@@ -91,11 +95,21 @@ export default function ReorderOrderSheetModal({
             </button>
 
             <button
-              onClick={handlePrint}
-              className="px-4 py-2 rounded-xl bg-white/10 hover:bg-white/15 text-white font-bold text-xs border border-white/20 flex items-center gap-1.5 transition active:scale-95"
+              onClick={() => handlePrint('thermal')}
+              className="px-3.5 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs flex items-center gap-1.5 transition active:scale-95 shadow-md shadow-amber-500/20"
+              title="طباعة إيصال كاشير 80mm حراري"
             >
-              <Printer className="w-4 h-4 text-amber-400" />
-              <span>طباعة أمر الشراء (A4) 🖨️</span>
+              <Printer className="w-4 h-4" />
+              <span>طباعة كشف النواقص (كاشير 80mm) 🧾</span>
+            </button>
+
+            <button
+              onClick={() => handlePrint('a4')}
+              className="px-3 py-2 rounded-xl bg-white/10 hover:bg-white/15 text-white font-bold text-xs border border-white/20 flex items-center gap-1.5 transition active:scale-95"
+              title="طباعة تقرير رسمي A4"
+            >
+              <FileText className="w-4 h-4 text-sky-400" />
+              <span>A4 رسمي 📄</span>
             </button>
 
             <button onClick={onClose} className="text-slate-400 hover:text-white p-2">
@@ -133,8 +147,8 @@ export default function ReorderOrderSheetModal({
           {/* Sheet Header */}
           <div className="border-b-2 border-slate-700 pb-3 flex items-center justify-between">
             <div>
-              <h1 className="text-xl font-black text-white print:text-black">مركز البنشر لخدمات وتغيير زيوت السيارات</h1>
-              <p className="text-xs text-slate-400 print:text-gray-600">طلب شراء وتوريد بضاعة ونواقص مخزنية - صنعاء، اليمن</p>
+              <h1 className="text-xl font-black text-white print:text-black">{settings.shopName}</h1>
+              <p className="text-xs text-slate-400 print:text-gray-600">طلب شراء وتوريد بضاعة ونواقص مخزنية {settings.address ? `- ${settings.address}` : ''}</p>
             </div>
             <div className="text-left font-mono text-xs text-slate-400 print:text-gray-700">
               <div>رقم أمر الشراء: <span className="font-bold text-amber-400 print:text-black">{data?.requisition_number}</span></div>
@@ -166,13 +180,12 @@ export default function ReorderOrderSheetModal({
             </div>
           </div>
 
-          {/* Items Table */}
+          {/* Items Table (NO SKU COLUMN) */}
           <div className="overflow-x-auto rounded-2xl border border-white/10 print:border-gray-400">
             <table className="w-full text-right text-xs">
               <thead className="bg-slate-900 print:bg-gray-100 text-slate-400 print:text-black font-bold">
                 <tr>
                   <th className="p-2 text-center">#</th>
-                  <th className="p-2">كود الصنف</th>
                   <th className="p-2">الصنف المطلوب ومواصفاته</th>
                   <th className="p-2">الماركة واللزوجة</th>
                   <th className="p-2 text-center">الرصيد الحالي</th>
@@ -186,7 +199,6 @@ export default function ReorderOrderSheetModal({
                 {items.map((item, idx) => (
                   <tr key={item.inventory_id} className="print:text-black">
                     <td className="p-2 text-center font-mono text-slate-400 print:text-gray-600">{idx + 1}</td>
-                    <td className="p-2 font-mono text-slate-400 print:text-gray-800">{item.sku}</td>
                     <td className="p-2 font-bold text-white print:text-black">
                       {item.name}
                       {item.pack_size && <span className="text-slate-400 print:text-gray-700 text-[10px] mr-1">({item.pack_size})</span>}

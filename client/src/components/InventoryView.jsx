@@ -29,6 +29,10 @@ import {
   Download,
   ClipboardList,
   Sparkles,
+  FileSpreadsheet,
+  Upload,
+  PackagePlus,
+  CreditCard,
 } from 'lucide-react';
 import PurchaseInvoiceModal from './PurchaseInvoiceModal';
 import AddInventoryModal, { calculateDotAge } from './AddInventoryModal';
@@ -38,7 +42,11 @@ import InventoryValuationModal from './InventoryValuationModal';
 import BarcodeLabelModal from './BarcodeLabelModal';
 import TurnoverAnalyticsModal from './TurnoverAnalyticsModal';
 import ReorderOrderSheetModal from './ReorderOrderSheetModal';
+import ImportInventoryModal from './ImportInventoryModal';
+import ConsignmentInboundModal from './ConsignmentInboundModal';
+import GeneralPaymentVoucherModal from './GeneralPaymentVoucherModal';
 import { getLocalTodayDate } from '../utils/dateUtils';
+import { printStocktakeSilently, printConsignmentAuditSilently } from '../utils/inventoryPrintTemplates';
 
 // Helper: Normalize Arabic characters for robust search (الهمزات والتاء المربوطة)
 export function normalizeArabic(text) {
@@ -98,7 +106,12 @@ export default function InventoryView({
   const [selectedItemForBarcode, setSelectedItemForBarcode] = useState(null);
   const [showTurnoverModal, setShowTurnoverModal] = useState(false);
   const [showReorderSheetModal, setShowReorderSheetModal] = useState(false);
+  const [showImportModal, setShowImportModal] = useState(false);
   const [prefilledPurchaseItems, setPrefilledPurchaseItems] = useState(null);
+  const [showConsignmentInboundModal, setShowConsignmentInboundModal] = useState(false);
+  const [selectedConsignmentInboundItem, setSelectedConsignmentInboundItem] = useState(null);
+  const [showConsignmentPayModal, setShowConsignmentPayModal] = useState(false);
+  const [consignmentPayInitialData, setConsignmentPayInitialData] = useState(null);
 
   const [selectedItemForAdjust, setSelectedItemForAdjust] = useState(null);
   const [itemToEdit, setItemToEdit] = useState(null);
@@ -268,188 +281,42 @@ export default function InventoryView({
   };
 
   // Print Comprehensive Physical Stocktake Count Sheet (كشف الجرد الفعلي للمستودع)
-  const handlePrintStocktakeSheet = () => {
+  const handlePrintStocktakeSheet = (layout = 'thermal') => {
     setShowAdvancedToolsMenu(false);
-    const printWindow = window.open('', '_blank');
-    if (!printWindow) return;
-
-    const activeItems = inventory
-      .filter((i) => i.is_active === 1 && i.item_type !== 'service' && i.category !== 'service')
-      .sort((a, b) => (a.location_shelf || '').localeCompare(b.location_shelf || '') || a.name.localeCompare(b.name));
-
-    const rowsHtml = activeItems.map((item, idx) => `
-      <tr style="border-bottom: 1px solid #cbd5e1; text-align: right;">
-        <td style="padding: 7px; text-align: center;">${idx + 1}</td>
-        <td style="padding: 7px; font-family: monospace;">${escapeHtml(item.sku)}</td>
-        <td style="padding: 7px; font-weight: bold;">
-          ${escapeHtml(item.name)}
-          <span style="font-size: 11px; color: #555;">(${escapeHtml(item.brand)} - ${escapeHtml(item.pack_size || item.viscosity || '')})</span>
-        </td>
-        <td style="padding: 7px; font-size: 11px;">${escapeHtml(item.location_shelf || '---')}</td>
-        <td style="padding: 7px; text-align: center; font-family: monospace; font-weight: bold; background: #f8fafc;">
-          ${item.stock_qty}
-        </td>
-        <td style="padding: 7px; text-align: center; border: 1px dashed #94a3b8; width: 100px;"></td>
-        <td style="padding: 7px; text-align: center; border: 1px dashed #94a3b8; width: 100px;"></td>
-        <td style="padding: 7px; border: 1px dashed #cbd5e1; width: 120px;"></td>
-      </tr>
-    `).join('');
-
-    printWindow.document.write(`
-      <!DOCTYPE html>
-      <html dir="rtl" lang="ar">
-      <head>
-        <meta charset="utf-8" />
-        <title>كشف الجرد الفعلي للمخزون والرفوف</title>
-        <style>
-          @page { size: A4 portrait; margin: 12mm; }
-          body { font-family: 'Segoe UI', Tahoma, sans-serif; direction: rtl; color: #111; margin: 0; padding: 10px; font-size: 12px; }
-          .header { text-align: center; border-bottom: 2px solid #000; padding-bottom: 10px; margin-bottom: 15px; }
-          .title { font-size: 18px; font-weight: 900; }
-          .sub { font-size: 11px; color: #555; margin-top: 3px; }
-          table { width: 100%; border-collapse: collapse; font-size: 11px; }
-          th { background: #e2e8f0; padding: 8px; border: 1px solid #94a3b8; text-align: right; }
-          td { border: 1px solid #cbd5e1; }
-          .sig { display: flex; justify-content: space-around; margin-top: 35px; font-weight: bold; font-size: 12px; }
-          @media print { button { display: none; } }
-        </style>
-      </head>
-      <body>
-        <div class="header">
-          <div class="title">مركز البنشر لخدمات وتغيير زيوت السيارات</div>
-          <div class="sub">استمارة المطابقة والجرد الفعلي للرفوف والمستودع - تاريخ: ${new Date().toLocaleDateString('ar-YE', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</div>
-        </div>
-
-        <table>
-          <thead>
-            <tr>
-              <th style="width: 30px; text-align: center;">#</th>
-              <th style="width: 75px;">كود SKU</th>
-              <th>الصنف والمواصفات</th>
-              <th style="width: 70px;">موقع الرف</th>
-              <th style="width: 80px; text-align: center;">رصيد النظام</th>
-              <th style="width: 90px; text-align: center;">العدد الفعلي</th>
-              <th style="width: 85px; text-align: center;">الفارق (+ / -)</th>
-              <th style="width: 100px;">ملاحظات الجرد</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${rowsHtml}
-          </tbody>
-        </table>
-
-        <div class="sig">
-          <div>أمين المستودع: _____________________</div>
-          <div>مدقق الجرد: _____________________</div>
-          <div>اعتماد الإدارة: _____________________</div>
-        </div>
-
-        <script>
-          window.onload = function() { window.print(); }
-        </script>
-      </body>
-      </html>
-    `);
-    printWindow.document.close();
+    printStocktakeSilently(inventory, null, layout);
   };
 
-  // Print consignment audit settlement report (with strict HTML escaping)
-  const handlePrintConsignmentReport = () => {
-    const printWindow = window.open('', '_blank');
-    if (!printWindow) return;
+  const handleOpenConsignmentInbound = (item = null) => {
+    setSelectedConsignmentInboundItem(item);
+    setShowConsignmentInboundModal(true);
+  };
 
-    const supplierFilterText = selectedConsignmentSupplier !== 'all' ? ` - المورد: ${selectedConsignmentSupplier}` : '';
-    const itemsToPrint = selectedConsignmentSupplier !== 'all'
-      ? consignmentItems.filter((i) => i.consignment_supplier_name === selectedConsignmentSupplier)
-      : consignmentItems;
+  const handleOpenConsignmentPayment = (supplierName) => {
+    const s = suppliers.find((sup) => sup.name === supplierName || sup.company_name === supplierName);
+    setConsignmentPayInitialData({
+      party_type: 'supplier',
+      party_id: s ? s.id : '',
+      party_name: supplierName,
+      amount: s && Number(s.balance_due) > 0 ? Number(s.balance_due) : '',
+      description: `سداد وتصفية مستحقات بضاعة أمانة وتصريف - المورد: ${supplierName}`,
+    });
+    setShowConsignmentPayModal(true);
+  };
 
-    const totalStock = itemsToPrint.reduce((acc, i) => acc + Math.max(0, Number(i.stock_qty) || 0), 0);
-    const totalCost = itemsToPrint.reduce((acc, i) => acc + Math.round((Number(i.cost_price) || 0) * Math.max(0, Number(i.stock_qty) || 0)), 0);
-
-    const rowsHtml = itemsToPrint.map((item, idx) => `
-      <tr style="border-bottom: 1px solid #ddd; text-align: right;">
-        <td style="padding: 8px;">${idx + 1}</td>
-        <td style="padding: 8px; font-weight: bold;">${escapeHtml(item.name)}</td>
-        <td style="padding: 8px;">${escapeHtml(item.consignment_supplier_name || 'عام')}</td>
-        <td style="padding: 8px; font-family: monospace;">${escapeHtml(item.sku)}</td>
-        <td style="padding: 8px; text-align: center; font-weight: bold; font-family: monospace;">${item.stock_qty}</td>
-        <td style="padding: 8px; text-align: left; font-family: monospace;">${Number(item.cost_price).toLocaleString()} ر.ي</td>
-        <td style="padding: 8px; text-align: left; font-weight: bold; font-family: monospace;">${Math.round((Number(item.cost_price) || 0) * Math.max(0, Number(item.stock_qty) || 0)).toLocaleString()} ر.ي</td>
-        <td style="padding: 8px; text-align: left; font-family: monospace;">${Number(item.sell_price).toLocaleString()} ر.ي</td>
-      </tr>
-    `).join('');
-
-    printWindow.document.write(`
-      <!DOCTYPE html>
-      <html dir="rtl" lang="ar">
-      <head>
-        <meta charset="utf-8" />
-        <title>كشف جرد بضاعة الأمانات والتصريف${escapeHtml(supplierFilterText)}</title>
-        <style>
-          body { font-family: 'Segoe UI', Tahoma, sans-serif; padding: 25px; direction: rtl; color: #111; }
-          .header { text-align: center; border-bottom: 2px solid #222; padding-bottom: 15px; margin-bottom: 20px; }
-          .title { font-size: 20px; font-weight: bold; margin-bottom: 5px; }
-          .meta { font-size: 13px; color: #555; }
-          .kpi-box { display: flex; justify-content: space-around; background: #f8f9fa; border: 1px solid #ddd; padding: 12px; border-radius: 8px; margin-bottom: 20px; }
-          .kpi-item { text-align: center; }
-          .kpi-val { font-size: 16px; font-weight: bold; color: #b45309; }
-          table { width: 100%; border-collapse: collapse; font-size: 12px; }
-          th { background: #f1f5f9; padding: 10px; border-bottom: 2px solid #cbd5e1; text-align: right; }
-          .signatures { display: flex; justify-content: space-between; margin-top: 50px; padding: 0 40px; font-weight: bold; }
-          @media print { button { display: none; } }
-        </style>
-      </head>
-      <body>
-        <div class="header">
-          <div class="title">كشف جرد ومطابقة بضاعة الأمانات والتصريف (Consignment Audit)</div>
-          <div class="meta">تاريخ الاستخراج: ${new Date().toLocaleDateString('ar-YE', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}${escapeHtml(supplierFilterText)}</div>
-        </div>
-
-        <div class="kpi-box">
-          <div class="kpi-item">
-            <div>عدد أصناف الأمانات:</div>
-            <div class="kpi-val">${itemsToPrint.length} صنف</div>
-          </div>
-          <div class="kpi-item">
-            <div>إجمالي الرصيد المتبقي بالرف:</div>
-            <div class="kpi-val">${totalStock} علبة/حبة</div>
-          </div>
-          <div class="kpi-item">
-            <div>إجمالي القيمة المستحقة للمورد بالتكلفة:</div>
-            <div class="kpi-val">${totalCost.toLocaleString()} ر.ي</div>
-          </div>
-        </div>
-
-        <table>
-          <thead>
-            <tr>
-              <th>#</th>
-              <th>الصنف والمواصفات</th>
-              <th>المورد صاحب الأمانة</th>
-              <th>كود SKU</th>
-              <th style="text-align: center;">الرصيد المتبقي</th>
-              <th style="text-align: left;">سعر التكلفة</th>
-              <th style="text-align: left;">إجمالي قيمة الرصيد</th>
-              <th style="text-align: left;">سعر البيع</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${rowsHtml}
-          </tbody>
-        </table>
-
-        <div class="signatures">
-          <div>توقيع واستلام مندوب الشركة: ___________________</div>
-          <div>توقيع وختم إدارة البنشر: ___________________</div>
-        </div>
-
-        <script>
-          window.onload = function() { window.print(); }
-        </script>
-      </body>
-      </html>
-    `);
-    printWindow.document.close();
+  // Print comprehensive consignment audit & settlement liquidation report
+  const handlePrintConsignmentReport = async (layout = 'thermal') => {
+    try {
+      const url = selectedConsignmentSupplier !== 'all'
+        ? `/api/inventory/consignment-settlements?supplier=${encodeURIComponent(selectedConsignmentSupplier)}`
+        : '/api/inventory/consignment-settlements';
+      const res = await fetch(url);
+      const json = await res.json();
+      const settlementData = json.success ? json.data : [];
+      printConsignmentAuditSilently(settlementData, null, layout);
+    } catch (err) {
+      console.error('Error printing consignment report:', err);
+      alert('فشل استخراج كشف تصفية بضاعة الأمانات: ' + err.message);
+    }
   };
 
   // Active owned inventory items (excluding archived, services, and supplier consignment)
@@ -738,15 +605,29 @@ export default function InventoryView({
                 {/* 1. Physical Stock Count Sheet */}
                 <button
                   type="button"
-                  onClick={handlePrintStocktakeSheet}
+                  onClick={() => handlePrintStocktakeSheet('thermal')}
                   className="w-full p-2.5 rounded-xl hover:bg-white/10 text-right flex items-center gap-2.5 transition text-slate-200 hover:text-white"
                 >
                   <div className="w-8 h-8 rounded-lg bg-teal-500/20 text-teal-400 flex items-center justify-center shrink-0">
                     <ClipboardList className="w-4 h-4" />
                   </div>
                   <div>
-                    <div className="text-xs font-bold">طباعة كشف الجرد الفعلي للمستودع 📋</div>
-                    <div className="text-[10px] text-slate-400">استمارة ورقية لمطابقة وعد الرفوف يدوياً</div>
+                    <div className="text-xs font-bold">طباعة كشف الجرد الفعلي (كاشير 80mm) 📋</div>
+                    <div className="text-[10px] text-slate-400">استمارة رول لمطابقة وعد الرفوف يدوياً بالقلم</div>
+                  </div>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => handlePrintStocktakeSheet('a4')}
+                  className="w-full p-2.5 rounded-xl hover:bg-white/10 text-right flex items-center gap-2.5 transition text-slate-200 hover:text-white"
+                >
+                  <div className="w-8 h-8 rounded-lg bg-sky-500/20 text-sky-400 flex items-center justify-center shrink-0">
+                    <FileText className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <div className="text-xs font-bold">طباعة كشف الجرد الفعلي (A4 رسمي) 📄</div>
+                    <div className="text-[10px] text-slate-400">جدول A4 واسع ومعتمد لمطابقة وعد المستودع</div>
                   </div>
                 </button>
 
@@ -867,6 +748,24 @@ export default function InventoryView({
                   <div>
                     <div className="text-xs font-bold">طباعة لصقات وباركود الأصناف</div>
                     <div className="text-[10px] text-slate-400">ملصقات الرفوف والأسعار الحرارية 50x25</div>
+                  </div>
+                </button>
+
+                {/* 7.5 Import from Excel / CSV */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowAdvancedToolsMenu(false);
+                    setShowImportModal(true);
+                  }}
+                  className="w-full p-2.5 rounded-xl hover:bg-emerald-500/20 text-right flex items-center gap-2.5 transition text-emerald-300 hover:text-emerald-200 border-t border-white/5 pt-2"
+                >
+                  <div className="w-8 h-8 rounded-lg bg-emerald-500/20 text-emerald-400 flex items-center justify-center shrink-0">
+                    <FileSpreadsheet className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <div className="text-xs font-bold">استيراد الأصناف من ملف Excel / CSV 📥</div>
+                    <div className="text-[10px] text-emerald-400/80">رفع ملف الأصناف ومعاينة الأسعار والمخزون</div>
                   </div>
                 </button>
 
@@ -1177,15 +1076,50 @@ export default function InventoryView({
               </div>
             </div>
 
-            <button
-              type="button"
-              onClick={handlePrintConsignmentReport}
-              disabled={consignmentCount === 0}
-              className="min-h-[42px] px-4 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs flex items-center gap-2 shadow-lg shadow-amber-500/20 active:scale-95 transition disabled:opacity-50"
-            >
-              <Printer className="w-4 h-4" />
-              <span>طباعة كشف جرد الأمانات للتسوية مع المندوب 📄</span>
-            </button>
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                onClick={() => handleOpenConsignmentInbound()}
+                disabled={consignmentCount === 0}
+                className="min-h-[42px] px-3.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs flex items-center gap-2 shadow-lg shadow-amber-500/20 active:scale-95 transition disabled:opacity-50"
+              >
+                <PackagePlus className="w-4 h-4 stroke-[2.5]" />
+                <span>استلام دفعة أمانة 📥</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => handlePrintConsignmentReport('thermal')}
+                disabled={consignmentCount === 0}
+                className="min-h-[42px] px-3.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-amber-300 border border-amber-500/30 font-bold text-xs flex items-center gap-2 shadow-lg active:scale-95 transition disabled:opacity-50"
+                title="طباعة إيصال كاشير 80mm حراري"
+              >
+                <Printer className="w-4 h-4" />
+                <span>كشف تصفية الأمانة (كاشير 80mm) 🧾</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => handlePrintConsignmentReport('a4')}
+                disabled={consignmentCount === 0}
+                className="min-h-[42px] px-3 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-700 font-bold text-xs flex items-center gap-1.5 shadow-lg active:scale-95 transition disabled:opacity-50"
+                title="طباعة تقرير رسمي A4 عريض"
+              >
+                <FileText className="w-4 h-4 text-sky-400" />
+                <span>A4 رسمي 📄</span>
+              </button>
+
+              {selectedConsignmentSupplier !== 'all' && (
+                <button
+                  type="button"
+                  onClick={() => handleOpenConsignmentPayment(selectedConsignmentSupplier)}
+                  className="min-h-[42px] px-3.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold text-xs flex items-center gap-2 shadow-lg shadow-emerald-600/20 active:scale-95 transition"
+                >
+                  <CreditCard className="w-4 h-4" />
+                  <span>سداد مستحقات ({selectedConsignmentSupplier}) 💳</span>
+                </button>
+              )}
+            </div>
           </div>
 
           {/* Consignment KPI Cards */}
@@ -1357,7 +1291,13 @@ export default function InventoryView({
 
                     {/* Brand & Viscosity */}
                     <td className="p-3.5">
-                      <span className="font-bold text-slate-300">{item.brand}</span>
+                      <span className="font-bold text-slate-300">
+                        {item.brand && item.brand.trim() && item.brand !== 'عام' ? (
+                          item.brand
+                        ) : (
+                          <span className="text-slate-600 font-normal select-none">—</span>
+                        )}
+                      </span>
                       {item.category === 'oil' && item.viscosity && (
                         <div className="mt-1">
                           <span className="px-2 py-0.5 rounded-full bg-slate-800 text-[10px] font-mono font-bold text-amber-300 border border-amber-500/20">
@@ -1546,6 +1486,18 @@ export default function InventoryView({
                           </button>
                         )}
 
+                        {/* Direct Consignment Inbound Button for Consignment Items */}
+                        {Boolean(item.is_consignment) && item.is_active === 1 && (
+                          <button
+                            type="button"
+                            onClick={() => handleOpenConsignmentInbound(item)}
+                            title="استلام وتوريد دفعة إضافية من بضاعة الأمانة"
+                            className="p-1.5 rounded-lg bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/30 transition active:scale-95"
+                          >
+                            <PackagePlus className="w-3.5 h-3.5" />
+                          </button>
+                        )}
+
                         {/* Edit Item */}
                         <button
                           type="button"
@@ -1696,6 +1648,53 @@ export default function InventoryView({
         isOpen={showReorderSheetModal}
         onClose={() => setShowReorderSheetModal(false)}
         onConvertToPurchaseInvoice={handleConvertToPurchaseInvoice}
+      />
+
+      {/* Excel / CSV Catalog Import Modal */}
+      <ImportInventoryModal
+        isOpen={showImportModal}
+        onClose={() => setShowImportModal(false)}
+        onImportSuccess={(res) => {
+          setShowImportModal(false);
+          if (onRefreshData) onRefreshData();
+          setActionMessage(
+            `تم استيراد (${res.importedCount}) صنف جديد بنجاح، وتوليد (${res.openingEntriesCount}) قيد محاسبي لرصيد أول المدة بقيمة (${(res.totalCommittedCost || 0).toLocaleString()} ر.ي) 🚀`
+          );
+          setTimeout(() => setActionMessage(''), 8000);
+        }}
+      />
+
+      {/* Consignment Stock Inbound Modal */}
+      <ConsignmentInboundModal
+        isOpen={showConsignmentInboundModal}
+        onClose={() => {
+          setShowConsignmentInboundModal(false);
+          setSelectedConsignmentInboundItem(null);
+        }}
+        consignmentItems={consignmentItems}
+        selectedItem={selectedConsignmentInboundItem}
+        onInboundSuccess={(updatedItem, qty, itemName) => {
+          if (onRefreshData) onRefreshData();
+          setActionMessage(`تم بنجاح توريد واستلام (${qty}) عبوة إضافية لصنف "${itemName || updatedItem.name}" برسم البيع 🤝`);
+          setTimeout(() => setActionMessage(''), 7000);
+        }}
+      />
+
+      {/* Consignment Supplier Settlement Payment Voucher Modal */}
+      <GeneralPaymentVoucherModal
+        isOpen={showConsignmentPayModal}
+        onClose={() => {
+          setShowConsignmentPayModal(false);
+          setConsignmentPayInitialData(null);
+        }}
+        initialData={consignmentPayInitialData}
+        suppliers={suppliers}
+        onVoucherCreated={() => {
+          if (onRefreshData) onRefreshData();
+          fetchSuppliers();
+          setActionMessage('تم ترحيل سند صرف وسداد مستحقات مورد الأمانة وتحديث الرصيد بنجاح 🧾');
+          setTimeout(() => setActionMessage(''), 7000);
+        }}
       />
 
       {/* Touch Confirmation Modal for Delete/Archive */}

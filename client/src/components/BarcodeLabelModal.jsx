@@ -1,5 +1,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { X, Printer, Barcode, Tag, MapPin, Copy, Layers, Check } from 'lucide-react';
+import { X, Printer, Barcode, Tag, Copy, Layers, Check } from 'lucide-react';
+import { getShopSettings } from '../utils/settings';
+import { printBarcodeLabelsSilently } from '../utils/inventoryPrintTemplates';
 
 /**
  * Pure JavaScript Code 128 Barcode Pattern Generator (Subset B)
@@ -59,7 +61,9 @@ function generateCode128Svg(text) {
 
 export default function BarcodeLabelModal({ isOpen, onClose, item }) {
   const [copies, setCopies] = useState(1);
-  const [labelSize, setLabelSize] = useState('50x25'); // '50x25' (thermal standard), '40x30' (shelf), 'sheet' (A4 sheet)
+  const [labelSize, setLabelSize] = useState('80mm'); // '80mm' (thermal cashier), '50x25' (thermal sticker), 'sheet' (A4 sheet)
+  const [isPrinting, setIsPrinting] = useState(false);
+  const settings = getShopSettings();
 
   useEffect(() => {
     if (!isOpen) return;
@@ -74,8 +78,17 @@ export default function BarcodeLabelModal({ isOpen, onClose, item }) {
 
   const barcodeValue = item.barcode || item.sku || `ITEM-${item.id}`;
 
-  const handlePrint = () => {
-    window.print();
+  const handlePrint = async () => {
+    try {
+      setIsPrinting(true);
+      await printBarcodeLabelsSilently(item, copies, labelSize);
+    } catch (err) {
+      console.error('Error printing labels:', err);
+      // Fallback
+      window.print();
+    } finally {
+      setIsPrinting(false);
+    }
   };
 
   const copiesArray = Array.from({ length: Math.max(1, Math.min(copies, 50)) });
@@ -90,17 +103,18 @@ export default function BarcodeLabelModal({ isOpen, onClose, item }) {
               <Barcode className="w-5 h-5 stroke-[2.2]" />
             </div>
             <div>
-              <h3 className="font-extrabold text-white text-base">طباعة ملصقات الباركود والرفوف الحرارية</h3>
-              <p className="text-xs text-slate-400">ستيكرات بدقة عالية متوافقة مع طابعات الباركود الحرارية Xprinter / Zebra</p>
+              <h3 className="font-extrabold text-white text-base">طباعة ملصقات وباركود الأصناف</h3>
+              <p className="text-xs text-slate-400">طباعة فورية صامتة متوافقة مع طابعات الكاشير 80mm وطابعات الستيكرات الحرارية</p>
             </div>
           </div>
           <div className="flex items-center gap-2">
             <button
               onClick={handlePrint}
-              className="px-4 py-2 rounded-xl bg-teal-500 hover:bg-teal-400 text-slate-950 font-black text-xs flex items-center gap-2 transition active:scale-95 shadow-lg shadow-teal-500/20"
+              disabled={isPrinting}
+              className="px-4 py-2 rounded-xl bg-teal-500 hover:bg-teal-400 text-slate-950 font-black text-xs flex items-center gap-2 transition active:scale-95 shadow-lg shadow-teal-500/20 disabled:opacity-50"
             >
               <Printer className="w-4 h-4" />
-              <span>طباعة الستيكرات 🖨️</span>
+              <span>{isPrinting ? 'جاري الطباعة...' : 'طباعة الملصقات 🖨️'}</span>
             </button>
             <button onClick={onClose} className="text-slate-400 hover:text-white p-2">
               <X className="w-5 h-5" />
@@ -111,12 +125,12 @@ export default function BarcodeLabelModal({ isOpen, onClose, item }) {
         {/* Configuration Controls (Hidden on print) */}
         <div className="p-4 border-b border-white/10 bg-slate-900/60 print:hidden flex flex-wrap items-center justify-between gap-3 text-xs">
           <div className="flex items-center gap-2">
-            <span className="text-slate-300 font-bold">مقاس الملصق:</span>
+            <span className="text-slate-300 font-bold">نوع الورق / المقاس:</span>
             <div className="flex items-center gap-1.5">
               {[
+                { id: '80mm', label: '🧾 رول كاشير 80mm' },
                 { id: '50x25', label: '🏷️ ستيكر علبة (50×25 مم)' },
-                { id: '40x30', label: '📌 ملصق رف (40×30 مم)' },
-                { id: 'sheet', label: '📄 صفحة كاملة A4' },
+                { id: 'sheet', label: '📄 صفحة A4 كاملة' },
               ].map((s) => (
                 <button
                   key={s.id}
@@ -159,16 +173,16 @@ export default function BarcodeLabelModal({ isOpen, onClose, item }) {
         {/* Printable Label Area */}
         <div className="flex-1 overflow-y-auto p-6 bg-slate-950 print:bg-white print:p-0">
           <div className="print:hidden mb-4 text-xs text-slate-400 font-bold flex items-center justify-between">
-            <span>معاينة الطباعة ({copies} ملصق):</span>
-            <span className="text-teal-400">ستطبع الخلفية بيضاء والنصوص سوداء حادة للطابعات الحرارية</span>
+            <span>معاينة الملصق ({copies} نسخة):</span>
+            <span className="text-teal-400">ستطبع الخلفية بيضاء نقية والباركود حاد بدقة 100%</span>
           </div>
 
           {/* Labels Grid */}
           <div className={`grid gap-3 ${
-            labelSize === '50x25'
-              ? 'grid-cols-1 sm:grid-cols-2 md:grid-cols-3'
-              : labelSize === '40x30'
+            labelSize === '80mm'
               ? 'grid-cols-1 sm:grid-cols-2'
+              : labelSize === '50x25'
+              ? 'grid-cols-1 sm:grid-cols-2 md:grid-cols-3'
               : 'grid-cols-3 md:grid-cols-4'
           } print:grid-cols-1 print:gap-1 print:m-0`}>
             {copiesArray.map((_, idx) => (
@@ -176,14 +190,14 @@ export default function BarcodeLabelModal({ isOpen, onClose, item }) {
                 key={idx}
                 className="bg-white text-black p-2.5 rounded-lg border border-slate-300 shadow-md flex flex-col justify-between select-none print:shadow-none print:border-none print:m-0 print:p-1.5 print:break-inside-avoid"
                 style={{
-                  width: labelSize === '50x25' ? '188px' : labelSize === '40x30' ? '150px' : '100%',
-                  height: labelSize === '50x25' ? '95px' : labelSize === '40x30' ? '112px' : 'auto',
+                  width: labelSize === '80mm' ? '240px' : labelSize === '50x25' ? '188px' : '100%',
+                  minHeight: '100px',
                   margin: 'auto',
                 }}
               >
                 {/* Header: Shop Name & Brand */}
                 <div className="flex items-center justify-between border-b border-black/20 pb-0.5 text-[9px] font-bold">
-                  <span className="truncate max-w-[100px]">مركز البنشر للسيارات</span>
+                  <span className="truncate max-w-[130px]">{settings.shopName}</span>
                   <span className="font-mono">{item.brand}</span>
                 </div>
 
@@ -202,13 +216,10 @@ export default function BarcodeLabelModal({ isOpen, onClose, item }) {
                   {generateCode128Svg(barcodeValue)}
                 </div>
 
-                {/* Footer: Price, SKU/Barcode, Shelf */}
+                {/* Footer: Price, Barcode (NO Shelf Location) */}
                 <div className="flex items-center justify-between text-[9px] font-mono font-bold pt-0.5 border-t border-black/20">
                   <span className="tracking-tight">{barcodeValue}</span>
-                  {item.location_shelf && (
-                    <span className="text-[8px] bg-gray-200 px-1 rounded">رف: {item.location_shelf}</span>
-                  )}
-                  <span className="font-black text-[11px] text-black">
+                  <span className="font-black text-[12px] text-black">
                     {Number(item.sell_price).toLocaleString()} ر.ي
                   </span>
                 </div>

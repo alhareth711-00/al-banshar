@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Lock } from 'lucide-react';
+import { Lock, Sparkles, X } from 'lucide-react';
 import Sidebar from './components/Sidebar';
 import PosScreen from './components/PosScreen';
 import RetentionRadar from './components/RetentionRadar';
@@ -16,6 +16,9 @@ import VouchersManagementView from './components/VouchersManagementView';
 import UserGuideModal from './components/UserGuideModal';
 import OwnerPinModal from './components/OwnerPinModal';
 import GlobalCommandPalette from './components/GlobalCommandPalette';
+import LicenseBanner from './components/LicenseBanner';
+import LicenseLockModal from './components/LicenseLockModal';
+import OnboardingWizardModal from './components/OnboardingWizardModal';
 import ErrorBoundary from './components/ErrorBoundary';
 import { getAutoLockMinutes } from './utils/settings';
 import { APP_EVENTS, subscribeAppEvent } from './utils/eventBus';
@@ -34,6 +37,82 @@ export default function App() {
   const [showUserGuideModal, setShowUserGuideModal] = useState(false);
   const [showCommandPalette, setShowCommandPalette] = useState(false);
   const [pulseRefreshTrigger, setPulseRefreshTrigger] = useState(0);
+
+  // Financial Pulse Bar Visibility State (شريط النبض المالي - مغلق ومخفي افتراضياً لتوفير مساحة الشاشة)
+  const [showFinancialPulse, setShowFinancialPulse] = useState(() => {
+    try {
+      return localStorage.getItem('quick_lube_show_pulse_bar') === 'true';
+    } catch (e) {
+      return false;
+    }
+  });
+
+  const handleToggleFinancialPulse = () => {
+    setShowFinancialPulse((prev) => {
+      const next = !prev;
+      try {
+        localStorage.setItem('quick_lube_show_pulse_bar', next ? 'true' : 'false');
+      } catch (e) {}
+      return next;
+    });
+  };
+
+  // First-run Welcome Onboarding Wizard State (معالج الإعداد الترحيبي لأول تشغيل)
+  const [showOnboarding, setShowOnboarding] = useState(false);
+
+  useEffect(() => {
+    try {
+      const onboarded = localStorage.getItem('quick_lube_onboarded');
+      if (onboarded !== 'true') {
+        setShowOnboarding(true);
+      }
+    } catch (e) {}
+  }, []);
+
+  // Desktop OTA Updates State (التحديث الهوائي في بيئة Electron)
+  const [otaUpdateReady, setOtaUpdateReady] = useState(null);
+
+  useEffect(() => {
+    if (window.electronAPI?.onUpdateDownloaded) {
+      window.electronAPI.onUpdateDownloaded((info) => {
+        setOtaUpdateReady(info || { version: 'جديد' });
+      });
+    }
+  }, []);
+
+  // License & Subscription Sentinel State (نظام التراخيص والاشتراك السنوي)
+  const [licenseStatus, setLicenseStatus] = useState(null);
+
+  const fetchLicenseStatus = useCallback(async () => {
+    try {
+      const res = await fetch('/api/system/license/status');
+      const data = await res.json();
+      if (data.success) {
+        setLicenseStatus(data.data);
+      }
+    } catch (e) {
+      console.error('Failed to fetch license status:', e);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchLicenseStatus();
+    const handleLicenseUpdate = () => fetchLicenseStatus();
+    window.addEventListener('al_banshar_license_updated', handleLicenseUpdate);
+    return () => window.removeEventListener('al_banshar_license_updated', handleLicenseUpdate);
+  }, [fetchLicenseStatus]);
+
+  const isLicenseLocked = Boolean(
+    licenseStatus &&
+      (licenseStatus.status === 'locked_expired' ||
+        licenseStatus.status === 'locked_tampered' ||
+        !licenseStatus.valid)
+  );
+
+  const handleLicenseActivated = (newStatus) => {
+    setLicenseStatus(newStatus);
+    window.dispatchEvent(new Event('al_banshar_license_updated'));
+  };
 
   // Smart Authority State (الجزء الأول: وضع الكاشير الآمن افتراضياً)
   const [isOwnerMode, setIsOwnerMode] = useState(false);
@@ -158,6 +237,11 @@ export default function App() {
     }
   };
 
+  const handleOpenStatementDirect = (type = 'customer', id = null) => {
+    setStatementInitialParty({ type, id });
+    setShowStatementModal(true);
+  };
+
   const handleOpenBayProfitabilityGuarded = () => {
     if (!isOwnerMode) {
       requireOwnerAuth(
@@ -168,6 +252,10 @@ export default function App() {
     } else {
       setShowBayModal(true);
     }
+  };
+
+  const handleOpenBayProfitabilityDirect = () => {
+    setShowBayModal(true);
   };
 
   // Fetch initial master data
@@ -255,19 +343,60 @@ export default function App() {
         isOwnerMode={isOwnerMode}
       />
 
-      {/* Main App Workspace with Global Smooth Scrollability */}
+      {/* Main App Workspace with Strict Viewport Lock in POS */}
+      <main
+        className={`flex-1 flex flex-col ${
+          activeTab === 'pos'
+            ? 'p-1.5 sm:p-2 lg:px-4 lg:py-2 space-y-1.5 overflow-hidden h-full max-h-screen'
+            : 'p-2.5 sm:p-3 lg:px-6 lg:py-3.5 space-y-2.5 overflow-y-auto'
+        } overflow-x-hidden min-w-0 min-h-0 bg-[#070b14] print:p-0 print:m-0 print:bg-white print:overflow-visible`}
+      >
+      {/* Desktop OTA Update Ready Toast Banner */}
+      {otaUpdateReady && (
+        <div className="w-full bg-gradient-to-r from-cyan-950 via-teal-900 to-cyan-950 border border-cyan-400/50 rounded-2xl px-4 py-2.5 text-white flex items-center justify-between gap-3 text-xs shadow-xl animate-in fade-in duration-300">
+          <div className="flex items-center gap-2 font-black">
+            <Sparkles className="w-4 h-4 text-cyan-300 animate-pulse shrink-0" />
+            <span>
+              🚀 تم تنزيل إصدار وتحديث جديد للنظام {otaUpdateReady.version ? `(v${otaUpdateReady.version})` : ''} بنجاح في الخلفية وهو جاهز للتطبيق!
+            </span>
+          </div>
+          <div className="flex items-center gap-2 shrink-0">
+            <button
+              type="button"
+              onClick={() => window.electronAPI?.restartAndInstallUpdate?.()}
+              className="px-3.5 py-1.5 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-black text-xs shadow-md transition active:scale-95 flex items-center gap-1.5"
+            >
+              <span>إعادة التشغيل وتطبيق التحديث الآن ⚡</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setOtaUpdateReady(null)}
+              className="p-1.5 rounded-lg text-slate-400 hover:text-white transition"
+              title="تطبيق لاحقاً عند إغلاق البرنامج"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+      )}
 
-
-
-        <main className="flex-1 flex flex-col p-3 lg:px-6 lg:py-4 overflow-y-auto overflow-x-hidden min-w-0 min-h-0 bg-[#070b14] space-y-3 print:p-0 print:m-0 print:bg-white print:overflow-visible">
-      {/* Real-time Financial Pulse Bar (Upgrade 2 & Action Center) */}
-      <FinancialPulseBar
-        onOpenStatement={() => handleOpenStatementGuarded('customer', null)}
-        onOpenBayProfitability={handleOpenBayProfitabilityGuarded}
-        refreshTrigger={pulseRefreshTrigger}
-        isOwnerMode={isOwnerMode}
-        onToggleOwnerMode={handleToggleOwnerMode}
+      {/* License & Subscription Grace/Trial Banner */}
+      <LicenseBanner
+        licenseStatus={licenseStatus}
+        onOpenActivation={handleOpenSettingsGuarded}
       />
+
+      {/* Real-time Financial Pulse Bar (Upgrade 2 & Action Center) */}
+      {showFinancialPulse && (
+        <FinancialPulseBar
+          onOpenStatement={() => handleOpenStatementDirect('customer', null)}
+          onOpenBayProfitability={handleOpenBayProfitabilityDirect}
+          refreshTrigger={pulseRefreshTrigger}
+          isOwnerMode={isOwnerMode}
+          onToggleOwnerMode={handleToggleOwnerMode}
+          onClose={handleToggleFinancialPulse}
+        />
+      )}
 
       {activeTab === 'pos' && (
         <ErrorBoundary>
@@ -279,6 +408,8 @@ export default function App() {
             onOpenStatement={(vehId) => handleOpenStatementGuarded('customer', vehId)}
             isOwnerMode={isOwnerMode}
             onRequireOwnerAuth={requireOwnerAuth}
+            showFinancialPulse={showFinancialPulse}
+            onToggleFinancialPulse={handleToggleFinancialPulse}
           />
         </ErrorBoundary>
       )}
@@ -349,12 +480,14 @@ export default function App() {
       />
 
       {/* Statement of Account Modal (Upgrade 3) */}
-      <StatementOfAccountModal
-        isOpen={showStatementModal}
-        onClose={() => setShowStatementModal(false)}
-        initialPartyType={statementInitialParty.type}
-        initialPartyId={statementInitialParty.id}
-      />
+      <ErrorBoundary onReset={() => setShowStatementModal(false)}>
+        <StatementOfAccountModal
+          isOpen={showStatementModal}
+          onClose={() => setShowStatementModal(false)}
+          initialPartyType={statementInitialParty.type}
+          initialPartyId={statementInitialParty.id}
+        />
+      </ErrorBoundary>
 
       {/* Bay Profitability & Labor Margin Modal (Upgrade 5) */}
       <BayProfitabilityModal
@@ -399,6 +532,25 @@ export default function App() {
           <span>{autoLockNotice}</span>
         </div>
       )}
+
+      {/* First-Run Welcome Onboarding Wizard */}
+      <OnboardingWizardModal
+        isOpen={showOnboarding && !isLicenseLocked}
+        onComplete={() => {
+          setShowOnboarding(false);
+          handleDataRefreshed();
+        }}
+      />
+
+      {/* License Lock Screen Modal (حارس الاشتراك الصارم) */}
+      <LicenseLockModal
+        isOpen={isLicenseLocked}
+        licenseStatus={licenseStatus}
+        onActivated={handleLicenseActivated}
+        onDownloadBackup={() => {
+          window.location.href = '/api/backup';
+        }}
+      />
     </div>
   );
 }

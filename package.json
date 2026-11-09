@@ -2,7 +2,11 @@
   "name": "quick-lube-pos-root",
   "version": "1.0.0",
   "description": "Quick Lube & Tire Touch POS (Yemen Market) - Clean & Modular Architecture",
+  "main": "desktop/main.js",
   "scripts": {
+    "desktop": "electron .",
+    "desktop:pack": "npm run client:build && electron-builder --dir",
+    "desktop:build": "npm run client:build && electron-builder --win nsis",
     "server": "cmd /c \"cd server && npm start\"",
     "server:dev": "cmd /c \"cd server && npm run dev\"",
     "server:test": "cmd /c \"cd server && npm test\"",
@@ -11,8 +15,93 @@
     "audit:radar": "cmd /c \"cd server && npm run audit:radar\"",
     "audit:chaos": "cmd /c \"cd server && npm run audit:chaos\"",
     "audit:all": "cmd /c \"cd server && npm run audit:all\"",
+    "audit:interactive": "cmd /c \"cd server && npm run audit:interactive\"",
+    "license:generate": "node server/scripts/generateLicense.js",
+    "developer": "node developer/server.js",
+    "developer:cli": "node developer/cli.js",
     "client": "cmd /c \"cd client && npm run dev\"",
-    "client:build": "cmd /c \"cd client && npm run build\""
+    "client:build": "cmd /c \"cd client && npm run build\"",
+    "patch:prepare": "node tools/patch-builder/build_patch.js",
+    "patch:build": "node tools/patch-builder/build_patch.js --zip"
+  },
+  "build": {
+    "appId": "com.albanshar.pos",
+    "productName": "سريع وبنشر PRO",
+    "copyright": "Copyright © 2026 Al-Banshar PRO",
+    "asar": false,
+    "directories": {
+      "output": "dist_desktop"
+    },
+    "extraFiles": [
+      {
+        "from": "bin",
+        "to": "bin"
+      },
+      {
+        "from": "bin/vcruntime140.dll",
+        "to": "vcruntime140.dll"
+      },
+      {
+        "from": "bin/msvcp140.dll",
+        "to": "msvcp140.dll"
+      },
+      {
+        "from": "bin/vcruntime140_1.dll",
+        "to": "vcruntime140_1.dll"
+      },
+      {
+        "from": "FIELD_GUIDE_A4.html",
+        "to": "FIELD_GUIDE_A4.html"
+      }
+    ],
+    "extraResources": [
+      {
+        "from": "server",
+        "to": "server",
+        "filter": [
+          "**/*",
+          "!backups/*",
+          "!test*.js"
+        ]
+      },
+      {
+        "from": "client/dist",
+        "to": "client/dist"
+      }
+    ],
+    "files": [
+      "desktop/**/*",
+      "server/**/*",
+      "client/dist/**/*",
+      "!server/backups/*",
+      "!server/test*.js",
+      "!**/*.map"
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "client/src/assets/hero.png"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "سريع وبنشر PRO",
+      "uninstallDisplayName": "سريع وبنشر PRO - إزالة التثبيت"
+    },
+    "publish": {
+      "provider": "github",
+      "owner": "albanshar-pos",
+      "repo": "pos-releases"
+    }
   },
   "keywords": [
     "pos",
@@ -21,5 +110,12 @@
     "tire-touch"
   ],
   "author": "Antigravity",
-  "license": "ISC"
+  "license": "ISC",
+  "devDependencies": {
+    "electron": "^33.4.11",
+    "electron-builder": "^25.1.8"
+  },
+  "dependencies": {
+    "electron-updater": "^6.8.11"
+  }
 }

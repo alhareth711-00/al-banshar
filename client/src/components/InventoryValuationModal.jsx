@@ -1,9 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { X, Printer, FileText, CheckCircle, Boxes, DollarSign, TrendingUp, AlertTriangle } from 'lucide-react';
+import { getShopSettings } from '../utils/settings';
+import { printInventoryValuationSilently } from '../utils/inventoryPrintTemplates';
 
 export default function InventoryValuationModal({ isOpen, onClose, inventory = [] }) {
   const [valuationData, setValuationData] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
+  const settings = getShopSettings();
 
   useEffect(() => {
     if (isOpen) {
@@ -33,8 +36,9 @@ export default function InventoryValuationModal({ isOpen, onClose, inventory = [
 
   if (!isOpen) return null;
 
-  const handlePrint = () => {
-    window.print();
+  const handlePrint = (layout = 'thermal') => {
+    if (!valuationData) return;
+    printInventoryValuationSilently(valuationData, inventory, null, layout);
   };
 
   const getCategoryArabicName = (cat) => {
@@ -65,11 +69,21 @@ export default function InventoryValuationModal({ isOpen, onClose, inventory = [
           </div>
           <div className="flex items-center gap-2">
             <button
-              onClick={handlePrint}
-              className="px-4 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-xs flex items-center gap-2 transition"
+              onClick={() => handlePrint('thermal')}
+              className="px-3.5 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs flex items-center gap-1.5 transition active:scale-95 shadow-md shadow-amber-500/20"
+              title="طباعة إيصال كاشير 80mm حراري"
             >
               <Printer className="w-4 h-4" />
-              <span>طباعة الكشف الرسمي (A4) 🖨️</span>
+              <span>طباعة ملخص رأس المال (كاشير 80mm) 🧾</span>
+            </button>
+
+            <button
+              onClick={() => handlePrint('a4')}
+              className="px-3 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs flex items-center gap-1.5 transition active:scale-95"
+              title="طباعة تقرير رسمي A4"
+            >
+              <FileText className="w-4 h-4" />
+              <span>A4 رسمي 📄</span>
             </button>
             <button onClick={onClose} className="text-slate-400 hover:text-white p-2">
               <X className="w-5 h-5" />
@@ -82,8 +96,8 @@ export default function InventoryValuationModal({ isOpen, onClose, inventory = [
           {/* Official Sheet Header for Print */}
           <div className="border-b-2 border-slate-700 pb-4 flex items-center justify-between">
             <div>
-              <h1 className="text-2xl font-black text-white print:text-black">مركز البنشر لخدمات وتغيير زيوت السيارات</h1>
-              <p className="text-xs text-slate-400 print:text-gray-600 mt-1">كشف الجرد الفعلي وتقييم رأس المال المخزني - صنعاء، اليمن</p>
+              <h1 className="text-2xl font-black text-white print:text-black">{settings.shopName}</h1>
+              <p className="text-xs text-slate-400 print:text-gray-600 mt-1">كشف الجرد الفعلي وتقييم رأس المال المخزني {settings.address ? `- ${settings.address}` : ''}</p>
             </div>
             <div className="text-left font-mono text-xs text-slate-400 print:text-gray-700">
               <div>تاريخ الجرد: {new Date().toLocaleDateString('ar-YE')}</div>
@@ -180,7 +194,6 @@ export default function InventoryValuationModal({ isOpen, onClose, inventory = [
                 <thead className="bg-slate-900 print:bg-gray-100 text-slate-400 print:text-black font-bold">
                   <tr>
                     <th className="p-2 text-center">#</th>
-                    <th className="p-2">كود SKU</th>
                     <th className="p-2">اسم الصنف والمواصفات</th>
                     <th className="p-2">الماركة</th>
                     <th className="p-2">العبوة/المقاس</th>
@@ -196,7 +209,6 @@ export default function InventoryValuationModal({ isOpen, onClose, inventory = [
                     return (
                       <tr key={item.id} className="print:text-black">
                         <td className="p-2 text-center font-mono text-slate-400 print:text-gray-600">{idx + 1}</td>
-                        <td className="p-2 font-mono text-slate-400 print:text-gray-800">{item.sku}</td>
                         <td className="p-2 font-bold text-white print:text-black">
                           {item.name}
                           {item.tire_battery_spec && (

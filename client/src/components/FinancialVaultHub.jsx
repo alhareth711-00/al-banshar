@@ -264,56 +264,16 @@ export default function FinancialVaultHub({ onRefreshData, onOpenStatement }) {
           </div>
         </div>
 
-        {/* Action Buttons */}
-        <div className="flex flex-wrap items-center gap-2.5">
-          {/* Issue Receipt Voucher */}
-          <button
-            onClick={() => {
-              setReceiptInitialData(null);
-              setShowReceiptModal(true);
-            }}
-            className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-bold text-sm shadow-lg shadow-emerald-900/30 border border-emerald-400/30 active:scale-95 transition-all"
-          >
-            <ArrowDownLeft className="w-4 h-4 stroke-[2.5]" />
-            <span>سند قبض نقدية 📥</span>
-          </button>
-
-          {/* Issue Payment Voucher */}
-          <button
-            onClick={() => handleOpenPayment('expense')}
-            className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-rose-600 to-pink-600 hover:from-rose-500 hover:to-pink-500 text-white font-bold text-sm shadow-lg shadow-rose-900/30 border border-rose-400/30 active:scale-95 transition-all"
-          >
-            <ArrowUpRight className="w-4 h-4 stroke-[2.5]" />
-            <span>سند صرف نقدية 📤</span>
-          </button>
-
-          {/* Owner Drawings (Direct Shortcut) */}
-          <button
-            onClick={() => handleOpenPayment('owner', { description: 'مسحوبات شخصية نقدية للمالك' })}
-            className="flex items-center gap-2 px-3.5 py-2.5 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-semibold text-xs shadow-lg shadow-purple-900/30 border border-purple-400/30 active:scale-95 transition-all"
-            title="مسحوبات المالك الشخصية تخفض جاري المالك (3101) ولا تقلل صافي الربح التشغيلي"
-          >
-            <UserCheck className="w-4 h-4" />
-            <span>مسحوبات المالك 👤</span>
-          </button>
-
-          {/* Upgrade 2: Cash Drawer Reconciliation */}
-          <button
-            onClick={() => setShowReconciliationModal(true)}
-            className="flex items-center gap-2 px-3.5 py-2.5 rounded-xl bg-gradient-to-r from-amber-600 to-yellow-600 hover:from-amber-500 hover:to-yellow-500 text-slate-950 font-black text-xs shadow-lg shadow-amber-900/30 border border-amber-400/40 active:scale-95 transition-all"
-            title="جرد ومطابقة المبلغ الإجمالي الفعلي الموجود في الصندوق مع الرصيد الدفتري (1101)"
-          >
-            <Scale className="w-4 h-4 stroke-[2.5]" />
-            <span>جرد ومطابقة الصندوق 🧮</span>
-          </button>
-
+        {/* Action Controls */}
+        <div className="flex items-center gap-2">
           {/* Refresh Data */}
           <button
             onClick={handleRefresh}
-            className="p-2.5 rounded-xl bg-slate-800/80 hover:bg-slate-700 text-slate-300 hover:text-white border border-white/10 active:scale-95 transition-all"
+            className="flex items-center gap-2 px-3 py-2 rounded-xl bg-slate-800/80 hover:bg-slate-700 text-slate-300 hover:text-white border border-white/10 active:scale-95 transition-all text-xs font-semibold"
             title="تحديث البيانات المالية"
           >
             <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin text-emerald-400' : ''}`} />
+            <span>تحديث</span>
           </button>
         </div>
       </div>
@@ -504,6 +464,22 @@ export default function FinancialVaultHub({ onRefreshData, onOpenStatement }) {
         {/* ======================================================== */}
         {activeTab === 'drawer' && (
           <div className="space-y-6">
+            {/* Tab 1 Header Bar with Reconciliation */}
+            <div className="flex flex-wrap items-center justify-between gap-3 bg-slate-900/60 p-3 rounded-2xl border border-white/10">
+              <div className="flex items-center gap-2 text-xs text-slate-400">
+                <Wallet className="w-4 h-4 text-emerald-400" />
+                <span>حسابات النقدية والمحافظ الإلكترونية الحية ومطابقة العهدة</span>
+              </div>
+              <button
+                onClick={() => setShowReconciliationModal(true)}
+                className="flex items-center gap-2 px-3.5 py-1.5 rounded-xl bg-gradient-to-r from-amber-600 to-yellow-600 hover:from-amber-500 hover:to-yellow-500 text-slate-950 font-black text-xs shadow-md border border-amber-400/40 active:scale-95 transition-all"
+                title="جرد ومطابقة المبلغ الإجمالي الفعلي الموجود في الصندوق مع الرصيد الدفتري (1101)"
+              >
+                <Scale className="w-4 h-4 stroke-[2.5]" />
+                <span>جرد ومطابقة الصندوق 🧮</span>
+              </button>
+            </div>
+
             {/* Account Balances Grid - Executive Apple Glass Vault (الخيار 3 المعتمد) */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
               {/* Glass Drawer Cash 1101 */}
