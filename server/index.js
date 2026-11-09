@@ -240,13 +240,37 @@ const clientDistCandidates = [
   path.join(__dirname, '..', 'client', 'dist'),
   path.join(__dirname, '..', '..', 'client', 'dist'),
   path.join(__dirname, '..', 'resources', 'client', 'dist'),
+  path.join(__dirname, '..', 'app', 'client', 'dist'),
 ];
 const clientDistPath = clientDistCandidates.find((p) => fs.existsSync(p)) || clientDistCandidates[0];
 if (fs.existsSync(clientDistPath)) {
   console.log('[Server] Serving production static frontend from:', clientDistPath);
-  app.use(express.static(clientDistPath));
+
+  // Serve hashed assets with strict 404 guard (do NOT fallback to index.html for assets)
+  app.use('/assets', express.static(path.join(clientDistPath, 'assets'), {
+    maxAge: '1y',
+    immutable: true,
+    fallthrough: false,
+  }));
+
+  app.use(express.static(clientDistPath, {
+    setHeaders: (res, filePath) => {
+      if (filePath.endsWith('.html')) {
+        res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+        res.setHeader('Pragma', 'no-cache');
+        res.setHeader('Expires', '0');
+      }
+    },
+  }));
+
   app.use((req, res, next) => {
     if (req.path.startsWith('/api')) return next();
+    if (req.path.startsWith('/assets/')) {
+      return res.status(404).json({ error: 'Asset not found' });
+    }
+    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+    res.setHeader('Pragma', 'no-cache');
+    res.setHeader('Expires', '0');
     res.sendFile(path.join(clientDistPath, 'index.html'));
   });
 } else {

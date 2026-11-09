@@ -180,7 +180,14 @@ async function main() {
   ];
   copyDirectory(SERVER_DIR, stagingServer, ignorePatterns);
 
-  // 2c. Write manifest.json
+  // 2c. Copy desktop shell
+  const desktopDir = path.join(ROOT_DIR, 'desktop');
+  if (fs.existsSync(desktopDir)) {
+    const stagingDesktop = path.join(stagingDir, 'desktop');
+    copyDirectory(desktopDir, stagingDesktop);
+  }
+
+  // 2d. Write manifest.json
   const manifest = {
     name: 'نظام سريع وبنشر PRO',
     version: targetVersion,

@@ -6,6 +6,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   getAppVersion: () => ipcRenderer.invoke('get-app-version'),
   restartAndInstallUpdate: () => ipcRenderer.invoke('restart-and-install-update'),
   relaunch: () => ipcRenderer.invoke('app-relaunch'),
+  emergencyHeal: () => ipcRenderer.invoke('emergency-heal'),
+  quitApp: () => ipcRenderer.invoke('app-quit'),
   printSilent: (html) => ipcRenderer.invoke('print-silent', html),
   saveStatementPdf: (data) => ipcRenderer.invoke('save-statement-pdf', data),
   onUpdateAvailable: (callback) => {

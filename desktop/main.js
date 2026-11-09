@@ -1,5 +1,5 @@
 const { app, BrowserWindow, ipcMain, globalShortcut, dialog, shell } = require('electron');
-const { spawn } = require('child_process');
+const { spawn, execSync } = require('child_process');
 const path = require('path');
 const fs = require('fs');
 const http = require('http');
@@ -137,7 +137,162 @@ function getServerScript() {
   return path.join(__dirname, '..', 'server', 'index.js');
 }
 
+function killProcessOnPort(port) {
+  if (process.platform !== 'win32') return;
+  try {
+    const out = execSync(`netstat -ano | findstr :${port}`, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] });
+    const lines = out.split('\n');
+    for (const line of lines) {
+      if (line.includes('LISTENING')) {
+        const parts = line.trim().split(/\s+/);
+        const pid = parts[parts.length - 1];
+        if (pid && pid !== '0' && pid !== String(process.pid)) {
+          debugLog(`[Process Guard] Terminating zombie process PID ${pid} holding port ${port}...`);
+          try {
+            execSync(`taskkill /F /PID ${pid} /T`, { stdio: 'ignore' });
+          } catch (e) {}
+        }
+      }
+    }
+  } catch (e) {}
+}
+
+const EMERGENCY_FALLBACK_HTML = `
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <title>سريع وبنشر PRO - درع التشغيل الآمن</title>
+  <style>
+    body {
+      background-color: #070b14;
+      color: #f1f5f9;
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, Tahoma, sans-serif;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      height: 100vh;
+      margin: 0;
+      user-select: none;
+    }
+    .card {
+      background: #0f172a;
+      border: 1px solid rgba(245, 158, 11, 0.3);
+      box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.7);
+      border-radius: 24px;
+      padding: 36px 40px;
+      max-width: 520px;
+      text-align: center;
+    }
+    h2 {
+      margin: 0 0 10px;
+      color: #f59e0b;
+      font-size: 24px;
+      font-weight: 900;
+    }
+    p {
+      color: #94a3b8;
+      font-size: 14px;
+      line-height: 1.6;
+      margin: 0 0 24px;
+    }
+    .btn-group {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+    button {
+      padding: 13px 20px;
+      border-radius: 14px;
+      font-weight: bold;
+      font-size: 14px;
+      cursor: pointer;
+      border: none;
+      transition: all 0.2s;
+    }
+    .btn-primary {
+      background: linear-gradient(135deg, #f59e0b, #d97706);
+      color: #020617;
+    }
+    .btn-primary:hover {
+      background: #f59e0b;
+      transform: scale(0.99);
+    }
+    .btn-secondary {
+      background: #1e293b;
+      color: #e2e8f0;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+    }
+    .btn-secondary:hover {
+      background: #334155;
+    }
+    .spinner {
+      display: inline-block;
+      width: 32px;
+      height: 32px;
+      border: 3px solid rgba(245,158,11,0.2);
+      border-radius: 50%;
+      border-top-color: #f59e0b;
+      animation: spin 1s ease-in-out infinite;
+      margin-bottom: 16px;
+    }
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="spinner"></div>
+    <h2>سريع وبنشر PRO</h2>
+    <p id="msg">جاري تشغيل محرك النظام وتأمين قاعدة البيانات... يرجى الانتظار ثوانٍ معدودة.</p>
+    <div class="btn-group">
+      <button class="btn-primary" onclick="retryConnection()">إعادة المحاولة والاتصال 🔄</button>
+      <button class="btn-secondary" onclick="emergencyHeal()">إصلاح تلقائي وتحرير المنفذ 🛠️</button>
+      <button class="btn-secondary" onclick="toggleWindowMode()">تبديل إلى نافذة عادية / ملء الشاشة 🪟</button>
+      <button class="btn-secondary" style="color: #f87171;" onclick="closeApp()">إغلاق البرنامج ✕</button>
+    </div>
+  </div>
+  <script>
+    function retryConnection() {
+      document.getElementById('msg').innerText = 'جاري الاتصال بالنظام...';
+      setTimeout(() => location.reload(), 800);
+    }
+    function emergencyHeal() {
+      document.getElementById('msg').innerText = 'جاري تحرير المنافذ وإعادة تشغيل المحرك...';
+      if (window.electronAPI && window.electronAPI.emergencyHeal) {
+        window.electronAPI.emergencyHeal().then(() => {
+          setTimeout(() => location.reload(), 1500);
+        });
+      } else {
+        location.reload();
+      }
+    }
+    function toggleWindowMode() {
+      if (window.electronAPI && window.electronAPI.toggleKiosk) {
+        window.electronAPI.toggleKiosk();
+      }
+    }
+    function closeApp() {
+      if (window.electronAPI && window.electronAPI.quitApp) {
+        window.electronAPI.quitApp();
+      } else {
+        window.close();
+      }
+    }
+    setInterval(() => {
+      fetch('http://127.0.0.1:5000/api/health')
+        .then(r => { if (r.ok) location.href = 'http://127.0.0.1:5000'; })
+        .catch(() => {});
+    }, 2500);
+  </script>
+</body>
+</html>
+`;
+
 function startBackendServer() {
+  const PORT = process.env.PORT || 5000;
+  killProcessOnPort(PORT);
   const nodeExe = getNodeExecutable();
   const serverScript = getServerScript();
   const serverDir = path.dirname(serverScript);
@@ -216,6 +371,7 @@ async function createMainWindow() {
     height: 800,
     minWidth: 1024,
     minHeight: 700,
+    backgroundColor: '#070b14', // STRICT: Dark canvas preventing white screen on boot/load
     kiosk: true, // Full Kiosk Mode for touchscreens
     fullscreen: true,
     autoHideMenuBar: true,
@@ -228,15 +384,29 @@ async function createMainWindow() {
     },
   });
 
-  // Load backend-served production React app
   const appUrl = `http://127.0.0.1:${PORT}`;
-  mainWindow.loadURL(appUrl);
+  let loadFailCount = 0;
+
+  if (serverReady) {
+    mainWindow.loadURL(appUrl);
+  } else {
+    debugLog('Server health-check timed out, displaying Emergency Recovery Canvas...');
+    mainWindow.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(EMERGENCY_FALLBACK_HTML)}`);
+  }
 
   mainWindow.webContents.on('did-fail-load', (event, errorCode, errorDescription, validatedURL) => {
-    debugLog(`[Desktop Window] URL load retry: ${validatedURL} (${errorCode} - ${errorDescription})`);
-    setTimeout(() => {
-      if (mainWindow) mainWindow.loadURL(appUrl);
-    }, 1500);
+    debugLog(`[Desktop Window] URL load failed: ${validatedURL} (${errorCode} - ${errorDescription})`);
+    loadFailCount++;
+    if (loadFailCount >= 3) {
+      debugLog('Multiple load failures, loading Emergency Recovery Canvas...');
+      if (mainWindow) {
+        mainWindow.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(EMERGENCY_FALLBACK_HTML)}`);
+      }
+    } else {
+      setTimeout(() => {
+        if (mainWindow) mainWindow.loadURL(appUrl);
+      }, 1500);
+    }
   });
 
   // Toggle Kiosk via F11 shortcut (for manager convenience)
@@ -300,10 +470,48 @@ ipcMain.handle('restart-and-install-update', () => {
   }
 });
 
-ipcMain.handle('app-relaunch', () => {
+ipcMain.handle('emergency-heal', async () => {
+  debugLog('[Emergency Heal] Requested by UI. Restarting sidecar process...');
+  const PORT = process.env.PORT || 5000;
+  if (backendProcess) {
+    try { backendProcess.kill(); } catch (e) {}
+    backendProcess = null;
+  }
+  killProcessOnPort(PORT);
+  const { session } = require('electron');
+  if (session && session.defaultSession) {
+    try { await session.defaultSession.clearCache(); } catch (e) {}
+  }
+  startBackendServer();
+  return true;
+});
+
+ipcMain.handle('app-quit', () => {
+  debugLog('[App] Quit requested.');
+  const PORT = process.env.PORT || 5000;
+  if (backendProcess) {
+    try { backendProcess.kill(); } catch (e) {}
+  }
+  killProcessOnPort(PORT);
+  app.quit();
+});
+
+ipcMain.handle('app-relaunch', async () => {
   debugLog('[App] Restarting application after hot-patch update...');
+  const PORT = process.env.PORT || 5000;
+  try {
+    if (backendProcess) {
+      backendProcess.kill();
+      backendProcess = null;
+    }
+    killProcessOnPort(PORT);
+    const { session } = require('electron');
+    if (session && session.defaultSession) {
+      await session.defaultSession.clearCache();
+    }
+  } catch (e) {}
   app.relaunch();
-  app.exit(0);
+  app.quit();
 });
 
 ipcMain.handle('print-silent', async (_event, htmlContent) => {

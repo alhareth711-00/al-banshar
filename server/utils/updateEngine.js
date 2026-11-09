@@ -153,6 +153,10 @@ const updateEngine = {
       if (fs.existsSync(clientDistSource)) {
         console.log('[UpdateEngine] Updating frontend assets (client/dist)...');
         copyDirSafely(clientDistSource, CLIENT_DIST_DIR);
+        const appClientDist = path.join(ROOT_DIR, 'app', 'client', 'dist');
+        if (fs.existsSync(appClientDist) && appClientDist !== CLIENT_DIST_DIR) {
+          copyDirSafely(clientDistSource, appClientDist);
+        }
       }
 
       // 7. Replace Server Code if present in package
@@ -160,6 +164,25 @@ const updateEngine = {
       if (fs.existsSync(serverSource)) {
         console.log('[UpdateEngine] Updating backend server modules...');
         copyDirSafely(serverSource, SERVER_DIR, protectedPaths);
+        const appServer = path.join(ROOT_DIR, 'app', 'server');
+        if (fs.existsSync(appServer) && appServer !== SERVER_DIR) {
+          copyDirSafely(serverSource, appServer, protectedPaths);
+        }
+      }
+
+      // 7b. Replace Desktop Code if present in package
+      const desktopSource = path.join(tempExtractDir, 'desktop');
+      if (fs.existsSync(desktopSource)) {
+        console.log('[UpdateEngine] Updating desktop shell modules...');
+        const desktopTargets = [
+          path.join(ROOT_DIR, 'app', 'desktop'),
+          path.join(ROOT_DIR, 'desktop'),
+        ];
+        for (const dt of desktopTargets) {
+          if (fs.existsSync(dt)) {
+            copyDirSafely(desktopSource, dt);
+          }
+        }
       }
 
       // 8. Run Safe Idempotent Database Migrations
