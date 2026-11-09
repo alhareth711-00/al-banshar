@@ -199,7 +199,7 @@ export default function SettingsModal({ isOpen, onClose, onSettingsUpdated }) {
       setUpdateFeedback({ text: 'يرجى اختيار ملف التحديث (.zip) أولاً', type: 'error' });
       return;
     }
-    if (updateConfirmWord !== 'تحديث') {
+    if (updateConfirmWord.trim() !== 'تحديث') {
       setUpdateFeedback({ text: 'يرجى كتابة كلمة "تحديث" بدقة لتأكيد العملية', type: 'error' });
       return;
     }
@@ -1431,7 +1431,7 @@ export default function SettingsModal({ isOpen, onClose, onSettingsUpdated }) {
 
                   <button
                     type="button"
-                    disabled={isApplyingUpdate || updateConfirmWord !== 'تحديث'}
+                    disabled={isApplyingUpdate || updateConfirmWord.trim() !== 'تحديث'}
                     onClick={handleApplySoftwareUpdate}
                     className="w-full min-h-[42px] rounded-xl bg-indigo-600 hover:bg-indigo-500 disabled:opacity-40 text-white font-black text-xs shadow-lg shadow-indigo-600/30 flex items-center justify-center gap-2 transition active:scale-95"
                   >

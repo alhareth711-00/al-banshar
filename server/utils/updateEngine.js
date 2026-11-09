@@ -17,6 +17,22 @@ function ensureDataDir() {
   }
 }
 
+function copyFileWithRetry(src, dest, maxRetries = 3) {
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      fs.copyFileSync(src, dest);
+      return;
+    } catch (err) {
+      if ((err.code === 'EBUSY' || err.code === 'EPERM') && attempt < maxRetries) {
+        const waitTill = Date.now() + 150;
+        while (Date.now() < waitTill) {}
+      } else {
+        throw err;
+      }
+    }
+  }
+}
+
 /**
  * Recursively copies directory contents with protected path guards
  */
@@ -46,7 +62,7 @@ function copyDirSafely(src, dest, protectedPaths = []) {
     if (entry.isDirectory()) {
       copyDirSafely(srcPath, destPath, protectedPaths);
     } else {
-      fs.copyFileSync(srcPath, destPath);
+      copyFileWithRetry(srcPath, destPath);
     }
   }
 }
@@ -107,9 +123,11 @@ const updateEngine = {
           timeout: 45000,
         });
       } catch (extractErr) {
-        // Fallback to native Windows PowerShell Expand-Archive
+        // Fallback to native Windows PowerShell Expand-Archive with UTF8 & execution bypass
         try {
-          execSync(`powershell -NoProfile -Command "Expand-Archive -LiteralPath '${tempZipPath}' -DestinationPath '${tempExtractDir}' -Force"`, {
+          const safeZip = tempZipPath.replace(/'/g, "''");
+          const safeDest = tempExtractDir.replace(/'/g, "''");
+          execSync(`powershell -NoProfile -NonInteractive -ExecutionPolicy Bypass -Command "[Console]::OutputEncoding = [System.Text.Encoding]::UTF8; Expand-Archive -LiteralPath '${safeZip}' -DestinationPath '${safeDest}' -Force"`, {
             windowsHide: true,
             timeout: 60000,
           });

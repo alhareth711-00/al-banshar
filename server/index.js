@@ -291,13 +291,22 @@ try {
     const { initPrinterSelfHealing } = require('./utils/printerSelfHealer');
     initPrinterSelfHealing();
   } catch (e) {}
-  const serverInstance = app.listen(PORT, () => {
-    console.log(`🚀 Quick Lube POS Backend running on http://localhost:${PORT}`);
-    console.log(`📡 Ready for Phase 1 endpoints testing`);
-  });
-  serverInstance.on('error', (err) => {
-    console.error('⚠️ Server listener error:', err.message);
-  });
+  function startListening(retriesLeft = 6) {
+    const serverInstance = app.listen(PORT, () => {
+      console.log(`🚀 Quick Lube POS Backend running on http://localhost:${PORT}`);
+      console.log(`📡 Ready for Phase 1 endpoints testing`);
+    });
+    serverInstance.on('error', (err) => {
+      if (err.code === 'EADDRINUSE' && retriesLeft > 0) {
+        console.warn(`[Server] Port ${PORT} temporarily busy, retrying in 600ms... (${retriesLeft} retries remaining)`);
+        setTimeout(() => startListening(retriesLeft - 1), 600);
+      } else {
+        console.error('⚠️ Server listener fatal error:', err.message);
+      }
+    });
+    return serverInstance;
+  }
+  startListening();
 } catch (err) {
   console.error('Failed to start server:', err);
   try {
