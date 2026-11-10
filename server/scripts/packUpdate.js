@@ -236,9 +236,29 @@ async function main() {
     if (fs.existsSync(projectZipPath)) fs.unlinkSync(projectZipPath);
     if (desktopZipPath && fs.existsSync(desktopZipPath)) fs.unlinkSync(desktopZipPath);
 
-    // PowerShell Compress-Archive command
-    const psCmd = `powershell -NoProfile -Command "Compress-Archive -Path '${stagingDir}\\*' -DestinationPath '${projectZipPath}' -CompressionLevel Optimal -Force"`;
-    execSync(psCmd, { stdio: 'pipe' });
+    // Compress using pure Node.js archiver
+    await new Promise((resolve, reject) => {
+      try {
+        const archiver = require('archiver');
+        const output = fs.createWriteStream(projectZipPath);
+        const archive = archiver('zip', { zlib: { level: 9 } });
+
+        output.on('close', resolve);
+        archive.on('error', reject);
+        archive.pipe(output);
+        archive.directory(stagingDir, false);
+        archive.finalize();
+      } catch (archiverErr) {
+        // Fallback to PowerShell if archiver fails
+        try {
+          const psCmd = `powershell -NoProfile -Command "Compress-Archive -Path '${stagingDir}\\*' -DestinationPath '${projectZipPath}' -CompressionLevel Optimal -Force"`;
+          execSync(psCmd, { stdio: 'pipe' });
+          resolve();
+        } catch (psErr) {
+          reject(psErr);
+        }
+      }
+    });
 
     if (desktopZipPath) {
       fs.copyFileSync(projectZipPath, desktopZipPath);

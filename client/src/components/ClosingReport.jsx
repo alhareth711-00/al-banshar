@@ -961,6 +961,11 @@ export default function ClosingReport({ onOpenBayProfitability }) {
             height: auto !important;
             min-height: auto !important;
             overflow: visible !important;
+            width: ${printLayout === 'thermal80' ? '72mm' : '100%'} !important;
+            max-width: ${printLayout === 'thermal80' ? '72mm' : '100%'} !important;
+            direction: ${printLayout === 'thermal80' ? 'ltr !important' : 'rtl'};
+            -webkit-print-color-adjust: exact;
+            print-color-adjust: exact;
           }
           body * {
             visibility: hidden !important;
@@ -971,12 +976,11 @@ export default function ClosingReport({ onOpenBayProfitability }) {
           .closing-printable-area {
             position: absolute !important;
             left: 0 !important;
-            right: 0 !important;
             top: 0 !important;
-            width: 100% !important;
-            max-width: 100% !important;
+            width: ${printLayout === 'thermal80' ? '72mm' : '100%'} !important;
+            max-width: ${printLayout === 'thermal80' ? '72mm' : '100%'} !important;
             margin: 0 !important;
-            padding: ${printLayout === 'thermal80' ? '4px 1mm 12px 1mm' : '10mm'} !important;
+            padding: ${printLayout === 'thermal80' ? '4px 3mm 12px 3mm' : '10mm'} !important;
             background: #ffffff !important;
             color: #000000 !important;
             box-shadow: none !important;
@@ -986,6 +990,9 @@ export default function ClosingReport({ onOpenBayProfitability }) {
             max-height: none !important;
             overflow: visible !important;
             z-index: 999999 !important;
+            direction: rtl !important;
+            text-align: right;
+            box-sizing: border-box !important;
           }
           .fixed, .overflow-hidden, .overflow-y-auto {
             position: static !important;

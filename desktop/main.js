@@ -526,6 +526,9 @@ ipcMain.handle('print-silent', async (_event, htmlContent) => {
 
     await printWindow.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(htmlContent)}`);
 
+    // Give layout engine 200ms to compute CSS and font metrics accurately
+    await new Promise((r) => setTimeout(r, 200));
+
     return new Promise((resolve) => {
       printWindow.webContents
         .getPrintersAsync()
@@ -543,10 +546,15 @@ ipcMain.handle('print-silent', async (_event, htmlContent) => {
 
           debugLog(`[Silent Print] Target printer selected: ${targetPrinter?.name || 'System Default'}`);
 
+          const is58 = htmlContent.includes('48mm') || htmlContent.includes('58mm');
           const printOptions = {
             silent: true,
             printBackground: true,
             margins: { marginType: 'none' },
+            pageSize: {
+              width: is58 ? 48000 : 72000, // microns (72mm = 72,000 microns)
+              height: 297000,              // microns (297mm standard thermal continuous page)
+            },
           };
 
           if (targetPrinter?.name) {

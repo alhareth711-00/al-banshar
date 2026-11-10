@@ -14,7 +14,16 @@ function initPrinterSelfHealing() {
   setTimeout(() => {
     try {
       const psCommand = `
-        $thermalPrinters = Get-Printer | Where-Object { $_.Name -like "*TD80*" -or $_.Name -like "*POS-80*" -or $_.Name -like "*XP-80*" }
+        $thermalPrinters = Get-Printer | Where-Object { 
+          $_.Name -like "*TD80*" -or 
+          $_.Name -like "*POS-80*" -or 
+          $_.Name -like "*XP-80*" -or 
+          $_.Name -like "*POS80*" -or 
+          $_.Name -like "*Thermal*" -or 
+          $_.Name -like "*Receipt*" -or 
+          $_.Name -like "*Xprinter*" -or 
+          ($_.Default -eq $true -and $_.Name -notlike "*PDF*" -and $_.Name -notlike "*XPS*" -and $_.Name -notlike "*OneNote*" -and $_.Name -notlike "*Fax*")
+        }
         foreach ($p in $thermalPrinters) {
           try {
             # 1. Reset WorkOffline if accidentally stuck
@@ -23,14 +32,20 @@ function initPrinterSelfHealing() {
               Set-CimInstance -Query "Select * From Win32_Printer Where Name='$($p.Name)'" -Property @{WorkOffline = $false} -ErrorAction SilentlyContinue
             }
 
-            # 2. Check and fix paper size to 80mm roll (72mm printable) if locked to 48mm
+            # 2. Check and fix paper size to 80mm roll (72mm printable) if locked to 48mm or wide Letter/A4
             $cfg = Get-PrintConfiguration -PrinterName $p.Name -ErrorAction SilentlyContinue
             if ($cfg -and $cfg.PrintTicketXML) {
               [xml]$ticket = $cfg.PrintTicketXML
               $feature = $ticket.PrintTicket.Feature | Where-Object { $_.name -eq "psk:PageMediaSize" }
               
-              if ($feature -and ($feature.InnerXml -like "*CUSTOMSIZE*" -or $feature.InnerXml -like "*58_x_*")) {
-                $feature.InnerXml = '<psf:Option name="ns0000:Paper_80_x_297"><psf:ScoredProperty name="psk:MediaSizeWidth"><psf:Value xsi:type="xsd:integer">71946</psf:Value></psf:ScoredProperty><psf:ScoredProperty name="psk:MediaSizeHeight"><psf:Value xsi:type="xsd:integer">296917</psf:Value></psf:ScoredProperty></psf:Option>'
+              if ($feature -and ($feature.InnerXml -like "*CUSTOMSIZE*" -or $feature.InnerXml -like "*58_x_*" -or $feature.InnerXml -like "*Letter*" -or $feature.InnerXml -like "*ISOA4*")) {
+                $nsAttr = $ticket.PrintTicket.Attributes | Where-Object { $_.Name -like "xmlns:ns*" } | Select-Object -First 1
+                $prefix = if ($nsAttr) { $nsAttr.LocalName } else { "ns0000" }
+                if (-not $nsAttr) {
+                  $ticket.PrintTicket.SetAttribute("xmlns:ns0000", "http://schemas.microsoft.com/windows/printing/oemdriverpt/")
+                }
+                $optName = "$($prefix):Paper_80_x_297"
+                $feature.InnerXml = "<psf:Option name=`"$optName`"><psf:ScoredProperty name=`"psk:MediaSizeWidth`"><psf:Value xsi:type=`"xsd:integer`">71946</psf:Value></psf:ScoredProperty><psf:ScoredProperty name=`"psk:MediaSizeHeight`"><psf:Value xsi:type=`"xsd:integer`">296917</psf:Value></psf:ScoredProperty></psf:Option>"
                 
                 $toRemove = @()
                 foreach ($pi in $ticket.PrintTicket.ParameterInit) {

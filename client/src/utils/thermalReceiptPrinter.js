@@ -1,4 +1,4 @@
-import { getShopSettings } from './settings';
+import { getShopSettings } from './settings.js';
 
 /**
  * Generate clean, self-contained HTML for an 80mm or 58mm Thermal Receipt
@@ -38,15 +38,15 @@ export function generateThermalReceiptHtml(invoice, customSettings = null) {
     .map(
       (it) => `
       <tr style="border-bottom: 1px dashed #555;">
-        <td style="padding: 6px 0; text-align: right; font-weight: bold; font-size: ${is58mm ? '12px' : '14px'}; line-height: 1.25;">${it.description}</td>
-        <td style="padding: 6px 0; text-align: center; font-weight: 900; font-size: ${is58mm ? '12px' : '14px'};">${it.qty}</td>
-        <td style="padding: 6px 0; text-align: left; font-weight: 900; font-size: ${is58mm ? '12px' : '14px'};">${Number(it.qty * it.unit_price).toLocaleString()}</td>
+        <td style="padding: 6px 2px; text-align: right; font-weight: bold; font-size: ${is58mm ? '12px' : '14px'}; line-height: 1.25;">${it.description}</td>
+        <td style="padding: 6px 2px; text-align: center; font-weight: 900; font-size: ${is58mm ? '12px' : '14px'};">${it.qty}</td>
+        <td style="padding: 6px 2px; text-align: left; font-weight: 900; font-size: ${is58mm ? '12px' : '14px'};">${Number(it.qty * it.unit_price).toLocaleString()}</td>
       </tr>`
     )
     .join('');
 
   return `<!DOCTYPE html>
-<html dir="rtl" lang="ar">
+<html lang="ar">
 <head>
   <meta charset="utf-8">
   <title>فاتورة #${invoice.invoice_number}</title>
@@ -61,8 +61,8 @@ export function generateThermalReceiptHtml(invoice, customSettings = null) {
       padding: 0;
     }
     html, body {
-      width: 100% !important;
-      max-width: 100% !important;
+      width: ${widthCss} !important;
+      max-width: ${widthCss} !important;
       margin: 0 !important;
       padding: 0 !important;
       font-family: 'Segoe UI', Tahoma, 'Cairo', Arial, sans-serif;
@@ -70,13 +70,18 @@ export function generateThermalReceiptHtml(invoice, customSettings = null) {
       line-height: 1.35;
       color: #000;
       background: #fff;
-      direction: rtl;
+      direction: ltr !important; /* Fixed left-origin anchor prevents RTL wide-spooler shifting */
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
     }
     .receipt-container {
-      width: 100% !important;
-      max-width: 100% !important;
-      padding: 4px 0 16px 0 !important;
+      width: ${widthCss} !important;
+      max-width: ${widthCss} !important;
+      margin: 0 !important;
+      padding: 4px ${is58mm ? '1.5mm' : '3mm'} 16px ${is58mm ? '1.5mm' : '3mm'} !important;
       box-sizing: border-box !important;
+      direction: rtl !important;
+      text-align: right;
     }
     .header {
       text-align: center;
@@ -97,6 +102,11 @@ export function generateThermalReceiptHtml(invoice, customSettings = null) {
       margin-top: 3px;
       font-size: ${is58mm ? '12px' : '14px'};
       font-weight: bold;
+      gap: 4px;
+      word-break: break-word;
+    }
+    .meta-row > span {
+      flex-shrink: 0;
     }
     .meta-section {
       padding: 4px 0 6px 0;
@@ -118,13 +128,19 @@ export function generateThermalReceiptHtml(invoice, customSettings = null) {
       table-layout: fixed;
       border-collapse: collapse;
       margin: 6px 0;
+      word-break: break-word;
     }
     th {
       border-top: 1.5px solid #000;
       border-bottom: 1.5px solid #000;
-      padding: 5px 0;
+      padding: 5px 2px;
       font-weight: 900;
       font-size: ${is58mm ? '12px' : '14.5px'};
+      word-break: break-word;
+    }
+    td {
+      word-break: break-word;
+      overflow-wrap: break-word;
     }
     .totals-section {
       padding: 6px 0;
@@ -314,7 +330,7 @@ export async function printHtmlContentSilently(html) {
         iframe.contentDocument.write(html);
         iframe.contentDocument.close();
 
-        // Allow styling to compute before printing
+        // Allow styling and layout to compute before printing
         setTimeout(() => {
           try {
             iframe.contentWindow.focus();
@@ -323,7 +339,7 @@ export async function printHtmlContentSilently(html) {
             console.log('[Browser Silent Print fallback notice]:', e);
           }
           resolve({ success: true });
-        }, 150);
+        }, 250);
       } catch (err) {
         console.log('[Silent Print fallback handled safely]:', err);
         resolve({ success: false, error: err.message });

@@ -125,7 +125,7 @@ export function generateStocktakeHtml(items, customSettings = null, layout = 'th
     .join('');
 
   return `<!DOCTYPE html>
-<html dir="rtl" lang="ar">
+<html lang="ar">
 <head>
   <meta charset="utf-8" />
   <title>كشف الجرد الفعلي - 80mm</title>
@@ -135,17 +135,28 @@ export function generateStocktakeHtml(items, customSettings = null, layout = 'th
       size: 72mm 297mm;
     }
     * { box-sizing: border-box; margin: 0; padding: 0; }
-    body {
-      width: 100% !important;
-      max-width: 100% !important;
+    html, body {
+      width: 72mm !important;
+      max-width: 72mm !important;
       margin: 0 !important;
-      padding: 4px 1mm 16px 1mm !important;
+      padding: 0 !important;
       font-family: 'Segoe UI', Tahoma, 'Cairo', Arial, sans-serif;
       font-size: 13px;
       line-height: 1.35;
       color: #000;
       background: #fff;
-      direction: rtl;
+      direction: ltr !important;
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+    }
+    .receipt-container {
+      width: 72mm !important;
+      max-width: 72mm !important;
+      margin: 0 !important;
+      padding: 4px 3mm 16px 3mm !important;
+      box-sizing: border-box !important;
+      direction: rtl !important;
+      text-align: right;
     }
     .header {
       text-align: center;
@@ -181,6 +192,7 @@ export function generateStocktakeHtml(items, customSettings = null, layout = 'th
   </style>
 </head>
 <body>
+  <div class="receipt-container">
   <div class="header">
     <div class="shop-name">${escapeHtml(settings.shopName)}</div>
     <div style="font-size: 12px; font-weight: bold; margin-top: 2px;">${escapeHtml(settings.address || '')}</div>
@@ -201,6 +213,7 @@ export function generateStocktakeHtml(items, customSettings = null, layout = 'th
     <div style="font-size: 10px; color: #555; margin-top: 6px; font-mono;">
       نظام سريع وبنشر PRO &bull; ${new Date().toLocaleTimeString('ar-YE')}
     </div>
+  </div>
   </div>
 </body>
 </html>`;
@@ -343,7 +356,7 @@ export function generateConsignmentAuditHtml(settlementData, customSettings = nu
     .join('');
 
   return `<!DOCTYPE html>
-<html dir="rtl" lang="ar">
+<html lang="ar">
 <head>
   <meta charset="utf-8" />
   <title>كشف بضاعة الأمانات - 80mm</title>
@@ -353,17 +366,28 @@ export function generateConsignmentAuditHtml(settlementData, customSettings = nu
       size: 72mm 297mm;
     }
     * { box-sizing: border-box; margin: 0; padding: 0; }
-    body {
-      width: 100% !important;
-      max-width: 100% !important;
+    html, body {
+      width: 72mm !important;
+      max-width: 72mm !important;
       margin: 0 !important;
-      padding: 4px 1mm 16px 1mm !important;
+      padding: 0 !important;
       font-family: 'Segoe UI', Tahoma, 'Cairo', Arial, sans-serif;
       font-size: 13px;
       line-height: 1.35;
       color: #000;
       background: #fff;
-      direction: rtl;
+      direction: ltr !important;
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+    }
+    .receipt-container {
+      width: 72mm !important;
+      max-width: 72mm !important;
+      margin: 0 !important;
+      padding: 4px 3mm 16px 3mm !important;
+      box-sizing: border-box !important;
+      direction: rtl !important;
+      text-align: right;
     }
     .header {
       text-align: center;
@@ -402,6 +426,7 @@ export function generateConsignmentAuditHtml(settlementData, customSettings = nu
   </style>
 </head>
 <body>
+  <div class="receipt-container">
   <div class="header">
     <div class="shop-name">${escapeHtml(settings.shopName)}</div>
     <div style="font-size: 12px; font-weight: bold; margin-top: 2px;">${escapeHtml(settings.address || '')}</div>
@@ -428,6 +453,7 @@ export function generateConsignmentAuditHtml(settlementData, customSettings = nu
     <div style="font-size: 10px; color: #555; margin-top: 6px; font-mono;">
       نظام سريع وبنشر PRO &bull; ${new Date().toLocaleTimeString('ar-YE')}
     </div>
+  </div>
   </div>
 </body>
 </html>`;
@@ -538,9 +564,10 @@ export function generateBarcodeLabelsHtml(item, copies = 1, labelSize = '80mm', 
 
   const isSheet = labelSize === 'sheet';
   const isDedicatedLabel = labelSize === '50x25';
+  const labelRollWidth = isDedicatedLabel ? '50mm' : '72mm';
 
   return `<!DOCTYPE html>
-<html dir="rtl" lang="ar">
+<html lang="ar">
 <head>
   <meta charset="utf-8" />
   <title>ملصقات باركود - ${escapeHtml(item.name)}</title>
@@ -550,16 +577,23 @@ export function generateBarcodeLabelsHtml(item, copies = 1, labelSize = '80mm', 
       size: ${isSheet ? 'A4 portrait' : isDedicatedLabel ? '50mm 25mm' : '72mm 297mm'};
     }
     * { box-sizing: border-box; margin: 0; padding: 0; }
-    body {
+    html, body {
       background: #fff;
       color: #000;
-      direction: rtl;
+      direction: ${isSheet ? 'rtl' : 'ltr !important'};
       font-family: 'Segoe UI', Tahoma, 'Cairo', Arial, sans-serif;
       margin: 0 !important;
-      padding: ${isSheet ? '10mm' : '2mm 1mm'} !important;
-      width: 100% !important;
+      padding: ${isSheet ? '10mm' : '0'} !important;
+      width: ${isSheet ? '100%' : labelRollWidth} !important;
+      max-width: ${isSheet ? '100%' : labelRollWidth} !important;
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
     }
     .container {
+      width: ${isSheet ? '100%' : labelRollWidth} !important;
+      max-width: ${isSheet ? '100%' : labelRollWidth} !important;
+      direction: rtl !important;
+      padding: ${isSheet ? '0' : '2mm 1mm'} !important;
       display: flex;
       flex-wrap: wrap;
       justify-content: center;
@@ -755,23 +789,35 @@ export function generateReorderSheetHtml(reorderData, customSettings = null, lay
     .join('');
 
   return `<!DOCTYPE html>
-<html dir="rtl" lang="ar">
+<html lang="ar">
 <head>
   <meta charset="utf-8" />
   <title>كشف نواقص البضاعة - 80mm</title>
   <style>
     @page { margin: 0 !important; size: 72mm 297mm; }
     * { box-sizing: border-box; margin: 0; padding: 0; }
-    body {
-      width: 100% !important;
+    html, body {
+      width: 72mm !important;
+      max-width: 72mm !important;
       margin: 0 !important;
-      padding: 4px 1mm 16px 1mm !important;
+      padding: 0 !important;
       font-family: 'Segoe UI', Tahoma, 'Cairo', Arial, sans-serif;
       font-size: 13px;
       line-height: 1.35;
       color: #000;
       background: #fff;
-      direction: rtl;
+      direction: ltr !important;
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+    }
+    .receipt-container {
+      width: 72mm !important;
+      max-width: 72mm !important;
+      margin: 0 !important;
+      padding: 4px 3mm 16px 3mm !important;
+      box-sizing: border-box !important;
+      direction: rtl !important;
+      text-align: right;
     }
     .header { text-align: center; padding-bottom: 6px; border-bottom: 2.5px solid #000; margin-bottom: 6px; }
     .shop-name { font-size: 20px; font-weight: 900; line-height: 1.2; }
@@ -781,6 +827,7 @@ export function generateReorderSheetHtml(reorderData, customSettings = null, lay
   </style>
 </head>
 <body>
+  <div class="receipt-container">
   <div class="header">
     <div class="shop-name">${escapeHtml(settings.shopName)}</div>
     <div style="font-size: 12px; font-weight: bold; margin-top: 2px;">${escapeHtml(settings.address || '')}</div>
@@ -809,6 +856,7 @@ export function generateReorderSheetHtml(reorderData, customSettings = null, lay
     <div style="font-size: 10px; color: #555; margin-top: 6px; font-mono;">
       نظام سريع وبنشر PRO &bull; ${new Date().toLocaleTimeString('ar-YE')}
     </div>
+  </div>
   </div>
 </body>
 </html>`;
@@ -968,23 +1016,35 @@ export function generateInventoryValuationHtml(valuationData, inventory = [], cu
     .join('');
 
   return `<!DOCTYPE html>
-<html dir="rtl" lang="ar">
+<html lang="ar">
 <head>
   <meta charset="utf-8" />
   <title>تقييم رأس المال المخزني - 80mm</title>
   <style>
     @page { margin: 0 !important; size: 72mm 297mm; }
     * { box-sizing: border-box; margin: 0; padding: 0; }
-    body {
-      width: 100% !important;
+    html, body {
+      width: 72mm !important;
+      max-width: 72mm !important;
       margin: 0 !important;
-      padding: 4px 1mm 16px 1mm !important;
+      padding: 0 !important;
       font-family: 'Segoe UI', Tahoma, 'Cairo', Arial, sans-serif;
       font-size: 13px;
       line-height: 1.35;
       color: #000;
       background: #fff;
-      direction: rtl;
+      direction: ltr !important;
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+    }
+    .receipt-container {
+      width: 72mm !important;
+      max-width: 72mm !important;
+      margin: 0 !important;
+      padding: 4px 3mm 16px 3mm !important;
+      box-sizing: border-box !important;
+      direction: rtl !important;
+      text-align: right;
     }
     .header { text-align: center; padding-bottom: 6px; border-bottom: 2.5px solid #000; margin-bottom: 6px; }
     .shop-name { font-size: 20px; font-weight: 900; line-height: 1.2; }
@@ -994,6 +1054,7 @@ export function generateInventoryValuationHtml(valuationData, inventory = [], cu
   </style>
 </head>
 <body>
+  <div class="receipt-container">
   <div class="header">
     <div class="shop-name">${escapeHtml(settings.shopName)}</div>
     <div style="font-size: 12px; font-weight: bold; margin-top: 2px;">${escapeHtml(settings.address || '')}</div>
@@ -1032,6 +1093,7 @@ export function generateInventoryValuationHtml(valuationData, inventory = [], cu
     <div style="font-size: 10px; color: #555; margin-top: 6px; font-mono;">
       نظام سريع وبنشر PRO &bull; ${new Date().toLocaleTimeString('ar-YE')}
     </div>
+  </div>
   </div>
 </body>
 </html>`;

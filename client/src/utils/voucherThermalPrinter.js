@@ -75,7 +75,7 @@ export function generateThermalVoucherHtml(voucher, customSettings = null) {
     : '';
 
   return `<!DOCTYPE html>
-<html dir="rtl" lang="ar">
+<html lang="ar">
 <head>
   <meta charset="utf-8">
   <title>${isReceipt ? 'سند قبض' : 'سند صرف'} #${voucher.voucher_number || ''}</title>
@@ -89,17 +89,28 @@ export function generateThermalVoucherHtml(voucher, customSettings = null) {
       margin: 0;
       padding: 0;
     }
-    body {
+    html, body {
       font-family: 'Cairo', 'Segoe UI Arabic', 'Tajawal', Tahoma, sans-serif;
-      width: 100% !important;
-      max-width: 100% !important;
+      width: ${widthCss} !important;
+      max-width: ${widthCss} !important;
       margin: 0 !important;
-      padding: 0 0 8px 0 !important;
+      padding: 0 !important;
       font-size: ${fontSizeCss};
       line-height: 1.35;
       color: #000;
       background: #fff;
-      direction: rtl;
+      direction: ltr !important;
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+    }
+    .voucher-container {
+      width: ${widthCss} !important;
+      max-width: ${widthCss} !important;
+      margin: 0 !important;
+      padding: 2px ${is58mm ? '1.5mm' : '3mm'} 12px ${is58mm ? '1.5mm' : '3mm'} !important;
+      box-sizing: border-box !important;
+      direction: rtl !important;
+      text-align: right;
     }
     .header {
       text-align: center;
@@ -221,6 +232,7 @@ export function generateThermalVoucherHtml(voucher, customSettings = null) {
   </style>
 </head>
 <body>
+  <div class="voucher-container">
   <div class="header">
     <div class="shop-name">${settings.shopName}</div>
     <!-- Compact single line for Address (Right) & Phone (Left) to save paper -->
@@ -308,6 +320,7 @@ export function generateThermalVoucherHtml(voucher, customSettings = null) {
   <div class="footer">
     <p>شكراً لتعاملكم معنا 🙏</p>
   </div>
+  </div>
 </body>
 </html>`;
 }
@@ -355,10 +368,10 @@ export async function printThermalVoucherSilently(voucher, customSettings = null
             iframe.contentWindow.focus();
             iframe.contentWindow.print();
           } catch (e) {
-            console.log('[Browser Voucher Print notice]:', e);
+            console.log('[Browser Silent Voucher Print fallback notice]:', e);
           }
           resolve({ success: true });
-        }, 150);
+        }, 250);
       } catch (err) {
         console.log('[Browser Voucher Print fallback error]:', err);
         resolve({ success: false, error: err.message });

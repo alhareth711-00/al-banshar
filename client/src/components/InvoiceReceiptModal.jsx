@@ -115,6 +115,11 @@ ${Number(invoice.scrap_battery_deduction) > 0 ? `🔹 خصم بدل بطارية
             padding: 0 !important;
             height: auto !important;
             overflow: visible !important;
+            direction: ltr !important;
+            width: ${is58mm ? '48mm' : '72mm'} !important;
+            max-width: ${is58mm ? '48mm' : '72mm'} !important;
+            -webkit-print-color-adjust: exact;
+            print-color-adjust: exact;
           }
           body * {
             visibility: hidden;
@@ -125,12 +130,11 @@ ${Number(invoice.scrap_battery_deduction) > 0 ? `🔹 خصم بدل بطارية
           .printable-area {
             position: absolute !important;
             left: 0 !important;
-            right: 0 !important;
             top: 0 !important;
-            width: 100% !important;
-            max-width: 100% !important;
+            width: ${is58mm ? '48mm' : '72mm'} !important;
+            max-width: ${is58mm ? '48mm' : '72mm'} !important;
             margin: 0 !important;
-            padding: 4px 1mm 12px 1mm !important;
+            padding: 4px ${is58mm ? '1.5mm' : '3mm'} 12px ${is58mm ? '1.5mm' : '3mm'} !important;
             background: #fff !important;
             color: #000 !important;
             box-shadow: none !important;
@@ -141,6 +145,9 @@ ${Number(invoice.scrap_battery_deduction) > 0 ? `🔹 خصم بدل بطارية
             overflow: visible !important;
             page-break-inside: auto !important;
             break-inside: auto !important;
+            direction: rtl !important;
+            text-align: right;
+            box-sizing: border-box !important;
             font-size: ${is58mm && activeTab === 'thermal' ? '11px' : 'inherit'};
             line-height: ${is58mm && activeTab === 'thermal' ? '1.2' : 'inherit'};
           }

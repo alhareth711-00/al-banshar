@@ -129,6 +129,11 @@ ${voucher.new_balance > 0 ? `⚖️ *الرصيد المتبقي:* ${Number(vouc
             height: auto !important;
             min-height: auto !important;
             overflow: visible !important;
+            width: ${printMode === 'thermal' ? '72mm' : '100%'} !important;
+            max-width: ${printMode === 'thermal' ? '72mm' : '100%'} !important;
+            direction: ${printMode === 'thermal' ? 'ltr !important' : 'rtl'};
+            -webkit-print-color-adjust: exact;
+            print-color-adjust: exact;
           }
           body * {
             visibility: hidden !important;
@@ -139,12 +144,11 @@ ${voucher.new_balance > 0 ? `⚖️ *الرصيد المتبقي:* ${Number(vouc
           .voucher-printable-area {
             position: absolute !important;
             left: 0 !important;
-            right: 0 !important;
             top: 0 !important;
-            width: 100% !important;
-            max-width: 100% !important;
+            width: ${printMode === 'thermal' ? '72mm' : '100%'} !important;
+            max-width: ${printMode === 'thermal' ? '72mm' : '100%'} !important;
             margin: 0 !important;
-            padding: ${printMode === 'thermal' ? '4px 1mm 12px 1mm' : '6mm'} !important;
+            padding: ${printMode === 'thermal' ? '4px 3mm 12px 3mm' : '6mm'} !important;
             background: #ffffff !important;
             color: #000000 !important;
             box-shadow: none !important;
@@ -154,6 +158,9 @@ ${voucher.new_balance > 0 ? `⚖️ *الرصيد المتبقي:* ${Number(vouc
             max-height: none !important;
             overflow: visible !important;
             z-index: 999999 !important;
+            direction: rtl !important;
+            text-align: right;
+            box-sizing: border-box !important;
           }
           .fixed, .overflow-hidden, .overflow-y-auto {
             position: static !important;
