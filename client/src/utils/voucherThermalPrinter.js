@@ -107,7 +107,7 @@ export function generateThermalVoucherHtml(voucher, customSettings = null) {
       width: ${widthCss} !important;
       max-width: ${widthCss} !important;
       margin: 0 !important;
-      padding: 2px ${is58mm ? '1.5mm' : '2mm'} 12px ${is58mm ? '1.5mm' : '2mm'} !important;
+      padding: 2px ${is58mm ? '1.5mm' : '2mm'} 4px ${is58mm ? '1.5mm' : '2mm'} !important;
       box-sizing: border-box !important;
       direction: rtl !important;
       text-align: right;

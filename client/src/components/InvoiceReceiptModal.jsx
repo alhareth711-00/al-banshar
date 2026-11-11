@@ -445,13 +445,9 @@ ${Number(invoice.scrap_battery_deduction) > 0 ? `🔹 خصم بدل بطارية
                 </div>
               )}
 
-              {/* Barcode & Footer */}
-              <div className="text-center pt-2.5 border-t border-dashed border-slate-300 space-y-1">
-                <div className="font-mono text-[10px] tracking-widest text-slate-600">
-                  * {invoice.invoice_number} *
-                </div>
-                <p className="font-bold text-[10.5px] font-sans">شكراً لزيارتكم ويسعدنا دائماً خدمتكم 🚗</p>
-                <p className="text-[8.5px] text-slate-500 font-sans">نظام سريع وبنشر - Quick Lube POS</p>
+              {/* Footer */}
+              <div className="text-center pt-2 border-t border-dashed border-slate-300">
+                <p className="font-bold text-[10.5px] font-sans">شكراً لزيارتكم ويسعدنا دائماً خدمتكم 🙏</p>
               </div>
             </div>
           )}

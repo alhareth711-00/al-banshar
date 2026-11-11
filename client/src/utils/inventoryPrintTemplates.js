@@ -153,7 +153,7 @@ export function generateStocktakeHtml(items, customSettings = null, layout = 'th
       width: 80mm !important;
       max-width: 80mm !important;
       margin: 0 !important;
-      padding: 4px 2mm 16px 2mm !important;
+      padding: 4px 2mm 6px 2mm !important;
       box-sizing: border-box !important;
       direction: rtl !important;
       text-align: right;
@@ -384,7 +384,7 @@ export function generateConsignmentAuditHtml(settlementData, customSettings = nu
       width: 80mm !important;
       max-width: 80mm !important;
       margin: 0 !important;
-      padding: 4px 2mm 16px 2mm !important;
+      padding: 4px 2mm 6px 2mm !important;
       box-sizing: border-box !important;
       direction: rtl !important;
       text-align: right;
@@ -814,7 +814,7 @@ export function generateReorderSheetHtml(reorderData, customSettings = null, lay
       width: 80mm !important;
       max-width: 80mm !important;
       margin: 0 !important;
-      padding: 4px 2mm 16px 2mm !important;
+      padding: 4px 2mm 6px 2mm !important;
       box-sizing: border-box !important;
       direction: rtl !important;
       text-align: right;
@@ -1041,7 +1041,7 @@ export function generateInventoryValuationHtml(valuationData, inventory = [], cu
       width: 80mm !important;
       max-width: 80mm !important;
       margin: 0 !important;
-      padding: 4px 2mm 16px 2mm !important;
+      padding: 4px 2mm 6px 2mm !important;
       box-sizing: border-box !important;
       direction: rtl !important;
       text-align: right;

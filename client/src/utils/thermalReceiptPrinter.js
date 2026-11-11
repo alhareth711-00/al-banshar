@@ -38,9 +38,9 @@ export function generateThermalReceiptHtml(invoice, customSettings = null) {
     .map(
       (it) => `
       <tr style="border-bottom: 1px dashed #555;">
-        <td style="padding: 5px 2px; text-align: right; font-weight: bold; font-size: ${is58mm ? '11.5px' : '13px'}; line-height: 1.45; vertical-align: top;">${it.description}</td>
-        <td style="padding: 5px 2px; text-align: center; font-weight: 900; font-size: ${is58mm ? '11.5px' : '13px'}; line-height: 1.45; vertical-align: top;">${it.qty}</td>
-        <td style="padding: 5px 2px; text-align: left; font-weight: 900; font-size: ${is58mm ? '11.5px' : '13px'}; line-height: 1.45; vertical-align: top;">${Number(it.qty * it.unit_price).toLocaleString()}</td>
+        <td style="padding: 4px 2px; text-align: right; font-weight: bold; font-size: ${is58mm ? '11.5px' : '13px'}; line-height: 1.45; vertical-align: top;">${it.description}</td>
+        <td style="padding: 4px 2px; text-align: center; font-weight: 900; font-size: ${is58mm ? '11.5px' : '13px'}; line-height: 1.45; vertical-align: top;">${it.qty}</td>
+        <td style="padding: 4px 2px; text-align: left; font-weight: 900; font-size: ${is58mm ? '11.5px' : '13px'}; line-height: 1.45; vertical-align: top;">${Number(it.qty * it.unit_price).toLocaleString()}</td>
       </tr>`
     )
     .join('');
@@ -78,28 +78,28 @@ export function generateThermalReceiptHtml(invoice, customSettings = null) {
       width: ${widthCss} !important;
       max-width: ${widthCss} !important;
       margin: 0 !important;
-      padding: 4px ${is58mm ? '1.5mm' : '2mm'} 16px ${is58mm ? '1.5mm' : '2mm'} !important;
+      padding: 2px ${is58mm ? '1.5mm' : '2mm'} 4px ${is58mm ? '1.5mm' : '2mm'} !important;
       box-sizing: border-box !important;
       direction: rtl !important;
       text-align: right;
     }
     .header {
       text-align: center;
-      padding-bottom: 6px;
+      padding-bottom: 4px;
       border-bottom: 2px solid #000;
-      margin-bottom: 6px;
+      margin-bottom: 4px;
     }
     .shop-name {
       font-size: ${is58mm ? '15px' : '19.5px'};
       font-weight: 900;
       line-height: 1.3;
-      margin-bottom: 3px;
+      margin-bottom: 2px;
     }
     .meta-row {
       display: flex;
       justify-content: space-between;
       align-items: flex-start;
-      margin-top: 4px;
+      margin-top: 2.5px;
       font-size: ${is58mm ? '11.5px' : '13px'};
       font-weight: bold;
       gap: 6px;
@@ -110,12 +110,12 @@ export function generateThermalReceiptHtml(invoice, customSettings = null) {
       flex-shrink: 0;
     }
     .meta-section {
-      padding: 4px 0 6px 0;
+      padding: 2px 0 4px 0;
       border-bottom: 1.5px solid #000;
     }
     .odo-box {
-      margin: 5px 0;
-      padding: 5px 4px;
+      margin: 4px 0;
+      padding: 4px;
       background: #f4f4f4;
       border: 1px solid #000;
       border-radius: 4px;
@@ -129,13 +129,13 @@ export function generateThermalReceiptHtml(invoice, customSettings = null) {
       width: 100% !important;
       table-layout: fixed;
       border-collapse: collapse;
-      margin: 6px 0;
+      margin: 4px 0;
       word-break: break-word;
     }
     th {
       border-top: 1.5px solid #000;
       border-bottom: 1.5px solid #000;
-      padding: 5px 2px;
+      padding: 4px 2px;
       font-weight: 900;
       font-size: ${is58mm ? '11.5px' : '13.5px'};
       line-height: 1.35;
@@ -148,14 +148,14 @@ export function generateThermalReceiptHtml(invoice, customSettings = null) {
       vertical-align: top;
     }
     .totals-section {
-      padding: 6px 0;
+      padding: 4px 0;
       border-top: 1.5px solid #000;
     }
     .total-row {
       display: flex;
       justify-content: space-between;
       align-items: center;
-      margin-top: 4px;
+      margin-top: 2.5px;
       font-size: ${is58mm ? '11.5px' : '13px'};
       line-height: 1.35;
     }
@@ -163,17 +163,18 @@ export function generateThermalReceiptHtml(invoice, customSettings = null) {
       font-size: ${is58mm ? '15px' : '18.5px'};
       font-weight: 900;
       border: 2px solid #000;
-      padding: 6px 6px;
-      margin: 6px 0;
+      padding: 4px 6px;
+      margin: 4px 0;
       line-height: 1.3;
     }
     .footer {
       text-align: center;
-      margin-top: 8px;
-      padding-top: 6px;
-      border-top: 1.5px solid #000;
+      margin-top: 5px;
+      padding-top: 4px;
+      border-top: 1px dashed #000;
       font-size: 11.5px;
-      line-height: 1.4;
+      font-weight: bold;
+      line-height: 1.3;
     }
   </style>
 </head>
@@ -292,11 +293,7 @@ export function generateThermalReceiptHtml(invoice, customSettings = null) {
   </div>
 
   <div class="footer">
-    <div style="font-family: monospace; letter-spacing: 2px; font-size: 13px; font-weight: 900; margin-bottom: 4px;">
-      * ${invoice.invoice_number} *
-    </div>
-    <div style="font-weight: 900; font-size: 13px; margin-bottom: 2px;">شكراً لزيارتكم ويسعدنا دائماً خدمتكم</div>
-    <div style="font-size: 10px; color: #444;">نظام سريع وبنشر PRO</div>
+    <div>شكراً لزيارتكم ويسعدنا دائماً خدمتكم 🙏</div>
   </div>
   </div>
 </body>
