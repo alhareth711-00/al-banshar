@@ -132,17 +132,17 @@ export function generateStocktakeHtml(items, customSettings = null, layout = 'th
   <style>
     @page {
       margin: 0 !important;
-      size: 72mm 297mm;
+      size: 80mm 297mm;
     }
     * { box-sizing: border-box; margin: 0; padding: 0; }
     html, body {
-      width: 72mm !important;
-      max-width: 72mm !important;
+      width: 80mm !important;
+      max-width: 80mm !important;
       margin: 0 !important;
       padding: 0 !important;
       font-family: 'Segoe UI', Tahoma, 'Cairo', Arial, sans-serif;
-      font-size: 13px;
-      line-height: 1.35;
+      font-size: 12.5px;
+      line-height: 1.4;
       color: #000;
       background: #fff;
       direction: ltr !important;
@@ -150,10 +150,10 @@ export function generateStocktakeHtml(items, customSettings = null, layout = 'th
       print-color-adjust: exact;
     }
     .receipt-container {
-      width: 72mm !important;
-      max-width: 72mm !important;
+      width: 80mm !important;
+      max-width: 80mm !important;
       margin: 0 !important;
-      padding: 4px 3mm 16px 3mm !important;
+      padding: 4px 2mm 16px 2mm !important;
       box-sizing: border-box !important;
       direction: rtl !important;
       text-align: right;
@@ -363,17 +363,17 @@ export function generateConsignmentAuditHtml(settlementData, customSettings = nu
   <style>
     @page {
       margin: 0 !important;
-      size: 72mm 297mm;
+      size: 80mm 297mm;
     }
     * { box-sizing: border-box; margin: 0; padding: 0; }
     html, body {
-      width: 72mm !important;
-      max-width: 72mm !important;
+      width: 80mm !important;
+      max-width: 80mm !important;
       margin: 0 !important;
       padding: 0 !important;
       font-family: 'Segoe UI', Tahoma, 'Cairo', Arial, sans-serif;
-      font-size: 13px;
-      line-height: 1.35;
+      font-size: 12.5px;
+      line-height: 1.4;
       color: #000;
       background: #fff;
       direction: ltr !important;
@@ -381,10 +381,10 @@ export function generateConsignmentAuditHtml(settlementData, customSettings = nu
       print-color-adjust: exact;
     }
     .receipt-container {
-      width: 72mm !important;
-      max-width: 72mm !important;
+      width: 80mm !important;
+      max-width: 80mm !important;
       margin: 0 !important;
-      padding: 4px 3mm 16px 3mm !important;
+      padding: 4px 2mm 16px 2mm !important;
       box-sizing: border-box !important;
       direction: rtl !important;
       text-align: right;
@@ -564,7 +564,7 @@ export function generateBarcodeLabelsHtml(item, copies = 1, labelSize = '80mm', 
 
   const isSheet = labelSize === 'sheet';
   const isDedicatedLabel = labelSize === '50x25';
-  const labelRollWidth = isDedicatedLabel ? '50mm' : '72mm';
+  const labelRollWidth = isDedicatedLabel ? '50mm' : '80mm';
 
   return `<!DOCTYPE html>
 <html lang="ar">
@@ -574,7 +574,7 @@ export function generateBarcodeLabelsHtml(item, copies = 1, labelSize = '80mm', 
   <style>
     @page {
       margin: 0 !important;
-      size: ${isSheet ? 'A4 portrait' : isDedicatedLabel ? '50mm 25mm' : '72mm 297mm'};
+      size: ${isSheet ? 'A4 portrait' : isDedicatedLabel ? '50mm 25mm' : '80mm 297mm'};
     }
     * { box-sizing: border-box; margin: 0; padding: 0; }
     html, body {
@@ -794,16 +794,16 @@ export function generateReorderSheetHtml(reorderData, customSettings = null, lay
   <meta charset="utf-8" />
   <title>كشف نواقص البضاعة - 80mm</title>
   <style>
-    @page { margin: 0 !important; size: 72mm 297mm; }
+    @page { margin: 0 !important; size: 80mm 297mm; }
     * { box-sizing: border-box; margin: 0; padding: 0; }
     html, body {
-      width: 72mm !important;
-      max-width: 72mm !important;
+      width: 80mm !important;
+      max-width: 80mm !important;
       margin: 0 !important;
       padding: 0 !important;
       font-family: 'Segoe UI', Tahoma, 'Cairo', Arial, sans-serif;
-      font-size: 13px;
-      line-height: 1.35;
+      font-size: 12.5px;
+      line-height: 1.4;
       color: #000;
       background: #fff;
       direction: ltr !important;
@@ -811,10 +811,10 @@ export function generateReorderSheetHtml(reorderData, customSettings = null, lay
       print-color-adjust: exact;
     }
     .receipt-container {
-      width: 72mm !important;
-      max-width: 72mm !important;
+      width: 80mm !important;
+      max-width: 80mm !important;
       margin: 0 !important;
-      padding: 4px 3mm 16px 3mm !important;
+      padding: 4px 2mm 16px 2mm !important;
       box-sizing: border-box !important;
       direction: rtl !important;
       text-align: right;
@@ -1021,16 +1021,16 @@ export function generateInventoryValuationHtml(valuationData, inventory = [], cu
   <meta charset="utf-8" />
   <title>تقييم رأس المال المخزني - 80mm</title>
   <style>
-    @page { margin: 0 !important; size: 72mm 297mm; }
+    @page { margin: 0 !important; size: 80mm 297mm; }
     * { box-sizing: border-box; margin: 0; padding: 0; }
     html, body {
-      width: 72mm !important;
-      max-width: 72mm !important;
+      width: 80mm !important;
+      max-width: 80mm !important;
       margin: 0 !important;
       padding: 0 !important;
       font-family: 'Segoe UI', Tahoma, 'Cairo', Arial, sans-serif;
-      font-size: 13px;
-      line-height: 1.35;
+      font-size: 12.5px;
+      line-height: 1.4;
       color: #000;
       background: #fff;
       direction: ltr !important;
@@ -1038,10 +1038,10 @@ export function generateInventoryValuationHtml(valuationData, inventory = [], cu
       print-color-adjust: exact;
     }
     .receipt-container {
-      width: 72mm !important;
-      max-width: 72mm !important;
+      width: 80mm !important;
+      max-width: 80mm !important;
       margin: 0 !important;
-      padding: 4px 3mm 16px 3mm !important;
+      padding: 4px 2mm 16px 2mm !important;
       box-sizing: border-box !important;
       direction: rtl !important;
       text-align: right;

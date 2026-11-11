@@ -552,7 +552,7 @@ ipcMain.handle('print-silent', async (_event, htmlContent) => {
             printBackground: true,
             margins: { marginType: 'none' },
             pageSize: {
-              width: is58 ? 48000 : 72000, // microns (72mm = 72,000 microns)
+              width: is58 ? 48000 : 80000, // microns (80mm = 80,000 microns)
               height: 297000,              // microns (297mm standard thermal continuous page)
             },
           };

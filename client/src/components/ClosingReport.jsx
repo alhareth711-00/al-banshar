@@ -29,6 +29,8 @@ import {
   BarChart2,
   PieChart,
   ShieldCheck,
+  Users,
+  FileText,
 } from 'lucide-react';
 import { getShopSettings, formatYemeniWhatsAppLink } from '../utils/settings';
 import { getLocalTodayDate } from '../utils/dateUtils';
@@ -171,6 +173,59 @@ export default function ClosingReport({ onOpenBayProfitability }) {
   const ownerDrawings = transactions_summary?.owner_drawings_total || 0;
   const liveDrawerBal = cash_register?.live_drawer_balance ?? cash_register?.net_drawer_cash ?? 0;
 
+  // Workers performance, advances & labor metrics
+  const workersSummary = reportData?.workers_summary || {};
+  const workersList = workersSummary.list || reportData?.workers_commissions || [];
+  const workerAdvancesList = workersSummary.advances_breakdown || [];
+  const workerAdvancesTotal = workersSummary.total_advances_today ?? transactions_summary?.worker_advances_total ?? 0;
+  const workerAdvancesCash = cash_register?.outflow_cash_worker_advances ?? workerAdvancesTotal;
+  const totalDailyWages = workersSummary.total_daily_wages_earned || workersList.reduce((acc, w) => acc + (w.daily_base_wage || 0), 0);
+  const presentWorkersCount = workersSummary.present_count ?? workersList.filter((w) => w.is_present !== false).length;
+  const netWorkersDueToday = workersSummary.net_payable_today ?? (totalDailyWages - workerAdvancesTotal);
+
+  // Advances summary brief for WhatsApp
+  let advancesSummaryBrief = '';
+  if (workerAdvancesList.length > 0) {
+    const workerTotalsMap = {};
+    workerAdvancesList.forEach((adv) => {
+      workerTotalsMap[adv.worker_name] = (workerTotalsMap[adv.worker_name] || 0) + Number(adv.amount || 0);
+    });
+    const parts = Object.entries(workerTotalsMap).map(([name, amt]) => `${name}: ${amt.toLocaleString()} ر.ي`);
+    advancesSummaryBrief = ` [${parts.join(' | ')}]`;
+  } else if (workerAdvancesTotal > 0) {
+    advancesSummaryBrief = ` [إجمالي: ${workerAdvancesTotal.toLocaleString()} ر.ي]`;
+  }
+
+  // Expenses summary brief for WhatsApp
+  const expensesList = reportData?.expenses_breakdown || [];
+  let expensesBrief = '';
+  if (expensesList.length > 0) {
+    const topExp = expensesList.slice(0, 3).map((e) => `${e.category_name || e.description || 'مصروف'}: ${Number(e.amount).toLocaleString()}`);
+    expensesBrief = ` (${topExp.join(' | ')})`;
+  }
+
+  // New debts brief for WhatsApp
+  const newDebtsList = reportData?.new_debts_list || [];
+  let newDebtsBrief = '';
+  if (newDebtsList.length > 0) {
+    const topDebts = newDebtsList.slice(0, 3).map((d) => `${d.customer_name || d.plate_number}: ${Number(d.remaining_debt).toLocaleString()}`);
+    newDebtsBrief = ` [${topDebts.join(' | ')}]`;
+  }
+
+  // Collections brief for WhatsApp
+  const collectionsList = reportData?.debt_collections_list || [];
+  let collectionsBrief = '';
+  if (collectionsList.length > 0) {
+    const topCol = collectionsList.slice(0, 3).map((c) => `${c.party_name || 'عميل'}: ${Number(c.amount).toLocaleString()}`);
+    collectionsBrief = ` [${topCol.join(' | ')}]`;
+  }
+
+  // Purchases from drawer brief for WhatsApp
+  const purchasesFromDrawer = transactions_summary?.purchases_from_drawer?.total_amount || 0;
+  const purchasesFromDrawerText = purchasesFromDrawer > 0
+    ? `\n- مشتريات بضاعة نقدية من الدرج: -${purchasesFromDrawer.toLocaleString()} ر.ي`
+    : '';
+
   // Upgrades 1 & 5 metrics
   const vsYest = comparison?.growth_vs_yesterday || {};
   const vsLastWeek = comparison?.growth_vs_last_week || {};
@@ -191,10 +246,11 @@ export default function ClosingReport({ onOpenBayProfitability }) {
   const closingTimeStr = new Date().toLocaleTimeString('ar-YE', { hour: '2-digit', minute: '2-digit' });
   const cashierLabel = currentShiftData?.shift?.cashier_name || 'كاشير المركز';
 
-  // Executive Owner Brief Message 3.0 (الجزء الرابع: مدمج مع النبض المالي وصافي الأرباح التقديري وتوقيت الإغلاق واسم الكاشير)
+  // Executive Owner Brief Message 3.0 (مدمج مع سلف العمال والنبض المالي وصافي الأرباح التقديري وتوقيت الإغلاق)
   const ownerBriefMessage =
 `📊 إغلاق مالي لمركز ${settings.shopName} - ${reportDate} (${closingTimeStr})
 👤 الكاشير المسؤول: ${cashierLabel}
+
 🚗 حركة العمليات والخدمة:
 - السيارات المخدومة: ${summary.total_cars_served} سيارة (${summary.total_invoices} فاتورة)
 - مبيعات الزيوت والقطع: ${goodsRev.toLocaleString()} ر.ي
@@ -210,15 +266,24 @@ export default function ClosingReport({ onOpenBayProfitability }) {
 - 🛡️ معدل تغطية المصروفات: ${execPulse.expense_coverage_ratio === null ? 'لا توجد مصاريف' : `${execPulse.expense_coverage_ratio}%`}
 
 💵 حركة الصندوق النقدي (1101):
-- إجمالي الكاش المقبوض من المبيعات: ${cash_register.inflow_cash_invoices.toLocaleString()} ر.ي
-- تحصيل ديون سابقة (سندات قبض): ${cash_register.inflow_cash_debt_collected.toLocaleString()} ر.ي
-- المصاريف التشغيلية المنصرفة: ${transactions_summary.expenses_total.toLocaleString()} ر.ي
-- مسحوبات المالك الشخصية (3101): ${ownerDrawings.toLocaleString()} ر.ي
-- رصيد الصندوق النقدي الفعلي الدفتري: ${liveDrawerBal.toLocaleString()} ر.ي
+- إجمالي الكاش المقبوض من المبيعات: +${cash_register.inflow_cash_invoices.toLocaleString()} ر.ي
+- تحصيل ديون سابقة (سندات قبض): +${cash_register.inflow_cash_debt_collected.toLocaleString()} ر.ي
+- المصاريف التشغيلية المنصرفة: -${transactions_summary.expenses_total.toLocaleString()} ر.ي${expensesBrief}
+- 👨‍🔧 سلف ومسحوبات العمال نقدياً: -${workerAdvancesCash.toLocaleString()} ر.ي${advancesSummaryBrief}${purchasesFromDrawerText}
+- مسحوبات المالك الشخصية (3101): -${ownerDrawings.toLocaleString()} ر.ي
+- 🏁 رصيد الصندوق النقدي الفعلي الدفتري: ${liveDrawerBal.toLocaleString()} ر.ي
+
+👨‍🔧 شؤون الفنيين والعمال اليوم:
+- الفنيون الحاضرون: ${presentWorkersCount} فنيين (من إجمالي ${workersList.length || 1})
+- إجمالي اليوميات المستحقة: ${totalDailyWages.toLocaleString()} ر.ي
+- إجمالي السلف والمسحوبات: ${workerAdvancesTotal.toLocaleString()} ر.ي${advancesSummaryBrief}
+- ⚖️ صافي المتبقي للعمال لليوم: ${netWorkersDueToday.toLocaleString()} ر.ي
 
 📱 قنوات الدفع الأخرى والآجل:
 - إجمالي المحافظ الإلكترونية: ${payment_methods_breakdown.e_wallets.total.toLocaleString()} ر.ي (كريمي: ${payment_methods_breakdown.e_wallets.kuraimi.toLocaleString()} | جيب: ${payment_methods_breakdown.e_wallets.jeeb.toLocaleString()})
-- مبيعات الآجل (ديون جديدة): ${summary.total_new_debts.toLocaleString()} ر.ي
+- مبيعات الآجل (ديون جديدة): ${summary.total_new_debts.toLocaleString()} ر.ي${newDebtsBrief}
+- تحصيل ديون قديمة: ${cash_register.inflow_cash_debt_collected.toLocaleString()} ر.ي${collectionsBrief}
+- 📈 إجمالي ديون العملاء بالسوق: ${(debts_and_payables?.total_customer_debts || 0).toLocaleString()} ر.ي
 
 🛢️ حركة الزيوت والفلاتر:
 - عبوات الزيوت: (${oil_sales.packs_summary['4L']} عبوة 4 لتر | ${oil_sales.packs_summary['1L']} عبوة 1 لتر | ${oil_sales.packs_summary['5L']} عبوة 5 لتر)
@@ -943,6 +1008,126 @@ export default function ClosingReport({ onOpenBayProfitability }) {
                 </div>
               </div>
             </div>
+
+            {/* Workers, Expenses & Debts Detailed Grid */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {/* Card 1: Workers & Labor Today */}
+              <div className="apple-glass rounded-3xl p-5 border border-purple-500/30 bg-slate-900/60 space-y-3 shadow-xl">
+                <div className="flex items-center justify-between">
+                  <h3 className="font-extrabold text-sm text-white flex items-center gap-2">
+                    <Users className="w-4 h-4 text-purple-400" />
+                    <span>شؤون وسلف ومستحقات الفنيين اليوم:</span>
+                  </h3>
+                  <span className="text-[11px] px-2.5 py-0.5 rounded-full bg-purple-500/20 text-purple-300 font-bold border border-purple-500/30 font-mono">
+                    حضور {presentWorkersCount} من {workersList.length || 1}
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-3 gap-2 text-center text-xs">
+                  <div className="p-3 rounded-2xl bg-slate-900/80 border border-white/10">
+                    <div className="text-slate-400">إجمالي اليوميات</div>
+                    <div className="text-lg font-mono font-black text-white mt-1">
+                      {totalDailyWages.toLocaleString()} <span className="text-[10px] font-sans">ر.ي</span>
+                    </div>
+                  </div>
+                  <div className="p-3 rounded-2xl bg-rose-500/10 border border-rose-500/20">
+                    <div className="text-rose-300">سلف اليوم</div>
+                    <div className="text-lg font-mono font-black text-rose-400 mt-1">
+                      {workerAdvancesTotal.toLocaleString()} <span className="text-[10px] font-sans">ر.ي</span>
+                    </div>
+                  </div>
+                  <div className="p-3 rounded-2xl bg-emerald-500/10 border border-emerald-500/20">
+                    <div className="text-emerald-300">الصافي المتبقي</div>
+                    <div className="text-lg font-mono font-black text-emerald-400 mt-1">
+                      {netWorkersDueToday.toLocaleString()} <span className="text-[10px] font-sans">ر.ي</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="space-y-1.5 max-h-52 overflow-y-auto pr-1 text-xs">
+                  {workersList.map((w, idx) => (
+                    <div
+                      key={idx}
+                      className="p-2.5 rounded-xl bg-slate-950/70 border border-white/5 flex items-center justify-between"
+                    >
+                      <div>
+                        <div className="font-bold text-white flex items-center gap-1.5">
+                          <span>{w.worker_name}</span>
+                          <span className="text-[10px] text-slate-400 font-normal">({w.role || 'فني'})</span>
+                          {w.is_present !== false ? (
+                            <span className="text-[9px] px-1.5 py-0.2 rounded bg-emerald-500/20 text-emerald-300 font-bold">حاضر</span>
+                          ) : (
+                            <span className="text-[9px] px-1.5 py-0.2 rounded bg-slate-700 text-slate-400">غائب</span>
+                          )}
+                        </div>
+                        <div className="text-[10px] text-slate-400 mt-0.5">
+                          يومية: <b className="text-slate-200 font-mono">{(w.daily_base_wage || 0).toLocaleString()}</b> | سلف: <b className="text-rose-400 font-mono">{(w.advances_taken || 0).toLocaleString()}</b>
+                        </div>
+                      </div>
+                      <div className="text-left font-mono font-bold text-emerald-400 text-xs">
+                        صافي: {(w.net_payable_today || 0).toLocaleString()} ر.ي
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Card 2: Operating Expenses & Receivables Details */}
+              <div className="apple-glass rounded-3xl p-5 border border-white/10 bg-slate-900/60 space-y-3 shadow-xl">
+                <div className="flex items-center justify-between">
+                  <h3 className="font-extrabold text-sm text-white flex items-center gap-2">
+                    <FileText className="w-4 h-4 text-amber-400" />
+                    <span>تفاصيل المصاريف التشغيلية والديون لليوم:</span>
+                  </h3>
+                  <span className="text-[11px] text-slate-400 font-mono">
+                    {expensesList.length} بنود مصاريف &bull; {newDebtsList.length} ديون جديدة
+                  </span>
+                </div>
+
+                <div className="space-y-2 max-h-56 overflow-y-auto pr-1 text-xs">
+                  {/* Top Expenses */}
+                  <div>
+                    <div className="text-[11px] font-bold text-slate-400 mb-1">أبرز المصاريف المنصرفة اليوم:</div>
+                    {expensesList.length === 0 ? (
+                      <div className="text-[11px] text-slate-500 italic p-1">لا توجد مصاريف تشغيلية اليوم</div>
+                    ) : (
+                      expensesList.slice(0, 4).map((exp, i) => (
+                        <div key={i} className="py-1 px-2 mb-1 rounded-lg bg-white/5 flex items-center justify-between text-[11px]">
+                          <span className="text-slate-200 truncate max-w-[200px]">{exp.category_name}: {exp.description}</span>
+                          <span className="font-mono font-bold text-rose-300">-{Number(exp.amount).toLocaleString()} ر.ي</span>
+                        </div>
+                      ))
+                    )}
+                  </div>
+
+                  {/* New Debts */}
+                  {newDebtsList.length > 0 && (
+                    <div className="pt-2 border-t border-white/5">
+                      <div className="text-[11px] font-bold text-amber-400 mb-1">ديون آجلة جديدة اليوم:</div>
+                      {newDebtsList.slice(0, 3).map((d, i) => (
+                        <div key={i} className="py-1 px-2 mb-1 rounded-lg bg-amber-500/10 border border-amber-500/20 flex items-center justify-between text-[11px]">
+                          <span className="text-amber-200">{d.customer_name} ({d.plate_number})</span>
+                          <span className="font-mono font-bold text-amber-400">{Number(d.remaining_debt).toLocaleString()} ر.ي</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Collections */}
+                  {collectionsList.length > 0 && (
+                    <div className="pt-2 border-t border-white/5">
+                      <div className="text-[11px] font-bold text-emerald-400 mb-1">تحصيلات ديون اليوم:</div>
+                      {collectionsList.slice(0, 3).map((c, i) => (
+                        <div key={i} className="py-1 px-2 mb-1 rounded-lg bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-between text-[11px]">
+                          <span className="text-emerald-200">{c.party_name} - {c.description}</span>
+                          <span className="font-mono font-bold text-emerald-400">+{Number(c.amount).toLocaleString()} ر.ي</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
           </div>
       </div>
 
@@ -951,7 +1136,7 @@ export default function ClosingReport({ onOpenBayProfitability }) {
         @media print {
           @page {
             margin: 0 !important;
-            size: ${printLayout === 'thermal80' ? '72mm 297mm' : 'A4 portrait'};
+            size: ${printLayout === 'thermal80' ? '80mm 297mm' : 'A4 portrait'};
           }
           html, body {
             background: #ffffff !important;
@@ -961,8 +1146,8 @@ export default function ClosingReport({ onOpenBayProfitability }) {
             height: auto !important;
             min-height: auto !important;
             overflow: visible !important;
-            width: ${printLayout === 'thermal80' ? '72mm' : '100%'} !important;
-            max-width: ${printLayout === 'thermal80' ? '72mm' : '100%'} !important;
+            width: ${printLayout === 'thermal80' ? '80mm' : '100%'} !important;
+            max-width: ${printLayout === 'thermal80' ? '80mm' : '100%'} !important;
             direction: ${printLayout === 'thermal80' ? 'ltr !important' : 'rtl'};
             -webkit-print-color-adjust: exact;
             print-color-adjust: exact;
@@ -977,10 +1162,10 @@ export default function ClosingReport({ onOpenBayProfitability }) {
             position: absolute !important;
             left: 0 !important;
             top: 0 !important;
-            width: ${printLayout === 'thermal80' ? '72mm' : '100%'} !important;
-            max-width: ${printLayout === 'thermal80' ? '72mm' : '100%'} !important;
+            width: ${printLayout === 'thermal80' ? '80mm' : '100%'} !important;
+            max-width: ${printLayout === 'thermal80' ? '80mm' : '100%'} !important;
             margin: 0 !important;
-            padding: ${printLayout === 'thermal80' ? '4px 3mm 12px 3mm' : '10mm'} !important;
+            padding: ${printLayout === 'thermal80' ? '4px 2mm 12px 2mm' : '10mm'} !important;
             background: #ffffff !important;
             color: #000000 !important;
             box-shadow: none !important;
@@ -1053,6 +1238,12 @@ export default function ClosingReport({ onOpenBayProfitability }) {
                 <span>مصاريف نقدية من الصندوق:</span>
                 <span className="font-black font-mono">-{transactions_summary.expenses_total.toLocaleString()} ر.ي</span>
               </div>
+              {workerAdvancesCash > 0 && (
+                <div className="flex justify-between items-center text-gray-900">
+                  <span>سلف ومسحوبات العمال نقدياً:</span>
+                  <span className="font-black font-mono">-{workerAdvancesCash.toLocaleString()} ر.ي</span>
+                </div>
+              )}
               {ownerDrawings > 0 && (
                 <div className="flex justify-between items-center text-gray-900">
                   <span>مسحوبات جاري المالك (3101):</span>
@@ -1073,6 +1264,24 @@ export default function ClosingReport({ onOpenBayProfitability }) {
               <div className="flex justify-between items-center">
                 <span className="text-gray-700">مبيعات آجلة جديدة (ديون):</span>
                 <span className="font-mono font-black">{summary.total_new_debts.toLocaleString()} ر.ي</span>
+              </div>
+            </div>
+
+            {/* Workers Summary in Thermal 80 */}
+            <div className="border-b-2 border-black py-1.5 space-y-1 text-xs font-bold">
+              <div className="flex justify-between items-center">
+                <span className="text-gray-700">شؤون الفنيين (حضور {presentWorkersCount}):</span>
+                <span className="font-mono">{totalDailyWages.toLocaleString()} ر.ي أجور</span>
+              </div>
+              {workerAdvancesTotal > 0 && (
+                <div className="flex justify-between items-center">
+                  <span className="text-gray-700">سلف العمال اليوم:</span>
+                  <span className="font-mono text-red-600">-{workerAdvancesTotal.toLocaleString()} ر.ي</span>
+                </div>
+              )}
+              <div className="flex justify-between items-center border-t border-dashed border-gray-400 pt-1">
+                <span className="font-black">صافي المستحق للعمال:</span>
+                <span className="font-black font-mono">{netWorkersDueToday.toLocaleString()} ر.ي</span>
               </div>
             </div>
 
@@ -1157,6 +1366,13 @@ export default function ClosingReport({ onOpenBayProfitability }) {
                   <td className="border border-gray-400 p-2 text-left font-mono">({transactions_summary.expenses_total.toLocaleString()})</td>
                   <td className="border border-gray-400 p-2 text-gray-600">مصاريف الصيانة والتشغيل اليومية</td>
                 </tr>
+                {workerAdvancesTotal > 0 && (
+                  <tr>
+                    <td className="border border-gray-400 p-2 font-bold">سلف ومسحوبات الفنيين (حساب 1202)</td>
+                    <td className="border border-gray-400 p-2 text-left font-mono">({workerAdvancesTotal.toLocaleString()})</td>
+                    <td className="border border-gray-400 p-2 text-gray-600">سلف نقدية مسحوبة من الصندوق تخصم من أجور العمال</td>
+                  </tr>
+                )}
                 <tr>
                   <td className="border border-gray-400 p-2">مسحوبات المالك الشخصية (حساب 3101)</td>
                   <td className="border border-gray-400 p-2 text-left font-mono">({ownerDrawings.toLocaleString()})</td>
@@ -1183,6 +1399,38 @@ export default function ClosingReport({ onOpenBayProfitability }) {
                 <div>عبوات 4 لتر: <b>{oil_sales.packs_summary['4L']}</b> | 1 لتر: <b>{oil_sales.packs_summary['1L']}</b></div>
                 <div>فلاتر زيت: <b>{oilFiltersCount}</b> | فلاتر هواء: <b>{airFiltersCount}</b></div>
               </div>
+            </div>
+
+            {/* Workers Labor & Advances Table in A4 */}
+            <div className="border border-gray-400 rounded p-2 text-xs">
+              <div className="font-bold mb-1 border-b border-gray-300 pb-1 flex justify-between">
+                <span>شؤون الفنيين والعمال والمسحوبات اليومية:</span>
+                <span>الحاضرون: {presentWorkersCount} فنيين &bull; إجمالي السلف: {workerAdvancesTotal.toLocaleString()} ر.ي &bull; صافي المستحق: {netWorkersDueToday.toLocaleString()} ر.ي</span>
+              </div>
+              <table className="w-full text-right text-[11px] mt-1 border-collapse">
+                <thead>
+                  <tr className="bg-gray-100 border-b border-gray-300">
+                    <th className="p-1">الفني / العامل</th>
+                    <th className="p-1">الوظيفة</th>
+                    <th className="p-1">الحالة</th>
+                    <th className="p-1">اليومية</th>
+                    <th className="p-1 text-red-600">سلف اليوم</th>
+                    <th className="p-1 text-emerald-700">صافي المستحق</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {workersList.map((w, idx) => (
+                    <tr key={idx} className="border-b border-gray-200">
+                      <td className="p-1 font-bold">{w.worker_name}</td>
+                      <td className="p-1 text-gray-600">{w.role || 'فني'}</td>
+                      <td className="p-1">{w.is_present !== false ? 'حاضر' : 'غائب'}</td>
+                      <td className="p-1 font-mono">{(w.daily_base_wage || 0).toLocaleString()}</td>
+                      <td className="p-1 font-mono text-red-600 font-bold">{(w.advances_taken || 0).toLocaleString()}</td>
+                      <td className="p-1 font-mono text-emerald-700 font-bold">{(w.net_payable_today || 0).toLocaleString()}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
 
             {/* Official Signatures */}

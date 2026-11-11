@@ -6,8 +6,8 @@ import { getShopSettings } from './settings.js';
 export function generateThermalReceiptHtml(invoice, customSettings = null) {
   const settings = customSettings || getShopSettings();
   const is58mm = settings.receiptPaperSize === '58mm';
-  const widthCss = is58mm ? '48mm' : '72mm';
-  const fontSizeCss = is58mm ? '12px' : '14.5px';
+  const widthCss = is58mm ? '48mm' : '80mm';
+  const fontSizeCss = is58mm ? '11.5px' : '13.5px';
 
   const items = invoice.items || [];
   const paymentMethodLabel =
@@ -38,9 +38,9 @@ export function generateThermalReceiptHtml(invoice, customSettings = null) {
     .map(
       (it) => `
       <tr style="border-bottom: 1px dashed #555;">
-        <td style="padding: 6px 2px; text-align: right; font-weight: bold; font-size: ${is58mm ? '12px' : '14px'}; line-height: 1.25;">${it.description}</td>
-        <td style="padding: 6px 2px; text-align: center; font-weight: 900; font-size: ${is58mm ? '12px' : '14px'};">${it.qty}</td>
-        <td style="padding: 6px 2px; text-align: left; font-weight: 900; font-size: ${is58mm ? '12px' : '14px'};">${Number(it.qty * it.unit_price).toLocaleString()}</td>
+        <td style="padding: 5px 2px; text-align: right; font-weight: bold; font-size: ${is58mm ? '11.5px' : '13px'}; line-height: 1.45; vertical-align: top;">${it.description}</td>
+        <td style="padding: 5px 2px; text-align: center; font-weight: 900; font-size: ${is58mm ? '11.5px' : '13px'}; line-height: 1.45; vertical-align: top;">${it.qty}</td>
+        <td style="padding: 5px 2px; text-align: left; font-weight: 900; font-size: ${is58mm ? '11.5px' : '13px'}; line-height: 1.45; vertical-align: top;">${Number(it.qty * it.unit_price).toLocaleString()}</td>
       </tr>`
     )
     .join('');
@@ -53,7 +53,7 @@ export function generateThermalReceiptHtml(invoice, customSettings = null) {
   <style>
     @page {
       margin: 0 !important;
-      size: ${is58mm ? '48mm 297mm' : '72mm 297mm'};
+      size: ${is58mm ? '48mm 297mm' : '80mm 297mm'};
     }
     * {
       box-sizing: border-box;
@@ -67,7 +67,7 @@ export function generateThermalReceiptHtml(invoice, customSettings = null) {
       padding: 0 !important;
       font-family: 'Segoe UI', Tahoma, 'Cairo', Arial, sans-serif;
       font-size: ${fontSizeCss};
-      line-height: 1.35;
+      line-height: 1.4;
       color: #000;
       background: #fff;
       direction: ltr !important; /* Fixed left-origin anchor prevents RTL wide-spooler shifting */
@@ -78,7 +78,7 @@ export function generateThermalReceiptHtml(invoice, customSettings = null) {
       width: ${widthCss} !important;
       max-width: ${widthCss} !important;
       margin: 0 !important;
-      padding: 4px ${is58mm ? '1.5mm' : '3mm'} 16px ${is58mm ? '1.5mm' : '3mm'} !important;
+      padding: 4px ${is58mm ? '1.5mm' : '2mm'} 16px ${is58mm ? '1.5mm' : '2mm'} !important;
       box-sizing: border-box !important;
       direction: rtl !important;
       text-align: right;
@@ -90,19 +90,20 @@ export function generateThermalReceiptHtml(invoice, customSettings = null) {
       margin-bottom: 6px;
     }
     .shop-name {
-      font-size: ${is58mm ? '16px' : '21px'};
+      font-size: ${is58mm ? '15px' : '19.5px'};
       font-weight: 900;
-      line-height: 1.25;
+      line-height: 1.3;
       margin-bottom: 3px;
     }
     .meta-row {
       display: flex;
       justify-content: space-between;
-      align-items: center;
-      margin-top: 3px;
-      font-size: ${is58mm ? '12px' : '14px'};
+      align-items: flex-start;
+      margin-top: 4px;
+      font-size: ${is58mm ? '11.5px' : '13px'};
       font-weight: bold;
-      gap: 4px;
+      gap: 6px;
+      line-height: 1.4;
       word-break: break-word;
     }
     .meta-row > span {
@@ -114,14 +115,15 @@ export function generateThermalReceiptHtml(invoice, customSettings = null) {
     }
     .odo-box {
       margin: 5px 0;
-      padding: 5px;
+      padding: 5px 4px;
       background: #f4f4f4;
       border: 1px solid #000;
       border-radius: 4px;
       display: flex;
       justify-content: space-around;
       text-align: center;
-      font-size: ${is58mm ? '11px' : '13px'};
+      font-size: ${is58mm ? '11px' : '12.5px'};
+      line-height: 1.35;
     }
     table {
       width: 100% !important;
@@ -135,12 +137,15 @@ export function generateThermalReceiptHtml(invoice, customSettings = null) {
       border-bottom: 1.5px solid #000;
       padding: 5px 2px;
       font-weight: 900;
-      font-size: ${is58mm ? '12px' : '14.5px'};
+      font-size: ${is58mm ? '11.5px' : '13.5px'};
+      line-height: 1.35;
       word-break: break-word;
     }
     td {
       word-break: break-word;
       overflow-wrap: break-word;
+      line-height: 1.45;
+      vertical-align: top;
     }
     .totals-section {
       padding: 6px 0;
@@ -150,22 +155,25 @@ export function generateThermalReceiptHtml(invoice, customSettings = null) {
       display: flex;
       justify-content: space-between;
       align-items: center;
-      margin-top: 3px;
-      font-size: ${is58mm ? '12px' : '14px'};
+      margin-top: 4px;
+      font-size: ${is58mm ? '11.5px' : '13px'};
+      line-height: 1.35;
     }
     .grand-total {
-      font-size: ${is58mm ? '16px' : '20px'};
+      font-size: ${is58mm ? '15px' : '18.5px'};
       font-weight: 900;
       border: 2px solid #000;
-      padding: 6px 4px;
+      padding: 6px 6px;
       margin: 6px 0;
+      line-height: 1.3;
     }
     .footer {
       text-align: center;
       margin-top: 8px;
       padding-top: 6px;
       border-top: 1.5px solid #000;
-      font-size: 12px;
+      font-size: 11.5px;
+      line-height: 1.4;
     }
   </style>
 </head>
@@ -217,8 +225,8 @@ export function generateThermalReceiptHtml(invoice, customSettings = null) {
   <table>
     <thead>
       <tr>
-        <th style="text-align: right; width: 56%;">الصنف / الخدمة</th>
-        <th style="text-align: center; width: 14%;">الكمية</th>
+        <th style="text-align: right; width: 54%;">الصنف / الخدمة</th>
+        <th style="text-align: center; width: 16%;">الكمية</th>
         <th style="text-align: left; width: 30%;">المبلغ</th>
       </tr>
     </thead>

@@ -14,8 +14,8 @@ export function generateThermalVoucherHtml(voucher, customSettings = null) {
 
   const settings = customSettings || getShopSettings();
   const is58mm = settings.receiptPaperSize === '58mm';
-  const widthCss = is58mm ? '48mm' : '72mm';
-  const fontSizeCss = is58mm ? '12px' : '14px';
+  const widthCss = is58mm ? '48mm' : '80mm';
+  const fontSizeCss = is58mm ? '11.5px' : '13px';
 
   const isReceipt = voucher.voucher_type === 'receipt';
   const isVoided = voucher.status === 'voided';
@@ -82,7 +82,7 @@ export function generateThermalVoucherHtml(voucher, customSettings = null) {
   <style>
     @page {
       margin: 0 !important;
-      size: ${is58mm ? '48mm 297mm' : '72mm 297mm'};
+      size: ${is58mm ? '48mm 297mm' : '80mm 297mm'};
     }
     * {
       box-sizing: border-box;
@@ -96,7 +96,7 @@ export function generateThermalVoucherHtml(voucher, customSettings = null) {
       margin: 0 !important;
       padding: 0 !important;
       font-size: ${fontSizeCss};
-      line-height: 1.35;
+      line-height: 1.4;
       color: #000;
       background: #fff;
       direction: ltr !important;
@@ -107,7 +107,7 @@ export function generateThermalVoucherHtml(voucher, customSettings = null) {
       width: ${widthCss} !important;
       max-width: ${widthCss} !important;
       margin: 0 !important;
-      padding: 2px ${is58mm ? '1.5mm' : '3mm'} 12px ${is58mm ? '1.5mm' : '3mm'} !important;
+      padding: 2px ${is58mm ? '1.5mm' : '2mm'} 12px ${is58mm ? '1.5mm' : '2mm'} !important;
       box-sizing: border-box !important;
       direction: rtl !important;
       text-align: right;

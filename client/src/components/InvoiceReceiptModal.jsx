@@ -105,7 +105,7 @@ ${Number(invoice.scrap_battery_deduction) > 0 ? `🔹 خصم بدل بطارية
       <style>{`
         @media print {
           @page {
-            size: ${is58mm ? '48mm 297mm' : '72mm 297mm'};
+            size: ${is58mm ? '48mm 297mm' : '80mm 297mm'};
             margin: 0 !important;
           }
           html, body {
@@ -116,8 +116,8 @@ ${Number(invoice.scrap_battery_deduction) > 0 ? `🔹 خصم بدل بطارية
             height: auto !important;
             overflow: visible !important;
             direction: ltr !important;
-            width: ${is58mm ? '48mm' : '72mm'} !important;
-            max-width: ${is58mm ? '48mm' : '72mm'} !important;
+            width: ${is58mm ? '48mm' : '80mm'} !important;
+            max-width: ${is58mm ? '48mm' : '80mm'} !important;
             -webkit-print-color-adjust: exact;
             print-color-adjust: exact;
           }
@@ -131,10 +131,10 @@ ${Number(invoice.scrap_battery_deduction) > 0 ? `🔹 خصم بدل بطارية
             position: absolute !important;
             left: 0 !important;
             top: 0 !important;
-            width: ${is58mm ? '48mm' : '72mm'} !important;
-            max-width: ${is58mm ? '48mm' : '72mm'} !important;
+            width: ${is58mm ? '48mm' : '80mm'} !important;
+            max-width: ${is58mm ? '48mm' : '80mm'} !important;
             margin: 0 !important;
-            padding: 4px ${is58mm ? '1.5mm' : '3mm'} 12px ${is58mm ? '1.5mm' : '3mm'} !important;
+            padding: 4px ${is58mm ? '1.5mm' : '2mm'} 12px ${is58mm ? '1.5mm' : '2mm'} !important;
             background: #fff !important;
             color: #000 !important;
             box-shadow: none !important;

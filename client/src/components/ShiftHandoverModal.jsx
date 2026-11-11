@@ -171,7 +171,7 @@ export default function ShiftHandoverModal({ isOpen, onClose, currentShift, onSh
         @media print {
           @page {
             margin: 0 !important;
-            size: 72mm 297mm;
+            size: 80mm 297mm;
           }
           html, body {
             background: #ffffff !important;
@@ -181,8 +181,8 @@ export default function ShiftHandoverModal({ isOpen, onClose, currentShift, onSh
             height: auto !important;
             min-height: auto !important;
             overflow: visible !important;
-            width: 72mm !important;
-            max-width: 72mm !important;
+            width: 80mm !important;
+            max-width: 80mm !important;
             direction: ltr !important;
             -webkit-print-color-adjust: exact;
             print-color-adjust: exact;
@@ -197,10 +197,10 @@ export default function ShiftHandoverModal({ isOpen, onClose, currentShift, onSh
             position: absolute !important;
             left: 0 !important;
             top: 0 !important;
-            width: 72mm !important;
-            max-width: 72mm !important;
+            width: 80mm !important;
+            max-width: 80mm !important;
             margin: 0 !important;
-            padding: 4px 3mm 12px 3mm !important;
+            padding: 4px 2mm 12px 2mm !important;
             background: #ffffff !important;
             color: #000000 !important;
             box-shadow: none !important;
