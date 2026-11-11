@@ -15,6 +15,7 @@ import {
   Lock,
   Search,
   Receipt,
+  FolderTree,
 } from 'lucide-react';
 
 export default function Sidebar({
@@ -83,6 +84,14 @@ export default function Sidebar({
       shortLabel: 'الخزينة والسيولة',
       icon: Landmark,
       accent: 'from-teal-500 to-cyan-600',
+      badge: null,
+    },
+    {
+      id: 'accounts',
+      label: 'شجرة الحسابات المالية',
+      shortLabel: 'شجرة الحسابات',
+      icon: FolderTree,
+      accent: 'from-amber-500 to-yellow-600',
       badge: null,
     },
     {

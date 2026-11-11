@@ -13,6 +13,7 @@ import StatementOfAccountModal from './components/StatementOfAccountModal';
 import BayProfitabilityModal from './components/BayProfitabilityModal';
 import FinancialVaultHub from './components/FinancialVaultHub';
 import VouchersManagementView from './components/VouchersManagementView';
+import ChartOfAccountsView from './components/ChartOfAccountsView';
 import UserGuideModal from './components/UserGuideModal';
 import OwnerPinModal from './components/OwnerPinModal';
 import GlobalCommandPalette from './components/GlobalCommandPalette';
@@ -449,6 +450,12 @@ export default function App() {
         <FinancialVaultHub
           onRefreshData={handleDataRefreshed}
           onOpenStatement={handleOpenStatement}
+          onNavigateToVouchers={() => handleTabSelect('vouchers')}
+        />
+      )}
+
+      {activeTab === 'accounts' && (
+        <ChartOfAccountsView
           onNavigateToVouchers={() => handleTabSelect('vouchers')}
         />
       )}

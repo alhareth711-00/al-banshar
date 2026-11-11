@@ -31,13 +31,27 @@ export default function ReceiptVoucherModal({
   const [barrelPrice, setBarrelPrice] = useState('25000');
   const [scrapCount, setScrapCount] = useState('1');
   const [scrapUnitPrice, setScrapUnitPrice] = useState('5000');
-  const [paymentMethod, setPaymentMethod] = useState('cash'); // 'cash' | 'kuraimi' | 'jeeb'
+  const [paymentMethod, setPaymentMethod] = useState('1101'); // '1101' cash or dynamic account code
   const [paperBillNumber, setPaperBillNumber] = useState('');
   const [description, setDescription] = useState('');
   const [notes, setNotes] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState('');
   const [printedVoucher, setPrintedVoucher] = useState(null);
+  const [liquidAccounts, setLiquidAccounts] = useState([]);
+
+  useEffect(() => {
+    if (isOpen) {
+      fetch('/api/accounting/liquid-accounts')
+        .then((r) => r.json())
+        .then((d) => {
+          if (d.success && d.data?.length > 0) {
+            setLiquidAccounts(d.data);
+          }
+        })
+        .catch(() => {});
+    }
+  }, [isOpen]);
 
   const handleSelectPartyType = (type) => {
     setPartyType(type);
@@ -126,6 +140,7 @@ export default function ReceiptVoucherModal({
         amount: numAmount,
         offset_account_code: partyType === 'waste_oil' ? '4302' : partyType === 'scrap_battery' ? '1304' : null,
         payment_method: paymentMethod,
+        cash_account_code: paymentMethod,
         paper_bill_number: paperBillNumber.trim() || null,
         description: description.trim() || 'سند قبض نقدية رسمي',
         notes: notes.trim() || null,
@@ -619,9 +634,21 @@ export default function ReceiptVoucherModal({
                 onChange={(e) => setPaymentMethod(e.target.value)}
                 className="w-full min-h-[44px] px-3.5 rounded-xl bg-slate-900 border border-white/15 text-white text-xs cursor-pointer font-bold"
               >
-                <option value="cash">💵 نقداً - يورد إلى صندوق الكاشير (حساب 1101)</option>
-                <option value="kuraimi">🏦 تحويل بنكي - حساب مصرف الكريمي (حساب 1102)</option>
-                <option value="jeeb">📱 محفظة إلكترونية - محفظة جيب (حساب 1103)</option>
+                {liquidAccounts.length > 0 ? (
+                  liquidAccounts.map((acc) => (
+                    <option key={acc.code} value={acc.code}>
+                      {acc.sub_type === 'bank' ? '🏦' : acc.sub_type === 'e_wallet' ? '📱' : '💵'}{' '}
+                      {acc.name} (حساب {acc.code})
+                      {Number(acc.current_balance) > 0 ? ` • الرصيد: ${Number(acc.current_balance).toLocaleString()} ر.ي` : ''}
+                    </option>
+                  ))
+                ) : (
+                  <>
+                    <option value="1101">💵 نقداً - يورد إلى صندوق الكاشير (حساب 1101)</option>
+                    <option value="1102">🏦 تحويل بنكي - حساب مصرف الكريمي (حساب 1102)</option>
+                    <option value="1103">📱 محفظة إلكترونية - محفظة جيب (حساب 1103)</option>
+                  </>
+                )}
               </select>
             </div>
 

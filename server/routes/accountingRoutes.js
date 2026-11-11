@@ -2,10 +2,18 @@ const express = require('express');
 const router = express.Router();
 const accountingController = require('../controllers/accountingController');
 
-// Chart of Accounts
+// Chart of Accounts & Dynamic Account Helpers
+router.get('/liquid-accounts', accountingController.getLiquidAccounts);
+router.get('/expense-accounts', accountingController.getExpenseAccounts);
 router.get('/accounts', accountingController.getAccounts);
+router.get('/accounts/next-code', accountingController.getNextCode);
+router.get('/accounts/liquid', accountingController.getLiquidAccounts);
+router.get('/accounts/expenses', accountingController.getExpenseAccounts);
 router.post('/accounts', accountingController.createAccount);
 router.get('/accounts/:code', accountingController.getAccountDetails);
+router.get('/accounts/:code/ledger', accountingController.getAccountLedger);
+router.put('/accounts/:code', accountingController.updateAccount);
+router.delete('/accounts/:code', accountingController.deleteAccount);
 
 // Journal Entries
 router.get('/journal-entries', accountingController.getJournalEntries);

@@ -28,7 +28,7 @@ export default function GeneralPaymentVoucherModal({
   const [partyName, setPartyName] = useState('');
   const [expenseCategoryCode, setExpenseCategoryCode] = useState('6101');
   const [amount, setAmount] = useState('');
-  const [paymentMethod, setPaymentMethod] = useState('cash'); // 'cash' | 'kuraimi' | 'jeeb'
+  const [paymentMethod, setPaymentMethod] = useState('1101'); // '1101' cash or dynamic account code
   const [paperBillNumber, setPaperBillNumber] = useState('');
   const [description, setDescription] = useState('');
   const [notes, setNotes] = useState('');
@@ -36,6 +36,8 @@ export default function GeneralPaymentVoucherModal({
   const [error, setError] = useState('');
   const [printedVoucher, setPrintedVoucher] = useState(null);
   const [ownerAnalytics, setOwnerAnalytics] = useState(null);
+  const [liquidAccounts, setLiquidAccounts] = useState([]);
+  const [expenseAccounts, setExpenseAccounts] = useState([]);
 
   useEffect(() => {
     if (isOpen) {
@@ -43,6 +45,25 @@ export default function GeneralPaymentVoucherModal({
         .then((r) => r.json())
         .then((d) => {
           if (d.success) setOwnerAnalytics(d.data);
+        })
+        .catch(() => {});
+
+      // Fetch dynamic liquid & expense accounts from Chart of Accounts
+      fetch('/api/accounting/liquid-accounts')
+        .then((r) => r.json())
+        .then((d) => {
+          if (d.success && d.data?.length > 0) {
+            setLiquidAccounts(d.data);
+          }
+        })
+        .catch(() => {});
+
+      fetch('/api/accounting/expense-accounts')
+        .then((r) => r.json())
+        .then((d) => {
+          if (d.success && d.data?.length > 0) {
+            setExpenseAccounts(d.data);
+          }
         })
         .catch(() => {});
     }
@@ -103,6 +124,7 @@ export default function GeneralPaymentVoucherModal({
         offset_account_code: partyType === 'expense' ? expenseCategoryCode : undefined,
         amount: numAmount,
         payment_method: paymentMethod,
+        cash_account_code: paymentMethod,
         paper_bill_number: paperBillNumber.trim() || null,
         description: description.trim() || (partyType === 'owner' ? 'مسحوبات شخصية للمالك (جاري المالك)' : 'سند صرف نقدية'),
         notes: notes.trim() || null,
@@ -482,15 +504,25 @@ export default function GeneralPaymentVoucherModal({
                       onChange={(e) => setExpenseCategoryCode(e.target.value)}
                       className="w-full min-h-[44px] px-3.5 rounded-xl bg-slate-900 border border-white/15 text-white font-bold text-xs"
                     >
-                      <option value="6101">🏢 6101 - إيجار المحل والمركز</option>
-                      <option value="6102">⚡ 6102 - فواتير الكهرباء والماء والماطور</option>
-                      <option value="6103">🍲 6103 - غداء وضيافة العمال</option>
-                      <option value="6104">🔧 6104 - أدوات وعدد ومستلزمات بنشر</option>
-                      <option value="6105">🚚 6105 - نقل ومشاوير وتنزيل بضاعة</option>
-                      <option value="6106">⚙️ 6106 - صيانة رافعات وأجهزة المركز</option>
-                      <option value="6107">🧹 6107 - نظافة وعوائد بلدية ورسوم</option>
-                      <option value="6108">👷 6108 - أجور ورواتب أخرى</option>
-                      <option value="6109">📑 6109 - مصاريف تشغيلية ونثرية عامة</option>
+                      {expenseAccounts.length > 0 ? (
+                        expenseAccounts.map((exp) => (
+                          <option key={exp.code} value={exp.code}>
+                            📁 {exp.code} - {exp.name}
+                          </option>
+                        ))
+                      ) : (
+                        <>
+                          <option value="6101">🏢 6101 - إيجار المحل والمركز</option>
+                          <option value="6102">⚡ 6102 - فواتير الكهرباء والماء والماطور</option>
+                          <option value="6103">🍲 6103 - غداء وضيافة العمال</option>
+                          <option value="6104">🔧 6104 - أدوات وعدد ومستلزمات بنشر</option>
+                          <option value="6105">🚚 6105 - نقل ومشاوير وتنزيل بضاعة</option>
+                          <option value="6106">⚙️ 6106 - صيانة رافعات وأجهزة المركز</option>
+                          <option value="6107">🧹 6107 - نظافة وعوائد بلدية ورسوم</option>
+                          <option value="6108">👷 6108 - أجور ورواتب أخرى</option>
+                          <option value="6109">📑 6109 - مصاريف تشغيلية ونثرية عامة</option>
+                        </>
+                      )}
                     </select>
                   </div>
 
@@ -552,9 +584,21 @@ export default function GeneralPaymentVoucherModal({
                 onChange={(e) => setPaymentMethod(e.target.value)}
                 className="w-full min-h-[44px] px-3.5 rounded-xl bg-slate-900 border border-white/15 text-white text-xs cursor-pointer font-bold"
               >
-                <option value="cash">💵 نقداً - يصرف من صندوق الكاشير (حساب 1101)</option>
-                <option value="kuraimi">🏦 تحويل بنكي - من حساب بنك الكريمي (حساب 1102)</option>
-                <option value="jeeb">📱 محفظة إلكترونية - من محفظة جيب (حساب 1103)</option>
+                {liquidAccounts.length > 0 ? (
+                  liquidAccounts.map((acc) => (
+                    <option key={acc.code} value={acc.code}>
+                      {acc.sub_type === 'bank' ? '🏦' : acc.sub_type === 'e_wallet' ? '📱' : '💵'}{' '}
+                      {acc.name} (حساب {acc.code})
+                      {Number(acc.current_balance) > 0 ? ` • الرصيد: ${Number(acc.current_balance).toLocaleString()} ر.ي` : ''}
+                    </option>
+                  ))
+                ) : (
+                  <>
+                    <option value="1101">💵 نقداً - يصرف من صندوق الكاشير (حساب 1101)</option>
+                    <option value="1102">🏦 تحويل بنكي - من حساب بنك الكريمي (حساب 1102)</option>
+                    <option value="1103">📱 محفظة إلكترونية - من محفظة جيب (حساب 1103)</option>
+                  </>
+                )}
               </select>
             </div>
 

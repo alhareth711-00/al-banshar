@@ -347,6 +347,9 @@ CREATE TABLE IF NOT EXISTS chart_of_accounts (
     type TEXT NOT NULL CHECK(type IN ('asset', 'liability', 'equity', 'revenue', 'expense')),
     sub_type TEXT NOT NULL, -- 'cash_drawer', 'bank', 'e_wallet', 'receivable', 'inventory', 'payable', 'operating_expense', etc.
     normal_balance TEXT NOT NULL CHECK(normal_balance IN ('debit', 'credit')),
+    parent_code TEXT REFERENCES chart_of_accounts(code) ON DELETE RESTRICT ON UPDATE CASCADE,
+    level INTEGER NOT NULL DEFAULT 1,
+    is_system INTEGER NOT NULL DEFAULT 0,
     is_active INTEGER NOT NULL DEFAULT 1 CHECK(is_active IN (0, 1)),
     description TEXT,
     created_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime'))
@@ -354,6 +357,8 @@ CREATE TABLE IF NOT EXISTS chart_of_accounts (
 
 CREATE INDEX IF NOT EXISTS idx_coa_type ON chart_of_accounts(type);
 CREATE INDEX IF NOT EXISTS idx_coa_subtype ON chart_of_accounts(sub_type);
+CREATE INDEX IF NOT EXISTS idx_coa_parent ON chart_of_accounts(parent_code);
+CREATE INDEX IF NOT EXISTS idx_coa_level ON chart_of_accounts(level);
 
 -- 2. General Journal Entries (سجل قيود اليومية العامة المركزية)
 CREATE TABLE IF NOT EXISTS journal_entries (

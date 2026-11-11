@@ -199,6 +199,8 @@ const reportModel = {
       count_payments: 0,
       owner_drawings: 0,
       supplier_payments: 0,
+      worker_advances: 0,
+      worker_payouts: 0,
       operating_expenses: 0,
       list: [],
     };
@@ -225,6 +227,10 @@ const reportModel = {
             vouchersSummary.owner_drawings += v.amount;
           } else if (v.party_type === 'supplier' || v.offset_account_code === '2101') {
             vouchersSummary.supplier_payments += v.amount;
+          } else if (v.party_type === 'worker' || v.offset_account_code === '1202') {
+            vouchersSummary.worker_advances += v.amount;
+          } else if (v.party_type === 'worker' || v.offset_account_code === '6108') {
+            vouchersSummary.worker_payouts += v.amount;
           } else {
             vouchersSummary.operating_expenses += v.amount;
           }
@@ -371,9 +377,14 @@ const reportModel = {
 
     const totalFiltersCount = filtersSold.reduce((acc, curr) => acc + curr.qty_sold, 0);
 
-    // 11. Workers performance & daily base wages (لا عمولات - رواتب أساسية وسلف يومية فقط)
+    // 11. Workers performance, attendance, base wages & advances (لا عمولات - رواتب أساسية وسلف يومية فقط)
     const workers = db.prepare('SELECT * FROM workers WHERE active = 1 ORDER BY id ASC').all();
     const workerReports = [];
+    let totalPresentWorkers = 0;
+    let totalDailyWagesEarned = 0;
+    let totalAdvancesToday = 0;
+    let totalPayoutsToday = 0;
+    const workerAdvancesList = [];
 
     for (const w of workers) {
       const workerInvoices = db.prepare(`
@@ -381,32 +392,94 @@ const reportModel = {
           COUNT(*) AS jobs_done,
           COALESCE(SUM(labor_total), 0) AS total_labor
         FROM invoices
-        WHERE worker_id = ? AND date(created_at) = date(?)
+        WHERE worker_id = ? AND date(created_at) = date(?) AND is_voided = 0
       `).get(w.id, date);
 
-      const workerAdvances = db.prepare(`
-        SELECT COALESCE(SUM(amount), 0) AS advances
+      // Check attendance
+      const att = db.prepare(`
+        SELECT status, daily_wage FROM worker_attendance
+        WHERE worker_id = ? AND date(work_date) = date(?)
+      `).get(w.id, date);
+
+      const isPresent = att ? att.status === 'present' : (w.active === 1);
+      if (isPresent) totalPresentWorkers += 1;
+
+      const dailyBaseWage = isPresent 
+        ? (att && att.daily_wage !== null ? Number(att.daily_wage) : Number(w.daily_base_wage) || 0)
+        : 0;
+      totalDailyWagesEarned += dailyBaseWage;
+
+      // Query advances for this worker on this date (de-duplicated across official_vouchers and daily_transactions)
+      const advRows = db.prepare(`
+        SELECT 
+          amount, payment_method, description, created_at
         FROM daily_transactions
         WHERE worker_id = ? AND tx_type = 'worker_advance' AND date(created_at) = date(?)
-      `).get(w.id, date);
+        UNION ALL
+        SELECT 
+          amount, payment_method, description, created_at
+        FROM official_vouchers
+        WHERE party_type = 'worker' AND party_id = ? AND voucher_type = 'payment'
+          AND offset_account_code = '1202' AND status != 'cancelled' AND date(created_at) = date(?)
+          AND NOT EXISTS (
+            SELECT 1 FROM daily_transactions dt
+            WHERE dt.worker_id = ? AND dt.amount = official_vouchers.amount AND date(dt.created_at) = date(official_vouchers.created_at)
+          )
+      `).all(w.id, date, w.id, date, w.id);
 
-      const dailyBaseWage = w.daily_base_wage || 0;
-      const advancesTaken = workerAdvances.advances || 0;
-      const netPayableToday = dailyBaseWage - advancesTaken;
+      const workerAdvancesTotal = advRows.reduce((sum, r) => sum + Number(r.amount || 0), 0);
+      totalAdvancesToday += workerAdvancesTotal;
+
+      advRows.forEach((r) => {
+        workerAdvancesList.push({
+          worker_id: w.id,
+          worker_name: w.name,
+          amount: Number(r.amount || 0),
+          payment_method: r.payment_method || 'cash',
+          description: r.description || '',
+          time: r.created_at ? r.created_at.slice(11, 16) : '',
+        });
+      });
+
+      // Payouts / wage settlements today (offset 6108)
+      const payoutRow = db.prepare(`
+        SELECT COALESCE(SUM(amount), 0) AS total
+        FROM official_vouchers
+        WHERE party_type = 'worker' AND party_id = ? AND voucher_type = 'payment'
+          AND offset_account_code = '6108' AND status != 'cancelled' AND date(created_at) = date(?)
+      `).get(w.id, date);
+      const workerPayoutsTotal = Number(payoutRow ? payoutRow.total : 0);
+      totalPayoutsToday += workerPayoutsTotal;
+
+      const netPayableToday = dailyBaseWage - (workerAdvancesTotal + workerPayoutsTotal);
 
       workerReports.push({
         worker_id: w.id,
         worker_name: w.name,
         role: w.role,
+        is_present: isPresent,
         daily_base_wage: dailyBaseWage,
-        jobs_done: workerInvoices.jobs_done,
-        total_labor_generated: workerInvoices.total_labor,
+        jobs_done: workerInvoices ? workerInvoices.jobs_done : 0,
+        total_labor_generated: workerInvoices ? workerInvoices.total_labor : 0,
         commission_rate: 0,
         commission_earned: 0,
-        advances_taken: advancesTaken,
+        advances_taken: workerAdvancesTotal,
+        payouts_taken: workerPayoutsTotal,
         net_payable_today: netPayableToday,
       });
     }
+
+    const workersSummary = {
+      total_workers_count: workers.length,
+      present_count: totalPresentWorkers,
+      absent_count: workers.length - totalPresentWorkers,
+      total_daily_wages_earned: totalDailyWagesEarned,
+      total_advances_today: totalAdvancesToday,
+      total_payouts_today: totalPayoutsToday,
+      net_payable_today: totalDailyWagesEarned - (totalAdvancesToday + totalPayoutsToday),
+      list: workerReports,
+      advances_breakdown: workerAdvancesList,
+    };
 
     // 12. Low Stock alerts (critical inventory items needing reorder - products only & active)
     const lowStockAlerts = db.prepare(`
@@ -432,6 +505,84 @@ const reportModel = {
       WHERE date(dt.created_at) = date(?)
       ORDER BY dt.id DESC
     `).all(date);
+
+    // 13.1 Operating Expenses breakdown for today (تفصيل بنود المصاريف لليوم)
+    const expensesBreakdown = db.prepare(`
+      SELECT 
+        COALESCE(coa.name, 'مصروف تشغيلي') AS category_name,
+        ov.description,
+        ov.amount,
+        ov.payment_method
+      FROM official_vouchers ov
+      LEFT JOIN chart_of_accounts coa ON ov.offset_account_code = coa.code
+      WHERE date(ov.created_at) = date(?)
+        AND ov.voucher_type = 'payment'
+        AND ov.party_type NOT IN ('owner', 'supplier', 'worker')
+        AND ov.offset_account_code NOT IN ('3101', '2101', '1202', '6108')
+        AND ov.status != 'cancelled'
+      UNION ALL
+      SELECT 
+        'مصروف نقدي' AS category_name,
+        dt.description,
+        dt.amount,
+        dt.payment_method
+      FROM daily_transactions dt
+      WHERE date(dt.created_at) = date(?)
+        AND dt.tx_type = 'expense'
+        AND dt.description NOT LIKE '%(PV-%'
+        AND dt.description NOT LIKE '%سلفة%'
+      ORDER BY amount DESC
+    `).all(date, date);
+
+    // 13.2 New credit sales today (الديون الجديدة لليوم وتفاصيل المركبات والعملاء)
+    const newDebtsList = db.prepare(`
+      SELECT 
+        i.id,
+        i.invoice_number,
+        i.net_total,
+        i.paid_amount,
+        i.remaining_debt,
+        i.created_at,
+        COALESCE(cv.customer_name, 'عميل آجل') AS customer_name,
+        COALESCE(cv.plate_number, 'بدون رقم') AS plate_number,
+        COALESCE(cv.car_make_model, '') AS car_make_model
+      FROM invoices i
+      LEFT JOIN customers_vehicles cv ON i.vehicle_id = cv.id
+      WHERE date(i.created_at) = date(?)
+        AND i.remaining_debt > 0
+        AND i.is_voided = 0
+      ORDER BY i.remaining_debt DESC
+    `).all(date);
+
+    // 13.3 Debt collections today (تحصيلات ديون سابقة لليوم وسندات القبض)
+    const debtCollectionsList = db.prepare(`
+      SELECT 
+        ov.voucher_number,
+        ov.amount,
+        ov.payment_method,
+        COALESCE(ov.party_name, 'عميل') AS party_name,
+        ov.description,
+        ov.created_at
+      FROM official_vouchers ov
+      WHERE date(ov.created_at) = date(?)
+        AND ov.voucher_type = 'receipt'
+        AND ov.party_type = 'customer'
+        AND ov.status != 'cancelled'
+      UNION ALL
+      SELECT 
+        'RV-LEGACY' AS voucher_number,
+        dt.amount,
+        dt.payment_method,
+        COALESCE(cv.customer_name, 'عميل') AS party_name,
+        dt.description,
+        dt.created_at
+      FROM daily_transactions dt
+      LEFT JOIN customers_vehicles cv ON dt.vehicle_id = cv.id
+      WHERE date(dt.created_at) = date(?)
+        AND dt.tx_type = 'debt_collection'
+        AND dt.description NOT LIKE '%(RV-%'
+      ORDER BY amount DESC
+    `).all(date, date);
 
     // 14. Daily Growth & Comparison (Upgrade 1)
     const yesterdayDate = getPreviousDate(date, 1);
@@ -601,7 +752,7 @@ const reportModel = {
       },
       transactions_summary: {
         expenses_total: expensesTotal,
-        worker_advances_total: workerAdvancesTotal,
+        worker_advances_total: Math.max(workerAdvancesTotal, totalAdvancesToday),
         debt_collections_total: debtCollectionsTotal,
         recent_transactions: transactionsList,
         official_vouchers: vouchersSummary,
@@ -623,6 +774,10 @@ const reportModel = {
         items_sold: filtersSold,
       },
       workers_commissions: workerReports,
+      workers_summary: workersSummary,
+      expenses_breakdown: expensesBreakdown,
+      new_debts_list: newDebtsList,
+      debt_collections_list: debtCollectionsList,
       low_stock_alerts: lowStockAlerts,
       comparison,
       hourly_analytics: hourlyAnalytics,

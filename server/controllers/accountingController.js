@@ -3,11 +3,42 @@ const { asyncHandler, AppError } = require('../utils/errorHandler');
 
 const accountingController = {
   getAccounts: asyncHandler(async (req, res) => {
-    const accounts = accountingModel.getChartOfAccounts();
+    const isTree = req.query.tree === 'true' || req.query.tree === '1';
+    const accounts = accountingModel.getChartOfAccounts({ tree: isTree });
     res.json({
       success: true,
       count: accounts.length,
       data: accounts,
+    });
+  }),
+
+  getLiquidAccounts: asyncHandler(async (req, res) => {
+    const accounts = accountingModel.getLiquidAccounts();
+    res.json({
+      success: true,
+      count: accounts.length,
+      data: accounts,
+    });
+  }),
+
+  getExpenseAccounts: asyncHandler(async (req, res) => {
+    const accounts = accountingModel.getExpenseAccounts();
+    res.json({
+      success: true,
+      count: accounts.length,
+      data: accounts,
+    });
+  }),
+
+  getNextCode: asyncHandler(async (req, res) => {
+    const { parent_code } = req.query;
+    const nextCode = accountingModel.getNextAccountCode(parent_code);
+    res.json({
+      success: true,
+      data: {
+        parent_code: parent_code || null,
+        next_code: nextCode,
+      },
     });
   }),
 
@@ -23,10 +54,22 @@ const accountingController = {
     });
   }),
 
+  getAccountLedger: asyncHandler(async (req, res) => {
+    const { code } = req.params;
+    const ledger = accountingModel.getAccountLedger(code, req.query);
+    if (!ledger) {
+      throw new AppError('الحساب المالي غير موجود في دليل الحسابات', 404);
+    }
+    res.json({
+      success: true,
+      data: ledger,
+    });
+  }),
+
   createAccount: asyncHandler(async (req, res) => {
-    const { code, name, type } = req.body;
-    if (!code || !name || !type) {
-      throw new AppError('رمز الحساب، الاسم، والنوع الرئيسي حقول إلزامية', 400);
+    const { code, name } = req.body;
+    if (!code || !name) {
+      throw new AppError('رمز الحساب واسم الحساب حقول إلزامية', 400);
     }
     const account = accountingModel.createAccount(req.body);
     res.status(201).json({
@@ -34,6 +77,22 @@ const accountingController = {
       message: 'تم إضافة الحساب المالي بنجاح',
       data: account,
     });
+  }),
+
+  updateAccount: asyncHandler(async (req, res) => {
+    const { code } = req.params;
+    const account = accountingModel.updateAccount(code, req.body);
+    res.json({
+      success: true,
+      message: 'تم تحديث بيانات الحساب بنجاح',
+      data: account,
+    });
+  }),
+
+  deleteAccount: asyncHandler(async (req, res) => {
+    const { code } = req.params;
+    const result = accountingModel.deleteAccount(code);
+    res.json(result);
   }),
 
   getJournalEntries: asyncHandler(async (req, res) => {

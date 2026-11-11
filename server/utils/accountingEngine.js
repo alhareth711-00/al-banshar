@@ -12,56 +12,105 @@ const { formatDate } = require('./helpers');
  */
 function seedChartOfAccounts(db) {
   const accounts = [
-    // 1000 - Assets (الأصول)
-    { code: '1101', name: 'الصندوق النقدي الرئيسي (الدرج)', type: 'asset', sub_type: 'cash_drawer', normal_balance: 'debit', description: 'النقدية الحاضرة في درج كاشير المركز' },
-    { code: '1102', name: 'حساب بنك الكريمي', type: 'asset', sub_type: 'bank', normal_balance: 'debit', description: 'حساب مصرف الكريمي للتمويل الأصغر الإسلامي' },
-    { code: '1103', name: 'محفظة جيب الإلكترونية', type: 'asset', sub_type: 'e_wallet', normal_balance: 'debit', description: 'محفظة جيب (بنك اليمن الدولي)' },
-    { code: '1104', name: 'محفظة جوالي الإلكترونية', type: 'asset', sub_type: 'e_wallet', normal_balance: 'debit', description: 'محفظة جوالي (بنك اليمن والكويت)' },
-    { code: '1105', name: 'محفظة ون كاش الإلكترونية', type: 'asset', sub_type: 'e_wallet', normal_balance: 'debit', description: 'محفظة ون كاش (بنك القطيبي)' },
-    { code: '1201', name: 'ذمم العملاء (حسابات الزبائن الآجلة)', type: 'asset', sub_type: 'receivable', normal_balance: 'debit', description: 'الديون المستحقة للمركز طرف أصحاب السيارات' },
-    { code: '1202', name: 'سلف وذمم الفنيين والعمال', type: 'asset', sub_type: 'receivable', normal_balance: 'debit', description: 'المسحوبات والسلف اليومية الممنوحة للفنيين' },
-    { code: '1301', name: 'مخزون الزيوت والمحركات', type: 'asset', sub_type: 'inventory', normal_balance: 'debit', description: 'قيمة مخزون زيوت السيارات بمختلف اللزوجات' },
-    { code: '1302', name: 'مخزون الفلاتر', type: 'asset', sub_type: 'inventory', normal_balance: 'debit', description: 'قيمة مخزون فلاتر الزيت والهواء والمكيف' },
-    { code: '1303', name: 'مخزون الإطارات والجنوط', type: 'asset', sub_type: 'inventory', normal_balance: 'debit', description: 'قيمة مخزون إطارات السيارات بمختلف المقاسات' },
-    { code: '1304', name: 'مخزون البطاريات والرجيع', type: 'asset', sub_type: 'inventory', normal_balance: 'debit', description: 'قيمة مخزون البطاريات الجديدة والرجيع المسترجع' },
-    { code: '1305', name: 'مخزون الإكسسوارات والمواد الاستهلاكية', type: 'asset', sub_type: 'inventory', normal_balance: 'debit', description: 'قيمة سوائل التبريد والفرامل ومستلزمات البنشر' },
+    // =========================================================================
+    // LEVEL 1: Main Classification Roots (الأبواب المحاسبية الستة الكبرى)
+    // =========================================================================
+    { code: '1', name: 'الأصول', type: 'asset', sub_type: 'root_asset', normal_balance: 'debit', parent_code: null, level: 1, is_system: 1, description: 'جميع الممتلكات والموجودات والنقدية التابعة للمركز' },
+    { code: '2', name: 'الخصوم والالتزامات', type: 'liability', sub_type: 'root_liability', normal_balance: 'credit', parent_code: null, level: 1, is_system: 1, description: 'الالتزامات والديون المستحقة على المركز للموردين أو العمال' },
+    { code: '3', name: 'حقوق الملكية', type: 'equity', sub_type: 'root_equity', normal_balance: 'credit', parent_code: null, level: 1, is_system: 1, description: 'رأس مال المركز وحصة المالك وصافي الأرباح التراكمية' },
+    { code: '4', name: 'الإيرادات', type: 'revenue', sub_type: 'root_revenue', normal_balance: 'credit', parent_code: null, level: 1, is_system: 1, description: 'إجمالي العوائد والمبيعات المحققة من نشاط المركز والخدمات' },
+    { code: '5', name: 'تكلفة النشاط والمبيعات', type: 'expense', sub_type: 'root_cogs', normal_balance: 'debit', parent_code: null, level: 1, is_system: 1, description: 'تكلفة البضائع والزيوت والفلاتر المباعة للعملاء (COGS)' },
+    { code: '6', name: 'المصروفات التشغيلية والإدارية', type: 'expense', sub_type: 'root_expense', normal_balance: 'debit', parent_code: null, level: 1, is_system: 1, description: 'كافة تكاليف التشغيل، الإيجار، الرواتب، والخدمات المساعدة' },
 
-    // 2000 - Liabilities (الخصوم والالتزامات)
-    { code: '2101', name: 'ذمم الموردين (حسابات الموردين الدائنة)', type: 'liability', sub_type: 'payable', normal_balance: 'credit', description: 'المستحقات الآجلة لموردي ووكلاء الزيوت والإطارات' },
-    { code: '2201', name: 'مستحقات وأجور العمال المستحقة', type: 'liability', sub_type: 'payable', normal_balance: 'credit', description: 'أجور وعمولات الفنيين المستحقة غير المصروفة' },
+    // =========================================================================
+    // LEVEL 2: Intermediate Groups (المجموعات والحسابات الإجمالية العامة)
+    // =========================================================================
+    // 1 - الأصول
+    { code: '11', name: 'النقدية وما في حكمها (الصناديق والبنوك والمحافظ)', type: 'asset', sub_type: 'cash_and_banks', normal_balance: 'debit', parent_code: '1', level: 2, is_system: 1, description: 'السيولة النقدية الحاضرة والأرصدة البنكية والمحافظ الرقمية' },
+    { code: '12', name: 'الذمم المدينة والعملاء (حقوق المركز لدى الغير)', type: 'asset', sub_type: 'receivables_group', normal_balance: 'debit', parent_code: '1', level: 2, is_system: 1, description: 'ديون العملاء الآجلة وسلف الفنيين' },
+    { code: '13', name: 'المخزون السلعي (البضاعة بالمستودع والرفوف)', type: 'asset', sub_type: 'inventory_group', normal_balance: 'debit', parent_code: '1', level: 2, is_system: 1, description: 'قيمة بضاعة المخزون من زيوت وفلاتر وإطارات وبطاريات' },
 
-    // 3000 - Equity (حقوق الملكية)
-    { code: '3001', name: 'رأس المال / الأرصدة الافتتاحية (بضاعة أول المدة)', type: 'equity', sub_type: 'capital', normal_balance: 'credit', description: 'رأس المال الافتتاحي وحقوق الملكية المقابلة لبضاعة أول المدة والأرصدة التأسيسية' },
-    { code: '3101', name: 'رأس المال التشغيلي / جاري المالك', type: 'equity', sub_type: 'capital', normal_balance: 'credit', description: 'أموال مالك المركز المستثمرة في النشاط' },
-    { code: '3201', name: 'الأرباح والخسائر المدورة', type: 'equity', sub_type: 'retained_earnings', normal_balance: 'credit', description: 'صافي الأرباح المتراكمة من النشاط' },
+    // 2 - الخصوم
+    { code: '21', name: 'الذمم الدائنة والموردون (مستحقات وكلاء البضاعة)', type: 'liability', sub_type: 'payables_group', normal_balance: 'credit', parent_code: '2', level: 2, is_system: 1, description: 'حسابات الموردين ووكلاء الشركات المستحقة للمركز' },
+    { code: '22', name: 'الأجور والمستحقات العمالية قصيرة الأجل', type: 'liability', sub_type: 'payables_group', normal_balance: 'credit', parent_code: '2', level: 2, is_system: 1, description: 'مستحقات وأجور وعمولات طاقم العمل المعلقة' },
 
-    // 4000 - Revenues (الإيرادات)
-    { code: '4101', name: 'إيراد مبيعات الأصناف والبضائع', type: 'revenue', sub_type: 'goods_sales', normal_balance: 'credit', description: 'إيرادات بيع الزيوت والفلاتر والإطارات والبطاريات' },
-    { code: '4201', name: 'إيراد الخدمات والتركيب', type: 'revenue', sub_type: 'service_revenue', normal_balance: 'credit', description: 'إيرادات خدمات تغيير الزيت، البنشر، والترصيص (ربح صافٍ)' },
-    { code: '4301', name: 'إيراد مبيعات البطاريات الرجيع والخردة', type: 'revenue', sub_type: 'scrap_revenue', normal_balance: 'credit', description: 'عوائد بيع بطاريات السكراب المسترجعة' },
-    { code: '4302', name: 'إيراد مبيعات الزيوت التالفة والتدوير', type: 'revenue', sub_type: 'reclamation_revenue', normal_balance: 'credit', description: 'عوائد بيع الزيوت المحروقة والتالفة لشركات التدوير (ربح صافٍ 100%)' },
-    { code: '4303', name: 'فائض وأرباح تسوية عهدة الصندوق', type: 'revenue', sub_type: 'cash_surplus', normal_balance: 'credit', description: 'الفائض النقدي غير المفسر الناتج عن جرد وتسوية عهدة الصندوق عند إغلاق الورديات' },
+    // 3 - حقوق الملكية
+    { code: '30', name: 'رأس المال والأرصدة التأسيسية والاحتياطيات', type: 'equity', sub_type: 'capital_group', normal_balance: 'credit', parent_code: '3', level: 2, is_system: 1, description: 'رأس مال التأسيس وبضاعة أول المدة والأرباح المدورة' },
 
-    // 5000 - Cost of Goods Sold (تكلفة البضاعة المباعة)
-    { code: '5101', name: 'تكلفة البضاعة المباعة (COGS)', type: 'expense', sub_type: 'cost_of_goods_sold', normal_balance: 'debit', description: 'التكلفة الشرائية للزيوت والفلاتر والإطارات المباعة' },
+    // 4 - الإيرادات
+    { code: '41', name: 'إيرادات المبيعات والخدمات الميدانية', type: 'revenue', sub_type: 'sales_group', normal_balance: 'credit', parent_code: '4', level: 2, is_system: 1, description: 'مبيعات الأصناف وخدمات تغيير الزيوت والترصيص والبنشر' },
+    { code: '43', name: 'عوائد وإيرادات تدوير وأخرى', type: 'revenue', sub_type: 'other_revenue_group', normal_balance: 'credit', parent_code: '4', level: 2, is_system: 1, description: 'بيع البطاريات السكراب والزيوت المسترجعة وفائض تسوية العهدة' },
 
-    // 6000 - Operating & Administrative Expenses (المصروفات التشغيلية)
-    { code: '6101', name: 'إيجار المحل والمركز', type: 'expense', sub_type: 'operating_expense', normal_balance: 'debit', description: 'الإيجار الدوري لمقر المركز' },
-    { code: '6102', name: 'فواتير الكهرباء والماء والماطور', type: 'expense', sub_type: 'operating_expense', normal_balance: 'debit', description: 'فواتير الكهرباء والديزل للمولد والماء' },
-    { code: '6103', name: 'غداء وضيافة العمال', type: 'expense', sub_type: 'operating_expense', normal_balance: 'debit', description: 'وجبات غداء وشاي وضيافة الفنيين' },
-    { code: '6104', name: 'أدوات وعدد ومستلزمات بنشر', type: 'expense', sub_type: 'operating_expense', normal_balance: 'debit', description: 'رقع تيوبلس، غراء، بلوف، صوابين، وخرق' },
-    { code: '6105', name: 'نقل ومشاوير وتنزيل بضاعة', type: 'expense', sub_type: 'operating_expense', normal_balance: 'debit', description: 'أجور تحميل وتنزيل ونقل البضائع من الموردين' },
-    { code: '6106', name: 'صيانة رافعات وأجهزة المركز', type: 'expense', sub_type: 'operating_expense', normal_balance: 'debit', description: 'صيانة ماطور الهواء، الرافعة الهيدروليكية، وماكينة الترصيص' },
-    { code: '6107', name: 'نظافة وعوائد بلدية ورسوم', type: 'expense', sub_type: 'operating_expense', normal_balance: 'debit', description: 'رسوم النظافة والبلدية ومستلزمات الغسيل' },
-    { code: '6108', name: 'أجور ورواتب الفنيين الأساسية', type: 'expense', sub_type: 'operating_expense', normal_balance: 'debit', description: 'الأجور اليومية والشهرية الأساسية لطاقم العمل' },
-    { code: '6109', name: 'مصاريف تشغيلية ونثرية عامة', type: 'expense', sub_type: 'operating_expense', normal_balance: 'debit', description: 'أي مصاريف نثرية أو طارئة أخرى' },
-    { code: '6110', name: 'عجز وفروقات عهدة الصندوق النقدي', type: 'expense', sub_type: 'cash_shortage', normal_balance: 'debit', description: 'العجز النقدي المثبت رسمياً الناتج عن جرد وتسوية عهدة الصندوق عند إغلاق الورديات' },
-    { code: '6201', name: 'خصومات مسموح بها للعملاء', type: 'expense', sub_type: 'discount_allowed', normal_balance: 'debit', description: 'التخفيضات والخصومات الممنوحة في فواتير المبيعات' },
+    // 5 - تكلفة النشاط
+    { code: '51', name: 'تكلفة البضاعة المباعة المباشرة', type: 'expense', sub_type: 'cogs_group', normal_balance: 'debit', parent_code: '5', level: 2, is_system: 1, description: 'التكلفة الشرائية للبضائع المباعة محسوبة بالمتوسط المرجح WAC' },
+
+    // 6 - المصروفات
+    { code: '61', name: 'المصروفات التشغيلية والخدمية للمركز', type: 'expense', sub_type: 'operating_expense_group', normal_balance: 'debit', parent_code: '6', level: 2, is_system: 1, description: 'نفقات تشغيل المركز اليومية والدورية' },
+    { code: '62', name: 'الخصومات والتخفيضات الممنوحة', type: 'expense', sub_type: 'discounts_group', normal_balance: 'debit', parent_code: '6', level: 2, is_system: 1, description: 'التخفيضات والخصومات التجارية الممنوحة للعملاء' },
+
+    // =========================================================================
+    // LEVEL 3: Operational Detail Accounts (الحسابات المساعدة والتفصيلية التشغيلية)
+    // =========================================================================
+    // 11 - النقدية والمصارف
+    { code: '1101', name: 'الصندوق النقدي الرئيسي (الدرج)', type: 'asset', sub_type: 'cash_drawer', normal_balance: 'debit', parent_code: '11', level: 3, is_system: 1, description: 'النقدية الحاضرة في درج كاشير المركز' },
+    { code: '1102', name: 'حساب بنك الكريمي', type: 'asset', sub_type: 'bank', normal_balance: 'debit', parent_code: '11', level: 3, is_system: 1, description: 'حساب مصرف الكريمي للتمويل الأصغر الإسلامي' },
+    { code: '1103', name: 'محفظة جيب الإلكترونية', type: 'asset', sub_type: 'e_wallet', normal_balance: 'debit', parent_code: '11', level: 3, is_system: 1, description: 'محفظة جيب (بنك اليمن الدولي)' },
+    { code: '1104', name: 'محفظة جوالي الإلكترونية', type: 'asset', sub_type: 'e_wallet', normal_balance: 'debit', parent_code: '11', level: 3, is_system: 1, description: 'محفظة جوالي (بنك اليمن والكويت)' },
+    { code: '1105', name: 'محفظة ون كاش الإلكترونية', type: 'asset', sub_type: 'e_wallet', normal_balance: 'debit', parent_code: '11', level: 3, is_system: 1, description: 'محفظة ون كاش (بنك القطيبي)' },
+
+    // 12 - الذمم والمدينون
+    { code: '1201', name: 'ذمم العملاء (حسابات الزبائن الآجلة)', type: 'asset', sub_type: 'receivable', normal_balance: 'debit', parent_code: '12', level: 3, is_system: 1, description: 'الديون المستحقة للمركز طرف أصحاب السيارات' },
+    { code: '1202', name: 'سلف وذمم الفنيين والعمال', type: 'asset', sub_type: 'receivable', normal_balance: 'debit', parent_code: '12', level: 3, is_system: 1, description: 'المسحوبات والسلف اليومية الممنوحة للفنيين' },
+
+    // 13 - المخزون السلعي
+    { code: '1301', name: 'مخزون الزيوت والمحركات', type: 'asset', sub_type: 'inventory', normal_balance: 'debit', parent_code: '13', level: 3, is_system: 1, description: 'قيمة مخزون زيوت السيارات بمختلف اللزوجات' },
+    { code: '1302', name: 'مخزون الفلاتر', type: 'asset', sub_type: 'inventory', normal_balance: 'debit', parent_code: '13', level: 3, is_system: 1, description: 'قيمة مخزون فلاتر الزيت والهواء والمكيف' },
+    { code: '1303', name: 'مخزون الإطارات والجنوط', type: 'asset', sub_type: 'inventory', normal_balance: 'debit', parent_code: '13', level: 3, is_system: 1, description: 'قيمة مخزون إطارات السيارات بمختلف المقاسات' },
+    { code: '1304', name: 'مخزون البطاريات والرجيع', type: 'asset', sub_type: 'inventory', normal_balance: 'debit', parent_code: '13', level: 3, is_system: 1, description: 'قيمة مخزون البطاريات الجديدة والرجيع المسترجع' },
+    { code: '1305', name: 'مخزون الإكسسوارات والمواد الاستهلاكية', type: 'asset', sub_type: 'inventory', normal_balance: 'debit', parent_code: '13', level: 3, is_system: 1, description: 'قيمة سوائل التبريد والفرامل ومستلزمات البنشر' },
+
+    // 21 & 22 - الخصوم والالتزامات
+    { code: '2101', name: 'ذمم الموردين (حسابات الموردين الدائنة)', type: 'liability', sub_type: 'payable', normal_balance: 'credit', parent_code: '21', level: 3, is_system: 1, description: 'المستحقات الآجلة لموردي ووكلاء الزيوت والإطارات' },
+    { code: '2201', name: 'مستحقات وأجور العمال المستحقة', type: 'liability', sub_type: 'payable', normal_balance: 'credit', parent_code: '22', level: 3, is_system: 1, description: 'أجور وعمولات الفنيين المستحقة غير المصروفة' },
+
+    // 30 - حقوق الملكية
+    { code: '3001', name: 'رأس المال / الأرصدة الافتتاحية (بضاعة أول المدة)', type: 'equity', sub_type: 'capital', normal_balance: 'credit', parent_code: '30', level: 3, is_system: 1, description: 'رأس المال الافتتاحي وحقوق الملكية المقابلة لبضاعة أول المدة والأرصدة التأسيسية' },
+    { code: '3101', name: 'رأس المال التشغيلي / جاري المالك', type: 'equity', sub_type: 'capital', normal_balance: 'credit', parent_code: '30', level: 3, is_system: 1, description: 'أموال مالك المركز المستثمرة في النشاط' },
+    { code: '3201', name: 'الأرباح والخسائر المدورة', type: 'equity', sub_type: 'retained_earnings', normal_balance: 'credit', parent_code: '30', level: 3, is_system: 1, description: 'صافي الأرباح المتراكمة من النشاط' },
+
+    // 41 & 43 - الإيرادات
+    { code: '4101', name: 'إيراد مبيعات الأصناف والبضائع', type: 'revenue', sub_type: 'goods_sales', normal_balance: 'credit', parent_code: '41', level: 3, is_system: 1, description: 'إيرادات بيع الزيوت والفلاتر والإطارات والبطاريات' },
+    { code: '4201', name: 'إيراد الخدمات والتركيب', type: 'revenue', sub_type: 'service_revenue', normal_balance: 'credit', parent_code: '41', level: 3, is_system: 1, description: 'إيرادات خدمات تغيير الزيت، البنشر، والترصيص (ربح صافٍ)' },
+    { code: '4301', name: 'إيراد مبيعات البطاريات الرجيع والخردة', type: 'revenue', sub_type: 'scrap_revenue', normal_balance: 'credit', parent_code: '43', level: 3, is_system: 1, description: 'عوائد بيع بطاريات السكراب المسترجعة' },
+    { code: '4302', name: 'إيراد مبيعات الزيوت التالفة والتدوير', type: 'revenue', sub_type: 'reclamation_revenue', normal_balance: 'credit', parent_code: '43', level: 3, is_system: 1, description: 'عوائد بيع الزيوت المحروقة والتالفة لشركات التدوير (ربح صافٍ 100%)' },
+    { code: '4303', name: 'فائض وأرباح تسوية عهدة الصندوق', type: 'revenue', sub_type: 'cash_surplus', normal_balance: 'credit', parent_code: '43', level: 3, is_system: 1, description: 'الفائض النقدي غير المفسر الناتج عن جرد وتسوية عهدة الصندوق عند إغلاق الورديات' },
+
+    // 51 - تكلفة البضاعة المباعة
+    { code: '5101', name: 'تكلفة البضاعة المباعة (COGS)', type: 'expense', sub_type: 'cost_of_goods_sold', normal_balance: 'debit', parent_code: '51', level: 3, is_system: 1, description: 'التكلفة الشرائية للزيوت والفلاتر والإطارات المباعة' },
+
+    // 61 & 62 - المصروفات التشغيلية
+    { code: '6101', name: 'إيجار المحل والمركز', type: 'expense', sub_type: 'operating_expense', normal_balance: 'debit', parent_code: '61', level: 3, is_system: 1, description: 'الإيجار الدوري لمقر المركز' },
+    { code: '6102', name: 'فواتير الكهرباء والماء والماطور', type: 'expense', sub_type: 'operating_expense', normal_balance: 'debit', parent_code: '61', level: 3, is_system: 1, description: 'فواتير الكهرباء والديزل للمولد والماء' },
+    { code: '6103', name: 'غداء وضيافة العمال', type: 'expense', sub_type: 'operating_expense', normal_balance: 'debit', parent_code: '61', level: 3, is_system: 1, description: 'وجبات غداء وشاي وضيافة الفنيين' },
+    { code: '6104', name: 'أدوات وعدد ومستلزمات بنشر', type: 'expense', sub_type: 'operating_expense', normal_balance: 'debit', parent_code: '61', level: 3, is_system: 1, description: 'رقع تيوبلس، غراء، بلوف، صوابين، وخرق' },
+    { code: '6105', name: 'نقل ومشاوير وتنزيل بضاعة', type: 'expense', sub_type: 'operating_expense', normal_balance: 'debit', parent_code: '61', level: 3, is_system: 1, description: 'أجور تحميل وتنزيل ونقل البضائع من الموردين' },
+    { code: '6106', name: 'صيانة رافعات وأجهزة المركز', type: 'expense', sub_type: 'operating_expense', normal_balance: 'debit', parent_code: '61', level: 3, is_system: 1, description: 'صيانة ماطور الهواء، الرافعة الهيدروليكية، وماكينة الترصيص' },
+    { code: '6107', name: 'نظافة وعوائد بلدية ورسوم', type: 'expense', sub_type: 'operating_expense', normal_balance: 'debit', parent_code: '61', level: 3, is_system: 1, description: 'رسوم النظافة والبلدية ومستلزمات الغسيل' },
+    { code: '6108', name: 'أجور ورواتب الفنيين الأساسية', type: 'expense', sub_type: 'operating_expense', normal_balance: 'debit', parent_code: '61', level: 3, is_system: 1, description: 'الأجور اليومية والشهرية الأساسية لطاقم العمل' },
+    { code: '6109', name: 'مصاريف تشغيلية ونثرية عامة', type: 'expense', sub_type: 'operating_expense', normal_balance: 'debit', parent_code: '61', level: 3, is_system: 1, description: 'أي مصاريف نثرية أو طارئة أخرى' },
+    { code: '6110', name: 'عجز وفروقات عهدة الصندوق النقدي', type: 'expense', sub_type: 'cash_shortage', normal_balance: 'debit', parent_code: '61', level: 3, is_system: 1, description: 'العجز النقدي المثبت رسمياً الناتج عن جرد وتسوية عهدة الصندوق عند إغلاق الورديات' },
+    { code: '6201', name: 'خصومات مسموح بها للعملاء', type: 'expense', sub_type: 'discount_allowed', normal_balance: 'debit', parent_code: '62', level: 3, is_system: 1, description: 'التخفيضات والخصومات الممنوحة في فواتير المبيعات' },
   ];
 
   const stmt = db.prepare(`
-    INSERT OR IGNORE INTO chart_of_accounts (code, name, type, sub_type, normal_balance, description)
-    VALUES (@code, @name, @type, @sub_type, @normal_balance, @description)
+    INSERT INTO chart_of_accounts (code, name, type, sub_type, normal_balance, parent_code, level, is_system, description)
+    VALUES (@code, @name, @type, @sub_type, @normal_balance, @parent_code, @level, @is_system, @description)
+    ON CONFLICT(code) DO UPDATE SET
+      parent_code = excluded.parent_code,
+      level = excluded.level,
+      is_system = excluded.is_system,
+      type = excluded.type,
+      normal_balance = excluded.normal_balance
   `);
 
   const runSeed = db.transaction(() => {
@@ -71,18 +120,35 @@ function seedChartOfAccounts(db) {
   });
 
   runSeed();
-  console.log(`[Accounting] Successfully configured ${accounts.length} enterprise accounts.`);
+  console.log(`[Accounting] Successfully configured ${accounts.length} enterprise multi-level accounts.`);
 }
 
 /**
  * Returns account code for a given payment method in sales/receipts context.
  */
-function getPaymentMethodAccountCode(paymentMethod) {
-  switch (paymentMethod) {
+function getPaymentMethodAccountCode(paymentMethod, db) {
+  if (!paymentMethod) return '1101';
+  const str = String(paymentMethod).trim();
+
+  if (/^11\d+$/.test(str)) {
+    return str;
+  }
+
+  if (db && typeof db.prepare === 'function') {
+    try {
+      const acc = db.prepare('SELECT code FROM chart_of_accounts WHERE code = ? AND is_active = 1').get(str);
+      if (acc) return acc.code;
+    } catch {
+      // fallback
+    }
+  }
+
+  switch (str) {
     case 'kuraimi': return '1102';
     case 'jeeb':    return '1103';
     case 'jawali':  return '1104';
     case 'onecash': return '1105';
+    case 'bank':    return '1102';
     case 'credit':  return '1101'; // Downpayment on credit sale is received cash into drawer
     case 'cash':
     default:        return '1101'; // Cash Drawer
@@ -92,8 +158,24 @@ function getPaymentMethodAccountCode(paymentMethod) {
 /**
  * Returns disbursement account code for purchases (cannot be 1201 Customer Receivable).
  */
-function getPurchasePaymentAccountCode(paymentMethod) {
-  switch (paymentMethod) {
+function getPurchasePaymentAccountCode(paymentMethod, db) {
+  if (!paymentMethod) return '1101';
+  const str = String(paymentMethod).trim();
+
+  if (/^11\d+$/.test(str)) {
+    return str;
+  }
+
+  if (db && typeof db.prepare === 'function') {
+    try {
+      const acc = db.prepare('SELECT code FROM chart_of_accounts WHERE code = ? AND is_active = 1').get(str);
+      if (acc) return acc.code;
+    } catch {
+      // fallback
+    }
+  }
+
+  switch (str) {
     case 'kuraimi': return '1102';
     case 'jeeb':    return '1103';
     case 'jawali':  return '1104';

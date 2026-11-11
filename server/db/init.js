@@ -348,6 +348,26 @@ function initDb() {
     console.warn('[DB] Pre-migration warning on journal_entries:', err.message);
   }
 
+  // Stage 5 Pre-schema migration: upgrade chart_of_accounts with hierarchy columns before schema.sql index execution
+  try {
+    const coaCheck = db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='chart_of_accounts'").get();
+    if (coaCheck) {
+      const coaCols = db.prepare("PRAGMA table_info(chart_of_accounts)").all().map(c => c.name);
+      if (!coaCols.includes('parent_code')) {
+        db.exec("ALTER TABLE chart_of_accounts ADD COLUMN parent_code TEXT REFERENCES chart_of_accounts(code) ON UPDATE CASCADE");
+      }
+      if (!coaCols.includes('level')) {
+        db.exec("ALTER TABLE chart_of_accounts ADD COLUMN level INTEGER NOT NULL DEFAULT 1");
+      }
+      if (!coaCols.includes('is_system')) {
+        db.exec("ALTER TABLE chart_of_accounts ADD COLUMN is_system INTEGER NOT NULL DEFAULT 0");
+      }
+      console.log('[DB] Pre-schema migration applied: upgraded chart_of_accounts with parent_code, level, is_system.');
+    }
+  } catch (err) {
+    console.warn('[DB] Pre-migration warning on chart_of_accounts:', err.message);
+  }
+
   const schemaPath = path.join(__dirname, 'schema.sql');
   const schemaSql = fs.readFileSync(schemaPath, 'utf8');
 

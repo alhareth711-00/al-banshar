@@ -182,27 +182,39 @@ const voucherModel = {
       const partyType = data.party_type || 'other';
       const partyId = data.party_id ? Number(data.party_id) : null;
       let partyName = (data.party_name || '').trim();
-      const paymentMethod = data.payment_method || 'cash';
+      let paymentMethod = data.payment_method || 'cash';
       const paperBillNumber = data.paper_bill_number ? data.paper_bill_number.trim() : null;
 
-      // Duplicate prevention for manual paper voucher numbers in current fiscal year
-      if (paperBillNumber) {
-        const dupBill = db.prepare(`
-          SELECT voucher_number FROM official_vouchers 
-          WHERE paper_bill_number = ? AND voucher_type = ? AND strftime('%Y', created_at) = strftime('%Y', 'now')
-          LIMIT 1
-        `).get(paperBillNumber, voucherType);
-        if (dupBill) {
-          console.warn(`[Voucher] Warning: paper_bill_number (${paperBillNumber}) already registered under voucher ${dupBill.voucher_number}`);
+      // Map payment method to asset account code and normalize payment_method for CHECK constraint
+      let cashAccountCode = data.cash_account_code;
+      if (/^11\d+$/.test(paymentMethod)) {
+        cashAccountCode = paymentMethod;
+        const accInfo = db.prepare('SELECT sub_type FROM chart_of_accounts WHERE code = ?').get(paymentMethod);
+        if (accInfo?.sub_type === 'cash_drawer') paymentMethod = 'cash';
+        else if (accInfo?.sub_type === 'e_wallet') paymentMethod = 'jeeb';
+        else paymentMethod = 'bank';
+      } else if (!cashAccountCode) {
+        if (paymentMethod === 'kuraimi' || paymentMethod === 'bank') {
+          cashAccountCode = '1102';
+        } else if (paymentMethod === 'jeeb') {
+          cashAccountCode = '1103';
+        } else if (paymentMethod === 'jawali') {
+          cashAccountCode = '1104';
+        } else if (paymentMethod === 'onecash') {
+          cashAccountCode = '1105';
+        } else {
+          cashAccountCode = '1101';
         }
       }
 
-      // Map payment method to asset account code
-      let cashAccountCode = '1101';
-      if (paymentMethod === 'kuraimi' || paymentMethod === 'bank') cashAccountCode = '1102';
-      else if (paymentMethod === 'jeeb') cashAccountCode = '1103';
-      else if (paymentMethod === 'jawali') cashAccountCode = '1104';
-      else if (paymentMethod === 'onecash') cashAccountCode = '1105';
+      if (cashAccountCode) {
+        const checkCashAcc = db.prepare('SELECT code FROM chart_of_accounts WHERE code = ? AND is_active = 1').get(cashAccountCode);
+        if (!checkCashAcc) {
+          cashAccountCode = '1101';
+        }
+      } else {
+        cashAccountCode = '1101';
+      }
 
       // Determine offset account code & adjust balance if customer/supplier/owner
       let offsetAccountCode = data.offset_account_code;
@@ -484,11 +496,36 @@ const voucherModel = {
       db.prepare('DELETE FROM voucher_items WHERE voucher_id = ?').run(existing.id);
 
       // 2. APPLY NEW IMPACTS
-      let cashAccountCode = '1101';
-      if (newPaymentMethod === 'kuraimi' || newPaymentMethod === 'bank') cashAccountCode = '1102';
-      else if (newPaymentMethod === 'jeeb') cashAccountCode = '1103';
-      else if (newPaymentMethod === 'jawali') cashAccountCode = '1104';
-      else if (newPaymentMethod === 'onecash') cashAccountCode = '1105';
+      let effectivePaymentMethod = newPaymentMethod;
+      let cashAccountCode = data.cash_account_code;
+      if (/^11\d+$/.test(newPaymentMethod)) {
+        cashAccountCode = newPaymentMethod;
+        const accInfo = db.prepare('SELECT sub_type FROM chart_of_accounts WHERE code = ?').get(newPaymentMethod);
+        if (accInfo?.sub_type === 'cash_drawer') effectivePaymentMethod = 'cash';
+        else if (accInfo?.sub_type === 'e_wallet') effectivePaymentMethod = 'jeeb';
+        else effectivePaymentMethod = 'bank';
+      } else if (!cashAccountCode) {
+        if (newPaymentMethod === 'kuraimi' || newPaymentMethod === 'bank') {
+          cashAccountCode = '1102';
+        } else if (newPaymentMethod === 'jeeb') {
+          cashAccountCode = '1103';
+        } else if (newPaymentMethod === 'jawali') {
+          cashAccountCode = '1104';
+        } else if (newPaymentMethod === 'onecash') {
+          cashAccountCode = '1105';
+        } else {
+          cashAccountCode = '1101';
+        }
+      }
+
+      if (cashAccountCode) {
+        const checkCashAccUpdate = db.prepare('SELECT code FROM chart_of_accounts WHERE code = ? AND is_active = 1').get(cashAccountCode);
+        if (!checkCashAccUpdate) {
+          cashAccountCode = '1101';
+        }
+      } else {
+        cashAccountCode = '1101';
+      }
 
       let offsetAccountCode = data.offset_account_code || existing.offset_account_code;
       let newPrevBalance = 0;
@@ -575,7 +612,7 @@ const voucherModel = {
         newPartyId,
         newPartyName,
         newAmount,
-        newPaymentMethod,
+        effectivePaymentMethod,
         cashAccountCode,
         offsetAccountCode,
         newPaperBillNumber,

@@ -16,6 +16,7 @@ import {
   TrendingUp,
   Clock,
   Tag,
+  FolderTree,
 } from 'lucide-react';
 import { normalizeArabic } from './SearchableCombobox';
 import { formatPackSize } from './InventoryView';
@@ -138,6 +139,15 @@ export default function GlobalCommandPalette({
       icon: DollarSign,
       iconColor: 'text-yellow-400 bg-yellow-500/20',
       action: () => onNavigateTab?.('vault'),
+    },
+    {
+      id: 'act-accounts',
+      category: 'actions',
+      title: 'شجرة الحسابات المالية (Chart of Accounts)',
+      subtitle: 'الدليل المحاسبي العام، الأصول، الخصوم، ودفتر الأستاذ',
+      icon: FolderTree,
+      iconColor: 'text-amber-400 bg-amber-500/20',
+      action: () => onNavigateTab?.('accounts'),
     },
     {
       id: 'act-radar',
